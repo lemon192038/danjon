@@ -28,7 +28,8 @@ const fileBackend = {
     const tmp = f + '.' + process.pid + '.tmp'; await fs.promises.writeFile(tmp, JSON.stringify(data)); await fs.promises.rename(tmp, f);
   },
 };
-const sbHeaders = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+// New-style secret keys (sb_secret_...) go only in the apikey header; legacy service_role JWTs also as Bearer.
+const sbHeaders = { apikey: SB_KEY, 'Content-Type': 'application/json', ...(SB_KEY.startsWith('eyJ') ? { Authorization: `Bearer ${SB_KEY}` } : {}) };
 async function sbSelectAll(table) {
   const out = []; const page = 1000;
   for (let from = 0; ; from += page) {
