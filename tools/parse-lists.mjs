@@ -21,7 +21,8 @@ export function parseLists(file) {
   }
   return byType;
 }
-if (process.argv[2]) {
+import { fileURLToPath } from 'node:url';
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2]) {
   const m = parseLists(process.argv[2]);
   const missing = []; for (let i = 1; i <= 86; i++) if (!m.has(i)) missing.push(i);
   console.log('types', m.size, 'missing', missing.join(','));
