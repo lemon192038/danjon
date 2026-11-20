@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: abyss-eternal-frontier
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build:data && npm run validate
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATA_DIR
+        value: /var/data/saves
+    disk:
+      name: saves
+      mountPath: /var/data
+      sizeGB: 1

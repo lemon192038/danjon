@@ -1,0 +1,22 @@
+{
+  "name": "abyss-eternal-frontier",
+  "version": "0.1.0",
+  "description": "ABYSS : ETERNAL FRONTIER - 2D top-down online exploration action RPG",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "build:data": "node tools/build-data.mjs",
+    "validate": "node tools/validate-data.mjs",
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node tools/validate-data.mjs && node --test test/",
+    "prestart": "node tools/build-data.mjs --if-missing"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "ws": "^8.23.0"
+  }
+}
