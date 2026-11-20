@@ -9,7 +9,7 @@
     "validate": "node tools/validate-data.mjs",
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node tools/validate-data.mjs && node --test test/",
+    "test": "node tools/validate-data.mjs && node --test test/*.test.mjs",
     "prestart": "node tools/build-data.mjs --if-missing"
   },
   "engines": {

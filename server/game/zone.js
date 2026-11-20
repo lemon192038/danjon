@@ -59,6 +59,26 @@ export class Zone {
   teleport(a, x, y, force) { if (force || !this.blocked(x, y, a)) { a.x = x; a.y = y; } else { const dx = x - a.x, dy = y - a.y; for (let k = 0.8; k > 0; k -= 0.2) if (!this.blocked(a.x + dx * k, a.y + dy * k, a)) { a.x += dx * k; a.y += dy * k; break; } } }
   push(t, dx, dy) { const n = 5; for (let i = 1; i <= n; i++) this.schedule(this.now + i * 25, () => !t.dead && this.moveActor(t, dx / n, dy / n)); }
   lunge(a, d) { this.push(a, Math.cos(a.facing) * d, Math.sin(a.facing) * d); }
+  // ---------- navigation: line of sight + BFS flow fields toward ally fighters
+  los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / 8); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (this.blocked(x, y)) return false; } return true; }
+  flowField(t) {
+    this.flows ||= new Map(); const tx = Math.floor(t.x / TILE), ty = Math.floor(t.y / TILE); let f = this.flows.get(t.id);
+    if (f && f.tx === tx && f.ty === ty && this.now - f.at < 1500) return f;
+    const W = this.map.w, H = this.map.h, dist = f?.dist && f.dist.length === W * H ? f.dist : new Int16Array(W * H); dist.fill(-1);
+    const q = new Int32Array(W * H); let qh = 0, qt = 0; const s0 = ty * W + tx; if (s0 < 0 || s0 >= W * H) return null; dist[s0] = 0; q[qt++] = s0;
+    while (qh < qt) { const c = q[qh++]; const cx = c % W, cy = (c / W) | 0; const dc = dist[c]; if (dc > 60) continue; for (let k = 0; k < 4; k++) { const nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = cy + (k === 2 ? 1 : k === 3 ? -1 : 0); if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const n = ny * W + nx; if (dist[n] !== -1 || BLOCKING.has(this.map.tiles[n])) continue; dist[n] = dc + 1; q[qt++] = n; } }
+    f = { tx, ty, at: this.now, dist }; this.flows.set(t.id, f); return f;
+  }
+  // unit direction for actor a to approach target t (direct if visible, else follow flow field)
+  navDir(a, t) {
+    const dx = t.x - a.x, dy = t.y - a.y, d = Math.hypot(dx, dy) || 1;
+    if (d < 24 || this.los(a, t)) return { x: dx / d, y: dy / d, d };
+    const f = this.flowField(t); if (!f) return { x: dx / d, y: dy / d, d };
+    const W = this.map.w, ax = Math.floor(a.x / TILE), ay = Math.floor(a.y / TILE); let best = null, bv = f.dist[ay * W + ax]; if (bv < 0) bv = 9999;
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) { const nx = ax + ox, ny = ay + oy; if (nx < 0 || ny < 0 || nx >= W || ny >= this.map.h) continue; const v = f.dist[ny * W + nx]; if (v < 0) continue; if (ox && oy && (BLOCKING.has(this.map.tiles[ay * W + nx]) || BLOCKING.has(this.map.tiles[ny * W + ax]))) continue; if (v < bv) { bv = v; best = [nx, ny]; } }
+    if (!best) return { x: dx / d, y: dy / d, d };
+    const cx = best[0] * TILE + TILE / 2 - a.x, cy = best[1] * TILE + TILE / 2 - a.y, cd = Math.hypot(cx, cy) || 1; return { x: cx / cd, y: cy / cd, d };
+  }
   addProj(p) { p.hits = new Set(); p.travelled = 0; this.projs.push(p); }
   addArea(r) { this.areas.push(r); }
   auraAtk(src) { return 0; }
@@ -220,7 +240,7 @@ export class Zone {
     if (!t) { if (owner && Math.hypot(owner.x - s.x, owner.y - s.y) > 40) { const a = Math.atan2(owner.y - s.y, owner.x - s.x); s.vx = Math.cos(a) * 90; s.vy = Math.sin(a) * 90; } else s.vx = s.vy = 0; return; }
     const d = Math.hypot(t.x - s.x, t.y - s.y), ang = Math.atan2(t.y - s.y, t.x - s.x); s.facing = ang;
     const ranged = s.sai !== 'melee'; const want = ranged ? 110 : 18;
-    if (s.sai === 'turret') { s.vx = s.vy = 0; } else if (d > want) { s.vx = Math.cos(ang) * 90; s.vy = Math.sin(ang) * 90; } else s.vx = s.vy = 0;
+    if (s.sai === 'turret') { s.vx = s.vy = 0; } else if (d > want) { const nd = this.navDir(s, t); s.vx = nd.x * 90; s.vy = nd.y * 90; } else s.vx = s.vy = 0;
     if ((s.atkCd || 0) < now && d < (ranged ? 220 : 30)) {
       s.atkCd = now + (ranged ? 900 : 700);
       if (ranged) spawnProj(this, s, { spd: 8, rng: 230, sz: 3, hom: 0.05 }, { m: 1, el: s.weaponEl }, ang, now);
@@ -346,7 +366,7 @@ export class Zone {
   describe(a) {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
     if (a.kind === 'player' || a.kind === 'npc') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
-    else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixes || null; }
+    else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; }
     else { d.sk = a.sumKind; d.look = a.look; d.wt = a.owner?.wt?.id; }
     return d;
   }

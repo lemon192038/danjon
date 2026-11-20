@@ -76,7 +76,7 @@ export function makeMonster(famKey, lv, diff, opt = {}) {
   if (opt.elite || (diff === 'ABYSS') || (diff === 'HELL' && Math.random() < 0.25)) {
     const nA = diff === 'ABYSS' ? 1 + (opt.elite ? 2 : Math.random() < 0.5 ? 1 : 0) : 1;
     m.affixes = [];
-    for (let i = 0; i < nA; i++) { const af = ABYSS_AFFIXES[Math.floor(Math.random() * ABYSS_AFFIXES.length)]; if (m.affixes.includes(af.k)) continue; m.affixes.push(af.k); if (af.mods) Object.assign(m.stats.mods, af.mods); if (af.move) m.stats.move *= af.move; if (af.dr) m.stats.dr += af.dr; if (af.regen) m.regen = af.regen; if (af.add) m.abilities.push(af.add); if (af.onDeath) m.onDeath = af.onDeath; m.name = af.n + '・' + m.name; }
+    for (let i = 0; i < nA; i++) { const af = ABYSS_AFFIXES[Math.floor(Math.random() * ABYSS_AFFIXES.length)]; if (m.affixes.includes(af.k)) continue; m.affixes.push(af.k); (m.affixNames ||= []).push(af.n); if (af.mods) Object.assign(m.stats.mods, af.mods); if (af.move) m.stats.move *= af.move; if (af.dr) m.stats.dr += af.dr; if (af.regen) m.regen = af.regen; if (af.add) m.abilities.push(af.add); if (af.onDeath) m.onDeath = af.onDeath; m.name = af.n + '・' + m.name; }
   }
   return m;
 }
@@ -160,9 +160,10 @@ export function monsterTick(zone, m, now, dt) {
   let mx = 0, my = 0; const range = m.range;
   const want = m.ai === 'kiter' || m.ai === 'caster' || m.ai === 'support' ? Math.min(range * 0.75, 120) : range * 0.8;
   if (m.ai === 'ambusher' && !m.awake) { if (d < 50 || m.hp < m.maxHp) m.awake = true; else { m.vx = m.vy = 0; return; } }
-  if (d > want + 6) { mx = dx / d; my = dy / d; }
+  const nav = zone.navDir(m, t); const visible = nav.x * dx / d + nav.y * dy / d > 0.999;
+  if (d > want + 6 || (!visible && d > 20)) { mx = nav.x; my = nav.y; }
   else if ((m.ai === 'kiter' || m.ai === 'caster' || m.ai === 'support') && d < want * 0.6) { mx = -dx / d; my = -dy / d; }
-  if (m.ai === 'flanker' || (m.aiLv >= 3 && d < 80 && m.ai !== 'tank')) { // circle to flank / surround
+  if (visible && (m.ai === 'flanker' || (m.aiLv >= 3 && d < 80 && m.ai !== 'tank'))) { // circle to flank / surround
     const side = (m.id % 2 ? 1 : -1); const tang = ang + side * (Math.PI / 2);
     mx = mx * 0.6 + Math.cos(tang) * 0.6; my = my * 0.6 + Math.sin(tang) * 0.6;
   }
@@ -172,7 +173,7 @@ export function monsterTick(zone, m, now, dt) {
   for (const o of zone.nearby(m, 16)) if (o !== m && o.team === m.team) { const ox = m.x - o.x, oy = m.y - o.y, od = Math.hypot(ox, oy) || 1; mx += ox / od * 0.5; my += oy / od * 0.5; }
   const ml = Math.hypot(mx, my) || 1; m.vx = mx / ml * spd * (Math.hypot(mx, my) > 0.1 ? 1 : 0); m.vy = my / ml * spd * (Math.hypot(mx, my) > 0.1 ? 1 : 0);
   // basic attack
-  if (d <= range + t.r + 4 && (m.atkCd || 0) < now && !m.statuses.fear) {
+  if (d <= range + t.r + 4 && (m.atkCd || 0) < now && !m.statuses.fear && (range < 60 || zone.los(m, t))) {
     const wind = Math.max(180, [700, 520, 420, 340, 260][m.aiLv] * (m.boss ? 1.2 : 1));
     m.atkCd = now + wind + [1400, 1000, 800, 650, 500][m.aiLv] / (1 + (m.buffMods.aspd || 0));
     const ranged = range > 60; const p = lead(m, t, 300);

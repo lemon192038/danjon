@@ -78,7 +78,7 @@ export class UI {
   toast(v, cls = '', ms = 2600) { const t = document.createElement('div'); t.className = 'toast ' + cls; t.textContent = v; this.$('#toasts').appendChild(t); setTimeout(() => t.remove(), ms); }
   note(n) {
     const add = (txt, cls = '') => { const d = document.createElement('div'); d.className = 'note ' + cls; d.innerHTML = txt; this.$('#notes').prepend(d); setTimeout(() => d.remove(), 6000); while (this.$('#notes').children.length > 7) this.$('#notes').lastChild.remove(); };
-    switch (n.t) {
+    switch (n.k) {
       case 'levelup': add(`★ レベル ${n.lv} に上昇！ ステータスポイント+3`, 'gold'); sfx.level(); this.toast(`LEVEL UP! Lv${n.lv}`, 'big'); break;
       case 'learn': add(`新スキル習得: ${esc(n.n)}`, 'blue'); break;
       case 'mastery': add(`${esc(WT_BY_ID[n.wt].name)}熟練度 ${n.lv}${n.n ? ` ― 「${esc(n.n)}」習得` : ''}`, 'blue'); break;

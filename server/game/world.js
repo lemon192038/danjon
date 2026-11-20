@@ -86,7 +86,7 @@ export class World {
     const st = a.stats;
     s.send({ t: 'self', ch: s.ch, d: { atk: st.atk, matk: st.matk, def: st.def, maxHp: st.maxHp, maxSp: st.maxSp, crit: st.crit, critDmg: st.critDmg, aspd: st.aspd, move: st.move, dr: st.dr, cdr: st.cdr, st: st.st, wt: st.wt, affinity: st.affinity, mods: st.mods }, known: knownSkills(s.ch), party: this.partyView(s.ch.id) });
   }
-  note(s, n) { s.send({ t: 'note', ...n }); s.dirty = true; }
+  note(s, n) { s.send({ ...n, k: n.t, t: 'note' }); s.dirty = true; }
   // ---------- per-tick interaction checks (tiles)
   checkTiles(s) {
     const a = s.actor, z = a.zone; if (a.dead) return;
