@@ -7,6 +7,7 @@ fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 const { World } = await import('../server/game/world.js');
 const { store } = await import('../server/store.js');
 const { DATA } = await import('../server/data.js');
+await store.init();
 
 function client(world, user) {
   const out = []; const ws = { readyState: 1, send: s => out.push(JSON.parse(s)), close() {} };

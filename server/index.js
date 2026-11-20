@@ -20,6 +20,7 @@ app.post('/api/register', (req, res) => { if (limited(req.ip)) return res.status
 app.post('/api/login', (req, res) => { if (limited(req.ip)) return res.status(429).json({ error: 'しばらく待ってから再試行してください' }); res.json(store.login(req.body?.user, req.body?.pass)); });
 app.get('/api/stats', (_, res) => res.json({ weapons: DATA.weapons.size, skills: DATA.skills.size, jobs: DATA.jobs.size, dungeons: DATA.dungeons.size, online: world.sessions.size, npcs: world.npcs.list.length }));
 
+await store.init();
 const server = http.createServer(app);
 const world = new World();
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8192 });
@@ -35,4 +36,4 @@ wss.on('connection', ws => {
 });
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`ABYSS : ETERNAL FRONTIER server on :${PORT}`));
-process.on('SIGTERM', () => { world.saveAll(); process.exit(0); });
+process.on('SIGTERM', async () => { world.saveAll(); await store.flush(); process.exit(0); });

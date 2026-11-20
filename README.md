@@ -34,4 +34,4 @@ npm start            # http://localhost:3000
 
 ## デプロイ (Render)
 
-`render.yaml` を使用。セーブは `DATA_DIR`（永続ディスク）に保存されます。
+セーブは `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` が設定されていれば Supabase（`aef_accounts` / `aef_chars` / `aef_world` テーブル、RLS有効・service role専用）に、未設定ならローカルの `DATA_DIR` に保存されます。サーバーはメモリキャッシュで動作し、変更は2秒ごとに非同期で書き込まれます。

@@ -223,7 +223,7 @@ export class World {
     if (store.nameTaken(name)) return s.send({ t: 'err', v: 'その名前は使用されています' });
     const wt = m.wt | 0; if (!STARTER_WEAPON_TYPES.includes(wt)) return s.send({ t: 'err', v: 'その武器種は初期選択できません' });
     const L = m.look || {}; const look = { body: (L.body | 0) % 3, skin: (L.skin | 0) % 5, hair: (L.hair | 0) % 6, hairColor: (L.hairColor | 0) % 10, outfit: (L.outfit | 0) % 10 };
-    const ch = newCharacter('c' + uid(), name, wt, look); store.saveChar(ch); acc.chars.push(ch.id); store.saveAccount(acc);
+    const ch = newCharacter('c' + uid(), name, wt, look); ch.account = acc.id; acc.chars.push(ch.id); store.saveAccount(acc); store.saveChar(ch);
     s.send({ t: 'chars', list: store.listChars(s.account) });
   }
   interact(s) {
