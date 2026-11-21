@@ -148,7 +148,7 @@ function sendInput() {
   const mv = input.move(); const blocked = ui.modalOpen || ui.chatOpen; const atk = !blocked && (input.mouse.l || input.touch.atk); const spc = !blocked && (input.mouse.r || input.touch.spc || input.keys.has('shift')); const moveSpecial = spc && ['dashStrike', 'vault', 'guardCharge', 'leap', 'roll', 'pounce', 'wings'].includes(WT_BY_ID[state.self?.d.wt]?.special.type); const a = moveSpecial && !usesMouse() ? stickAim() : aimPoint(atk || spc);
   if (!blocked) { if (mv.x || mv.y) ui.tut?.event('move'); if (atk) ui.tut?.event('attack'); if (spc) ui.tut?.event('special'); }
   state.input = { mx: blocked ? 0 : mv.x, my: blocked ? 0 : mv.y };
-  net.send({ t: 'in', mx: state.input.mx, my: state.input.my, ax: Math.round(a.x), ay: Math.round(a.y), atk, spc });
+  net.send({ t: 'in', mx: state.input.mx, my: state.input.my, ax: Math.round(a.x), ay: Math.round(a.y), atk, spc, au: usesMouse() ? 0 : 1 });
 }
 function predict(dt) {
   const me = state.me, sv = state.meServer, z = state.zone; if (!sv || !state.self) return;

@@ -232,7 +232,9 @@ export class Zone {
   playerTick(p, now) {
     const inp = p.input || {};
     if (p.aimX != null && (!p.action || p.action.type === 'attack' || p.action.type === 'aim' || p.action.type === 'charge' || p.action.type === 'channel' || p.action.type === 'guard' || p.action.type === 'iai' || p.action.type === 'breath' || p.action.type === 'drill' || p.action.type === 'barrage')) {
-      if (!(p.action?.type === 'attack' && now > p.action.hitAt)) p.facing = Math.atan2(p.aimY - p.y, p.aimX - p.x);
+      const lock = p.autoAim && p.action?.type === 'attack' ? p.lockTarget(this, false) : null;
+      if (lock) p.facing = Math.atan2(lock.y - p.y, lock.x - p.x);
+      else if (!(p.action?.type === 'attack' && now > p.action.hitAt)) p.facing = Math.atan2(p.aimY - p.y, p.aimX - p.x);
     }
     let spd = 82 * p.stats.move * (1 + (p.buffMods.move || 0));
     const act = p.action; let mm = 1;

@@ -43,6 +43,8 @@ export class Fighter extends Actor {
     if (!this.canAct(now) || this.statuses.fear) return false;
     if (this.action && this.action.type !== 'attack') return false;
     if (this.action?.type === 'attack') { if (now > this.action.recAt) this.action.buffered = true; return false; }
+    // touch players: lock onto the nearest enemy so attacks home in even while moving with the stick
+    if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
     const combo = this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo;
     if (now - this.lastAttackEnd > 450) this.comboStep = 0;
     const idx = this.comboStep % combo.length, step = combo[idx];
@@ -56,8 +58,21 @@ export class Fighter extends Actor {
     zone.schedule(act.until, () => { if (this.action === act) { this.action = null; this.lastAttackEnd = zone.now; this.comboStep = idx + 1; if (act.buffered && this.attackHeld) this.attack(zone.now, zone); } });
     return true;
   }
+  lockTarget(zone, refresh) {
+    let t = this.lockId ? zone.actors.get(this.lockId) : null;
+    if (!t || t.dead || Math.hypot(t.x - this.x, t.y - this.y) > 300 || refresh && !this.action) { t = zone.nearestEnemy(this, 280); this.lockId = t?.id || null; }
+    return t;
+  }
   doStep(zone, step, last, first) {
     const now = zone.now;
+    if (this.autoAim) {
+      const t = this.lockTarget(zone, false);
+      if (t) {
+        const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy); this.facing = Math.atan2(dy, dx);
+        if (step.s !== 'proj' && step.s !== 'beam') { const reach = (step.r || step.l || 30) + (step.d || 0) + t.r; const gap = d - reach * 0.75; if (gap > 0 && gap < 70) zone.push(this, dx / d * Math.min(gap, 40), dy / d * Math.min(gap, 40)); }
+        else step = { ...step, hom: Math.max(step.hom || 0, 0.07) };
+      }
+    }
     if (first && step.lg) zone.lunge(this, step.lg);
     const o = { m: step.m, st: step.st || 1, kb: step.kb, pen: step.pen, ls: step.ls, el: step.el, pull: step.pull, finisher: last };
     if (step.bleed) o.status = ['bleed', 0.35, 4000];
