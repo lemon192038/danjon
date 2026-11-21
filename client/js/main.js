@@ -150,7 +150,8 @@ function predict(dt) {
     const dx = state.input.mx / l * spd * dt / 1000, dy = state.input.my / l * spd * dt / 1000; const r = 4.8;
     const blk = (x, y) => { const tx = Math.floor(x / 16), ty = Math.floor(y / 16); return tx < 0 || ty < 0 || tx >= z.w || ty >= z.h || BLOCK.has(z.tiles[ty * z.w + tx]); };
     const can = (x, y) => !blk(x - r, y - r) && !blk(x + r, y - r) && !blk(x - r, y + r) && !blk(x + r, y + r);
-    if (can(me.x + dx, me.y)) me.x += dx; if (can(me.x, me.y + dy)) me.y += dy;
+    const inside = !can(me.x, me.y);
+    if (inside || can(me.x + dx, me.y)) me.x += dx; if (inside || can(me.x, me.y + dy)) me.y += dy;
   }
   const ex = sv.x - me.x, ey = sv.y - me.y, err = Math.hypot(ex, ey);
   if (err > 48) { me.x = sv.x; me.y = sv.y; } else { const k = moving && mm > 0 ? 0.06 : 0.25; me.x += ex * k * dt / 16; me.y += ey * k * dt / 16; }

@@ -134,7 +134,8 @@ function execOne(zone, a, e, ctx, lvM, el, now) {
       const p = aimPoint(a, ctx, e.d); const sx = a.x, sy = a.y; const T = 380;
       a.invulnUntil = Math.max(a.invulnUntil, now + T + 50); a.airUntil = now + T;
       a.action = { type: 'leap', until: now + T + 120, lockMove: true };
-      for (let i = 1; i <= 8; i++) zone.schedule(now + i * T / 8, () => zone.teleport(a, sx + (p.x - sx) * i / 8, sy + (p.y - sy) * i / 8, true));
+      // move along the path with collision so a leap can never end inside a wall
+      for (let i = 1; i <= 8; i++) zone.schedule(now + i * T / 8, () => zone.moveActor(a, (p.x - sx) / 8, (p.y - sy) / 8));
       zone.fx({ t: 'tele', s: 'circle', x: Math.round(p.x), y: Math.round(p.y), r: e.r, d: T, e: el || 'phys' });
       zone.schedule(now + T, () => { const m = (1 + (a.stats.mods.leapDmg || 0)); meleeHit(zone, a, { s: 'circle', r: e.r }, { ...hitOpts(a, e, lvM * m, el), kb: 60 }, zone.now, { x: a.x, y: a.y, a: a.facing }); zone.fx({ t: 'boom', x: Math.round(a.x), y: Math.round(a.y), r: e.r, e: el || 'earth' }); zone.shake(4); });
       break;

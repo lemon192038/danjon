@@ -16,8 +16,10 @@ const STEPS = [
 export class Tutorial {
   constructor(net, isTouch) {
     this.net = net; this.isTouch = isTouch; this.step = null; this.kills0 = null;
-    this.el = document.createElement('div'); this.el.id = 'tutorial'; document.getElementById('hud').appendChild(this.el);
-    this.el.addEventListener('click', e => { const a = e.target.dataset.tut; if (a === 'next') this.advance(); if (a === 'skip') this.set(STEPS.length); });
+    this.el = document.createElement('div'); this.el.id = 'tutorial'; document.body.appendChild(this.el);
+    const act = e => { const a = e.target.closest('[data-tut]')?.dataset.tut; if (!a) return; e.preventDefault(); e.stopPropagation(); if (a === 'next') this.advance(); if (a === 'skip') this.set(STEPS.length); };
+    this.el.addEventListener('touchend', act, { passive: false });
+    this.el.addEventListener('click', act);
   }
   sync(ch) { if (this.step === null) this.set(ch.progress.tut || 0, true); if (this.cur?.ev === 'kill3') { if (this.kills0 === null) this.kills0 = ch.progress.kills; if (ch.progress.kills - this.kills0 >= 3) this.advance(); } }
   get cur() { return STEPS[this.step]; }

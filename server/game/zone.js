@@ -56,7 +56,7 @@ export class Zone {
     const can = (x, y) => !this.blocked(x - r, y - r, a) && !this.blocked(x + r, y - r, a) && !this.blocked(x - r, y + r, a) && !this.blocked(x + r, y + r, a);
     if (can(a.x + dx, a.y)) a.x += dx; if (can(a.x, a.y + dy)) a.y += dy;
   }
-  teleport(a, x, y, force) { if (force || !this.blocked(x, y, a)) { a.x = x; a.y = y; } else { const dx = x - a.x, dy = y - a.y; for (let k = 0.8; k > 0; k -= 0.2) if (!this.blocked(a.x + dx * k, a.y + dy * k, a)) { a.x += dx * k; a.y += dy * k; break; } } }
+  teleport(a, x, y, force) { if (!this.blocked(x, y, a) && this.los({ x: a.x, y: a.y }, { x, y })) { a.x = x; a.y = y; } else { const dx = x - a.x, dy = y - a.y; for (let k = 0.8; k > 0; k -= 0.2) { const nx = a.x + dx * k, ny = a.y + dy * k; if (!this.blocked(nx, ny, a) && this.los({ x: a.x, y: a.y }, { x: nx, y: ny })) { a.x = nx; a.y = ny; break; } } } }
   push(t, dx, dy) { const n = 5; for (let i = 1; i <= n; i++) this.schedule(this.now + i * 25, () => !t.dead && this.moveActor(t, dx / n, dy / n)); }
   lunge(a, d) { this.push(a, Math.cos(a.facing) * d, Math.sin(a.facing) * d); }
   // ---------- navigation: line of sight + BFS flow fields toward ally fighters
@@ -172,8 +172,20 @@ export class Zone {
     for (let i = this.respawns.length - 1; i >= 0; i--) if (this.respawns[i].at <= now) { this.spawnFieldMonster(this.respawns[i].cell); this.respawns.splice(i, 1); }
     if (this.drops.length) this.drops = this.drops.filter(d => d.chest || d.until > now);
   }
+  // If an actor ever ends up inside a blocking tile, move it to the nearest free tile centre.
+  unstuck(a) {
+    const r = a.r * 0.8; const free = (x, y) => !this.blocked(x - r, y - r, a) && !this.blocked(x + r, y - r, a) && !this.blocked(x - r, y + r, a) && !this.blocked(x + r, y + r, a);
+    if (free(a.x, a.y)) return;
+    const tx = Math.floor(a.x / TILE), ty = Math.floor(a.y / TILE);
+    for (let rad = 0; rad <= 8; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue; const c = this.tileCenter([tx + dx, ty + dy]);
+      if (free(c.x, c.y)) { a.x = c.x; a.y = c.y; return; }
+    }
+    const st = this.tileCenter(this.map.start); a.x = st.x; a.y = st.y;
+  }
   tickActor(a, now, dt) {
     if (a.dead) return;
+    if (((a.stuckChk = (a.stuckChk || 0) + 1) & 3) === 0) this.unstuck(a);
     const s = a.statuses;
     for (const k in s) {
       const st = s[k]; if (st.until <= now) { delete s[k]; continue; }
