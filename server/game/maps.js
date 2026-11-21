@@ -116,7 +116,7 @@ export function genDungeonFloor(dungeon, floor, diff) {
   let ex = null; for (const [dx, dy] of [[0, 2], [2, 0], [-2, 0], [0, -2], [1, 1], [-1, 1]]) if (!BLOCKING.has(g.get(start[0] + dx, start[1] + dy))) { ex = [start[0] + dx, start[1] + dy]; break; }
   if (ex) g.set(ex[0], ex[1], T.EXIT);
   cells = floorCells(g);
-  const spawns = []; const nMon = boss ? 0 : 10 + Math.floor(floor / 8) + Math.floor(r() * 6);
+  const spawns = []; const nMon = boss ? 0 : (floor <= 3 && dungeon.minLv < 10 ? 6 : 10) + Math.floor(floor / 8) + Math.floor(r() * 6);
   for (let k = 0; k < nMon * 3 && spawns.length < nMon; k++) { const c = cells[Math.floor(r() * cells.length)]; if ((c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2 > 100) spawns.push(c); }
   const chests = []; if (!boss) for (let k = 0; k < 1 + Math.floor(r() * 3); k++) chests.push(cells[Math.floor(r() * cells.length)]);
   const lights = []; for (let k = 0; k < 10; k++) lights.push(cells[Math.floor(r() * cells.length)]);

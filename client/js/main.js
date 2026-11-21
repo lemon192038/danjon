@@ -107,33 +107,37 @@ function startGame() {
   const frame = t => {
     const dt = Math.min(50, t - last); last = t;
     if (state.zone && state.me) { tickInput(dt); sendAcc += dt; if (sendAcc >= 50) { sendAcc = 0; sendInput(); } predict(dt); }
-    for (const e of state.ents.values()) { if (!e.seen) continue; if (e.d.id === state.myId && state.me) { e.x = state.me.x; e.y = state.me.y; continue; } e.x += (e.tx - e.x) * Math.min(1, dt / 70); e.y += (e.ty - e.y) * Math.min(1, dt / 70); }
+    for (const e of state.ents.values()) { if (!e.seen) continue; if (e.d.id === state.myId && state.me) { e.x = state.me.x; e.y = state.me.y; if (state.aimAngle != null && !(e.flags & 8)) e.facing = state.aimAngle; e.vx = state.input.mx; e.vy = state.input.my; continue; } e.x += (e.tx - e.x) * Math.min(1, dt / 70); e.y += (e.ty - e.y) * Math.min(1, dt / 70); }
     renderer.draw(state, dt); ui.frame(dt);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }
-function aimPoint() {
-  if (input.mouse.in && !input.touch.active && !input.isTouch) return renderer.screenToWorld(input.mouse.x, input.mouse.y);
-  // touch / no mouse: auto-aim nearest enemy
-  let best = null, bd = 220; for (const e of state.ents.values()) { if (!e.seen || e.d.team !== 'enemy' || (e.flags & 1)) continue; const d = Math.hypot(e.x - state.me.x, e.y - state.me.y); if (d < bd) { bd = d; best = e; } }
-  if (best) return { x: best.x, y: best.y };
-  const f = state.meEnt?.facing ?? 0; return { x: state.me.x + Math.cos(f) * 60, y: state.me.y + Math.sin(f) * 60 };
+function nearestEnemy(range) { let best = null, bd = range; for (const e of state.ents.values()) { if (!e.seen || e.d.team !== 'enemy' || (e.flags & 1)) continue; const d = Math.hypot(e.x - state.me.x, e.y - state.me.y); if (d < bd) { bd = d; best = e; } } return best; }
+// Aim direction: mouse on PC; on touch the stick direction, snapping to the nearest enemy while attacking/casting.
+function aimPoint(acting = false) {
+  if (!input.touchOn && input.mouse.in && !input.isTouch) { const p = renderer.screenToWorld(input.mouse.x, input.mouse.y); state.aimAngle = Math.atan2(p.y - state.me.y, p.x - state.me.x); return p; }
+  const t = input.touch, mv = input.move();
+  if (acting || t.atk) { const e = nearestEnemy(acting ? 200 : 140); if (e) { state.aimAngle = Math.atan2(e.y - state.me.y, e.x - state.me.x); return { x: e.x, y: e.y }; } }
+  if (t.active && (t.mx || t.my)) state.aimAngle = Math.atan2(t.my, t.mx);
+  else if (mv.x || mv.y) state.aimAngle = Math.atan2(mv.y, mv.x);
+  const a = state.aimAngle ?? Math.PI / 2; return { x: state.me.x + Math.cos(a) * 60, y: state.me.y + Math.sin(a) * 60 };
 }
 function tickInput() {
   for (const k of input.take()) {
     if (ui.chatOpen) continue;
-    if (k === ' ') { const mv = input.move(); net.send({ t: 'dodge', dx: mv.x, dy: mv.y }); }
-    else if ('1234'.includes(k) && k.length === 1) { const a = aimPoint(); net.send({ t: 'skill', i: +k - 1, tx: a.x, ty: a.y }); ui.flashSlot(+k - 1); }
+    if (k === ' ') { const mv = input.move(); const a = state.aimAngle ?? 0; net.send({ t: 'dodge', dx: mv.x || Math.cos(a), dy: mv.y || Math.sin(a) }); ui.tut?.event('dodge'); }
+    else if ('1234'.includes(k) && k.length === 1) { const a = aimPoint(true); ui.tut?.event('skill'); net.send({ t: 'skill', i: +k - 1, tx: a.x, ty: a.y }); ui.flashSlot(+k - 1); }
     else if (k === 'q') net.send({ t: 'potion', ref: 'hp' }); else if (k === 'e') net.send({ t: 'potion', ref: 'sp' });
-    else if (k === 'f') net.send({ t: 'interact' });
+    else if (k === 'f') { net.send({ t: 'interact' }); ui.tut?.event('interact'); }
     else ui.key(k);
   }
 }
 function sendInput() {
-  const mv = input.move(); const a = aimPoint(); const blocked = ui.modalOpen || ui.chatOpen;
+  const mv = input.move(); const blocked = ui.modalOpen || ui.chatOpen; const atk = !blocked && (input.mouse.l || input.touch.atk); const spc = !blocked && (input.mouse.r || input.touch.spc || input.keys.has('shift')); const a = aimPoint(atk || spc);
+  if (!blocked) { if (mv.x || mv.y) ui.tut?.event('move'); if (atk) ui.tut?.event('attack'); if (spc) ui.tut?.event('special'); }
   state.input = { mx: blocked ? 0 : mv.x, my: blocked ? 0 : mv.y };
-  net.send({ t: 'in', mx: state.input.mx, my: state.input.my, ax: Math.round(a.x), ay: Math.round(a.y), atk: !blocked && (input.mouse.l || input.touch.atk || input.keys.has('j') && false), spc: !blocked && (input.mouse.r || input.touch.spc || input.keys.has('shift')) });
+  net.send({ t: 'in', mx: state.input.mx, my: state.input.my, ax: Math.round(a.x), ay: Math.round(a.y), atk, spc });
 }
 function predict(dt) {
   const me = state.me, sv = state.meServer, z = state.zone; if (!sv || !state.self) return;

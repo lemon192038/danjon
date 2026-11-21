@@ -94,7 +94,7 @@ export class Zone {
     for (const s of this.map.spawns) {
       const f = fams[Math.floor(Math.random() * fams.length)];
       const isBossFam = DATA.bosses.has(f);
-      const elite = isBossFam || Math.random() < 0.06 + this.D.ai * 0.03;
+      const elite = isBossFam || (this.floor > 3 && Math.random() < 0.06 + this.D.ai * 0.03);
       const m = makeMonster(isBossFam ? 'golem' : f, this.lv, this.diff, { elite });
       if (isBossFam) { m.name = '小型・' + DATA.bosses.get(f).name; m.sprite = DATA.bosses.get(f).sprite; }
       const p = this.tileCenter(s); m.x = p.x; m.y = p.y; m.home = [p.x, p.y];
@@ -111,9 +111,9 @@ export class Zone {
     for (const c of this.map.chests) { const p = this.tileCenter(c); this.drops.push({ id: 'c' + Math.random().toString(36).slice(2, 8), x: p.x, y: p.y, chest: true }); }
   }
   spawnFieldMonster(s) {
-    const [lo, hi] = this.lv; const lv = lo + Math.floor(Math.random() * (hi - lo));
-    const fams = this.id === 'field_green' ? ['slime', 'rat', 'goblin', 'wolf', 'goblinArcher', 'bat', 'spider'] : ['wolf', 'harpy', 'lizard', 'golem', 'imp', 'treant', 'knight', 'elemThunder'];
-    const m = makeMonster(fams[Math.floor(Math.random() * fams.length)], lv, 'NORMAL', { elite: Math.random() < 0.04 });
+    const [lo, hi] = this.lv; const t = this.id === 'field_green' ? s[0] / this.map.w : 1 - s[1] / this.map.h; const lv = Math.max(1, Math.round(lo + (hi - lo) * Math.pow(t, 1.6) + Math.random() * 2));
+    const fams = this.id === 'field_green' ? (lv < 5 ? ['slime', 'rat', 'bat'] : ['slime', 'rat', 'goblin', 'wolf', 'goblinArcher', 'bat', 'spider']) : ['wolf', 'harpy', 'lizard', 'golem', 'imp', 'treant', 'knight', 'elemThunder'];
+    const m = makeMonster(fams[Math.floor(Math.random() * fams.length)], lv, 'NORMAL', { elite: lv > 6 && Math.random() < 0.04 });
     const p = this.tileCenter(s); m.x = p.x; m.y = p.y; m.home = [p.x, p.y]; m.spawnCell = s; this.add(m);
   }
   spawnMinions(owner, n, fam) {
@@ -358,8 +358,8 @@ export class Zone {
       ents.push([a.id, Math.round(a.x), Math.round(a.y), +a.facing.toFixed(2), Math.round(a.hp / a.maxHp * 1000), flags, sts, a.action?.type || '', a.enchant?.until > n ? a.enchant.el : '']);
       if (!viewer.known.has(a.id)) { viewer.known.add(a.id); full.push(this.describe(a)); }
     }
-    const projs = this.projs.filter(p => Math.abs(p.x - vx) < R && Math.abs(p.y - vy) < R).map(p => [Math.round(p.x), Math.round(p.y), +Math.atan2(p.vy, p.vx).toFixed(2), p.sz, p.opt.el || p.owner.weaponEl || '', p.k || '', p.owner.team === 'ally' ? 1 : 0]);
-    const areas = this.areas.filter(r => Math.abs(r.x - vx) < R && Math.abs(r.y - vy) < R).map(r => [Math.round(r.x), Math.round(r.y), Math.round(r.r), r.opt?.el || r.e.el || '', r.e.ally ? 1 : r.e.trigger ? 2 : r.orbit ? 3 : r.e.pull ? 4 : r.e.timeZone ? 5 : 0, r.owner.team === 'ally' ? 1 : 0]);
+    const projs = this.projs.filter(p => Math.abs(p.x - vx) < R && Math.abs(p.y - vy) < R).map(p => [Math.round(p.x), Math.round(p.y), +Math.atan2(p.vy, p.vx).toFixed(2), p.sz, p.opt.el || p.owner.weaponEl || '', p.k || '', p.owner.team === 'ally' ? 1 : 0, p.opt.vfx || '']);
+    const areas = this.areas.filter(r => Math.abs(r.x - vx) < R && Math.abs(r.y - vy) < R).map(r => [Math.round(r.x), Math.round(r.y), Math.round(r.r), r.opt?.el || r.e.el || '', r.e.ally ? 1 : r.e.trigger ? 2 : r.orbit ? 3 : r.e.pull ? 4 : r.e.timeZone ? 5 : 0, r.owner.team === 'ally' ? 1 : 0, r.opt?.vfx || '']);
     const drops = this.drops.filter(d => (d.chest || d.owner === viewer.id) && Math.abs(d.x - vx) < R && Math.abs(d.y - vy) < R).map(d => [d.id, Math.round(d.x), Math.round(d.y), d.chest ? 'chest' : d.it.kind, d.it?.ref ? (DATA.weapons.get(d.it.ref)?.rar || 0) : 0]);
     return { ents, full, projs, areas, drops };
   }

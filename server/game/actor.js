@@ -89,7 +89,7 @@ export class Fighter extends Actor {
     this.cds[id] = now + sk.cd * (1 - cdr) * (1 - (lv - 1) * 0.03);
     const c = { id, lvM, el: sk.el, tx: ctx.tx ?? this.aimX, ty: ctx.ty ?? this.aimY };
     const fire = () => { if (this.dead) return; execEffects(zone, this, sk.eff, c, zone.now); };
-    zone.fx({ t: 'skill', id: this.id, n: sk.name, e: sk.el || 'phys', k: sk.kind });
+    zone.fx({ t: 'skill', id: this.id, sid: sk.id, n: sk.name, e: sk.el || 'phys', k: sk.kind, c: sk.cast || 0 });
     if (sk.cast) { this.action = { type: 'cast', until: now + sk.cast, lockMove: true }; zone.schedule(now + sk.cast, fire); }
     else { if (!this.action || this.action.type === 'attack') this.action = { type: 'skillAnim', until: now + 220, moveMul: 0.5 }; fire(); }
     this.onSkillUsed?.(sk);

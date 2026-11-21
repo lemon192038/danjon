@@ -282,6 +282,7 @@ export class World {
       case 'npcInvite': { const n = this.npcs.byId.get(m.id); if (!n || n.state === 'party' || !n.actorId) return err('勧誘できません'); const p = this.ensureParty(ch.id); if (p.leader !== ch.id) return err('リーダーのみ勧誘できます'); if (p.members.length + p.npcs.length >= 6) return err('パーティーは6人までです'); const r = this.npcs.invite(n, ch); if (r.ok) { p.npcs.push(n.id); this.pushParty(ch.id); } return ok(r.msg); }
       case 'npcList': return s.send({ t: 'npcList', list: this.npcs.list.map(n => ({ id: n.id, name: n.ch.name, lv: n.ch.level, state: n.state, where: n.zone, bond: n.bond[ch.id] || 0 })) });
       case 'npcInfo': { const n = this.npcs.byId.get(m.id); if (n) s.send({ t: 'open', service: 'npc', data: { ...this.npcs.info(n), bond: n.bond[ch.id] || 0, inParty: n.partyWith === ch.id, remote: !n.actorId || n.actorZone !== a.zone.id } }); return; }
+      case 'tut': { const v = Math.max(0, Math.min(99, m.s | 0)); if (v > (ch.progress.tut || 0) || m.reset) ch.progress.tut = m.reset ? 0 : v; return; }
       case 'players': return s.send({ t: 'players', list: [...this.sessions.values()].filter(o => o.ch).map(o => ({ name: o.ch.name, lv: o.ch.level, zone: o.actor?.zone.name })) });
     }
   }

@@ -58,9 +58,9 @@ export function monsterStats(fam, lv, diff, mul = 1) {
   const D = DIFFICULTIES.find(d => d.id === diff) || DIFFICULTIES[1];
   const abyssScale = diff === 'ABYSS' ? 1 + lv * 0.004 : 1;
   return {
-    atk: Math.round(fam.atk * (6 + lv * 4.6 + lv * lv * 0.012) * D.atk * mul * abyssScale), matk: 0,
-    def: Math.round(fam.def * (3 + lv * 1.5) * D.def * abyssScale), crit: 0.05 + D.ai * 0.03, critDmg: 1.5, dr: 0, cdr: 0, range: 1,
-    mods: {}, maxHp: Math.round(fam.hp * (30 + lv * 9 + lv * lv * 2.3) * D.hp * mul * abyssScale), move: fam.spd,
+    atk: Math.round(fam.atk * (3 + lv * 2.8 + lv * lv * 0.02) * D.atk * mul * abyssScale), matk: 0,
+    def: Math.round(fam.def * (1 + lv * 1.5) * D.def * abyssScale), crit: 0.05 + D.ai * 0.03, critDmg: 1.5, dr: 0, cdr: 0, range: 1,
+    mods: {}, maxHp: Math.round(fam.hp * (16 + lv * 8 + lv * lv * 2.3) * D.hp * mul * abyssScale), move: fam.spd,
   };
 }
 
@@ -94,7 +94,7 @@ const lead = (m, t, spd) => { if (m.aiLv < 3 && !m.abilities.includes('predict')
 
 function pickTarget(zone, m, now) {
   if (m.forcedUntil > now) { const f = zone.actors.get(m.forcedTarget); if (f && !f.dead) return f; }
-  const aggro = (m.boss ? 400 : 150 + m.aiLv * 35) * (zone.darkness ? 0.8 : 1);
+  const aggro = (m.boss ? 400 : (m.level < 10 ? 110 : 150) + m.aiLv * 35) * (zone.darkness ? 0.8 : 1);
   let best = null, bs = -Infinity;
   for (const t of zone.enemiesOf(m)) {
     if (t.buffMods?.stealth && Math.hypot(t.x - m.x, t.y - m.y) > 30) continue;
@@ -139,7 +139,7 @@ export function monsterTick(zone, m, now, dt) {
     const A = ABILITIES[ab]; if (!A || A.passive || (m.abCd[ab] || 0) > now) continue;
     if (A.support) { const hurt = zone.alliesOf(m).some(o => o.hp < o.maxHp * 0.7 && Math.hypot(o.x - m.x, o.y - m.y) < A.range); if (ab === 'heal' && !hurt) continue; }
     else if (d > A.range * (A.self ? 3 : 1)) continue;
-    const cdMul = [2.2, 1.3, 1.0, 0.8, 0.6][m.aiLv];
+    const cdMul = [2.2, 1.3, 1.0, 0.8, 0.6][m.aiLv] * (m.level < 10 ? 1.6 : 1);
     m.abCd[ab] = now + A.cd * cdMul + Math.random() * 600;
     const cast = Math.max(150, (A.cast || 0) * [1.3, 1.1, 1, 0.9, 0.8][m.aiLv]);
     const p = lead(m, t, 360);
@@ -174,8 +174,9 @@ export function monsterTick(zone, m, now, dt) {
   const ml = Math.hypot(mx, my) || 1; m.vx = mx / ml * spd * (Math.hypot(mx, my) > 0.1 ? 1 : 0); m.vy = my / ml * spd * (Math.hypot(mx, my) > 0.1 ? 1 : 0);
   // basic attack
   if (d <= range + t.r + 4 && (m.atkCd || 0) < now && !m.statuses.fear && (range < 60 || zone.los(m, t))) {
-    const wind = Math.max(180, [700, 520, 420, 340, 260][m.aiLv] * (m.boss ? 1.2 : 1));
-    m.atkCd = now + wind + [1400, 1000, 800, 650, 500][m.aiLv] / (1 + (m.buffMods.aspd || 0));
+    const early = m.level < 10 ? 1.5 : m.level < 20 ? 1.2 : 1;
+    const wind = Math.max(180, [700, 520, 420, 340, 260][m.aiLv] * (m.boss ? 1.2 : 1) * early);
+    m.atkCd = now + wind + [1400, 1000, 800, 650, 500][m.aiLv] * early / (1 + (m.buffMods.aspd || 0));
     const ranged = range > 60; const p = lead(m, t, 300);
     if (!ranged) zone.fx({ t: 'tele', s: 'arc', x: Math.round(m.x), y: Math.round(m.y), a: +ang.toFixed(2), r: range + 10 + m.r, ar: 100, d: wind, e: m.el || 'phys' });
     m.action = { type: 'cast', until: now + wind + 150, lockMove: true };

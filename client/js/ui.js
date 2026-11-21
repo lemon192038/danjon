@@ -6,6 +6,7 @@ import { describeSkill, modsText, SRC_NAMES, ACQ_NAMES, unlockText } from '/shar
 import { xpToNext, masteryXpToNext, jobXpToNext, enhanceCost, armorDef } from '/shared/formulas.js';
 import { weaponSprite } from './sprites.js';
 import { sfx } from './sfx.js';
+import { Tutorial } from './tutorial.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rar = r => RARITIES[r] || RARITIES[1];
@@ -39,10 +40,11 @@ export class UI {
     net.on('players', m => { this.players = m.list; if (this.panel === 'party') this.render(); });
     net.on('skillfail', m => { const r = { cd: 'クールダウン中', sp: 'SPが足りない', busy: '行動中', ng: '使用できない' }[m.r]; if (r) this.toast(r, 'err', 900); });
     this.slotSel = null; this.skillTab = 'wtype'; this.codexType = 1; this.codexTab = 'profile';
+    this.tut = new Tutorial(net, () => !!ctx.input.touchOn);
   }
   // ---------- events from net
-  onZone(z) { this.closeModal(); this.$('#zname').textContent = z.name; this.$('#curses').innerHTML = (z.curses || []).map(c => `<span>${esc(c)}</span>`).join(''); this.drawMini(); this.toast(z.name, 'zone', 2200); }
-  onSelf(m) { this.self = m; this.renderSkillbar(); this.$('#pname').innerHTML = `<b>${esc(m.ch.name)}</b> Lv${m.ch.level} <small>${esc(D.jobMap.get(m.ch.job)?.name || '')} / ${esc(WT_BY_ID[m.d.wt].name)}</small>${m.ch.statPoints ? ` <em class="pts">+${m.ch.statPoints}</em>` : ''} <span class="gold">${m.ch.gold.toLocaleString()}G</span>`; if (this.modalOpen) this.render(); }
+  onZone(z) { this.tut.event('zone:' + z.kind); this.closeModal(); this.$('#zname').textContent = z.name; this.$('#curses').innerHTML = (z.curses || []).map(c => `<span>${esc(c)}</span>`).join(''); this.drawMini(); this.toast(z.name, 'zone', 2200); }
+  onSelf(m) { this.self = m; this.renderSkillbar(); this.tut.sync(m.ch); this.$('#pname').innerHTML = `<b>${esc(m.ch.name)}</b> Lv${m.ch.level} <small>${esc(D.jobMap.get(m.ch.job)?.name || '')} / ${esc(WT_BY_ID[m.d.wt].name)}</small>${m.ch.statPoints ? ` <em class="pts">+${m.ch.statPoints}</em>` : ''} <span class="gold">${m.ch.gold.toLocaleString()}G</span>`; if (this.modalOpen) this.render(); }
   onSnap(m) {
     const me = m.me; this.me = me;
     this.bar('.hp', me.hp / me.mhp, `${me.hp}/${me.mhp}${me.sh ? ` (+${me.sh})` : ''}`); this.bar('.sp', me.sp / me.msp, `${me.sp}/${me.msp}`);
@@ -50,6 +52,7 @@ export class UI {
     const g = me.g ? Object.entries(me.g).filter(([k, v]) => v > 0) : []; this.$('#gauges').innerHTML = g.map(([k, v]) => `<span class="gauge">${GAUGE_NAMES[k] || k} ${Math.floor(v * 10) / 10}</span>`).join('') + (me.alt ? '<span class="gauge">第二形態</span>' : '');
     this.$('#buffs').innerHTML = me.bm ? `<span class="buff">${esc(modsText(me.bm)).slice(0, 80)}</span>` : '';
     for (let i = 0; i < 4; i++) { const id = this.self?.ch.skills.slots[i]; const el = this.$(`#sk${i} .cd`); if (!el) continue; const cd = id && me.cds[id]; const sk = D.skills.get(id); el.style.height = cd && sk ? Math.min(100, cd / sk.cd * 100) + '%' : '0'; this.$(`#sk${i} .cdt`).textContent = cd ? (cd / 1000).toFixed(1) : ''; }
+    if (this.self) { const ch = this.self.ch; this.ctx.input.setTouchInfo({ cds: ch.skills.slots.map(id => { const sk = D.skills.get(id); return id && me.cds[id] && sk ? Math.min(1, me.cds[id] / sk.cd) : 0; }), pot: ch.inventory.find(i => i.ref === 'hp')?.n || 0, spc: SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type] }); }
     this.$('#deadov').style.display = me.dead ? 'flex' : 'none';
     let boss = null; for (const e of this.state.ents.values()) if (e.seen && e.d.boss && !(e.flags & 1)) boss = e;
     this.$('#bossbar').style.display = boss ? 'block' : 'none'; if (boss) { this.$('#bossname').textContent = boss.d.name; this.$('.bar.boss i').style.width = boss.hp / 10 + '%'; }
@@ -70,9 +73,10 @@ export class UI {
   renderSkillbar() {
     const ch = this.self.ch;
     this.$('#skillbar').innerHTML = `<div class="sk basic" title="通常攻撃 (左クリック)"><b>攻</b><small>LMB</small></div><div class="sk basic" title="${esc(SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type])} (右クリック/Shift)"><b>特</b><small>RMB</small></div>` +
-      ch.skills.slots.map((id, i) => { const s = D.skills.get(id); return `<div class="sk" id="sk${i}" title="${esc(s ? s.name + '\n' + describeSkill(s) : '空きスロット')}"><b style="color:${s?.el ? ELEMENT_COLORS[s.el] : '#fff'}">${s ? (KIND_ICON[s.kind] || '✧') : '·'}</b><span>${esc(s?.name?.slice(0, 6) || '')}</span><div class="cd"></div><div class="cdt"></div><small>${i + 1}</small></div>`; }).join('') +
+      (this.touchSync(), ch.skills.slots).map((id, i) => { const s = D.skills.get(id); return `<div class="sk" id="sk${i}" title="${esc(s ? s.name + '\n' + describeSkill(s) : '空きスロット')}"><b style="color:${s?.el ? ELEMENT_COLORS[s.el] : '#fff'}">${s ? (KIND_ICON[s.kind] || '✧') : '·'}</b><span>${esc(s?.name?.slice(0, 6) || '')}</span><div class="cd"></div><div class="cdt"></div><small>${i + 1}</small></div>`; }).join('') +
       `<div class="sk basic" title="回避 (Space)"><b>避</b><small>SPC</small></div><div class="sk basic pot" title="回復薬 (Q)"><b>薬</b><small>Q ${ch.inventory.find(i => i.ref === 'hp')?.n || 0}</small></div>`;
   }
+  touchSync() { const ch = this.self?.ch; if (!ch) return; this.ctx.input.setTouchSkills(ch.skills.slots.map(id => { const s = D.skills.get(id); return s ? { name: s.name, color: s.el ? ELEMENT_COLORS[s.el] : '' } : null; })); }
   flashSlot(i) { const e = this.$(`#sk${i}`); if (e) { e.classList.remove('fl'); void e.offsetWidth; e.classList.add('fl'); } }
   chat(from, v) { const l = this.$('#chatlog'); const d = document.createElement('div'); d.innerHTML = `<b>${esc(from)}</b>: ${esc(v)}`; l.appendChild(d); while (l.children.length > 40) l.firstChild.remove(); l.scrollTop = 1e9; }
   toast(v, cls = '', ms = 2600) { const t = document.createElement('div'); t.className = 'toast ' + cls; t.textContent = v; this.$('#toasts').appendChild(t); setTimeout(() => t.remove(), ms); }
@@ -99,7 +103,7 @@ export class UI {
     if (k === 'enter') { this.$('#chatin').focus(); return; }
     if (map[k]) { if (this.panel === map[k] && this.modalOpen) this.closeModal(); else this.open(map[k]); }
   }
-  open(p, service = null) { this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
+  open(p, service = null) { if (p === 'skills') this.tut.event('menu'); this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
   closeModal() { this.modalOpen = false; this.modal.style.display = 'none'; this.panel = null; this.service = null; }
   openService(s, data) {
     this.svc = data;
@@ -136,6 +140,7 @@ export class UI {
       case 'npcInfo': return m('npcInfo', { id: v }); case 'npcInvite': m('npcInvite', { id: v }); return this.closeModal();
       case 'logout': try { localStorage.removeItem('aef_token'); } catch {} location.reload(); return;
       case 'page': this.sel.page = +v; return this.render();
+      case 'tutReset': this.closeModal(); return this.tut.restart();
     }
   }
   // ---------- panels
@@ -278,6 +283,6 @@ export class UI {
     return this.wrap('設定', `<div class="settings"><label>効果音 <input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-setting="sfx"></label><label><input type="checkbox" ${s.dmgNumbers ? 'checked' : ''} data-setting="dmgNumbers"> ダメージ数値表示</label><label><input type="checkbox" ${s.shake ? 'checked' : ''} data-setting="shake"> 画面揺れ</label><label><input type="checkbox" ${s.lighting ? 'checked' : ''} data-setting="lighting"> ライティング</label>
       <label>タッチ操作 <select data-setting="touch"><option value="auto" ${s.touch === 'auto' ? 'selected' : ''}>自動</option><option value="on" ${s.touch === 'on' ? 'selected' : ''}>常に表示</option><option value="off" ${s.touch === 'off' ? 'selected' : ''}>非表示</option></select></label>
       <h3>操作</h3><p>移動: WASD ・ 攻撃: 左クリック(長押しでコンボ) ・ 特殊アクション: 右クリック/Shift ・ 回避: Space ・ スキル: 1〜4 (マウス位置に発動) ・ 回復薬: Q/E ・ 調べる: F ・ チャット: Enter</p><p>メニュー: I所持品 C状態 Kスキル J職業 B図鑑 Lクエスト Pパーティー N冒険者 Mマップ O設定</p>
-      <button data-act="logout">ログアウト</button></div>`);
+      <button data-act="tutReset">チュートリアルを最初から</button> <button data-act="logout">ログアウト</button></div>`);
   }
 }

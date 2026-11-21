@@ -17,7 +17,7 @@ export function meleeHit(zone, a, sh, opt, now, origin) {
     dealDamage(zone, a, t, { ...opt, tip: isTip(sh, o, t), ang: Math.atan2(t.y - o.y, t.x - o.x) }, now);
     hit.push(t);
   }
-  zone.fx({ t: 'sh', id: a.id, s: sh.s, x: Math.round(o.x), y: Math.round(o.y), a: +o.a.toFixed(2), r: sh.r || 0, l: sh.l || 0, w: sh.w || 0, ar: sh.a || 0, d: sh.d || 0, e: opt.el || a.weaponEl || 'phys', k: a.visKey });
+  zone.fx({ t: 'sh', id: a.id, v: opt.vfx, s: sh.s, x: Math.round(o.x), y: Math.round(o.y), a: +o.a.toFixed(2), r: sh.r || 0, l: sh.l || 0, w: sh.w || 0, ar: sh.a || 0, d: sh.d || 0, e: opt.el || a.weaponEl || 'phys', k: a.visKey });
   if (opt.pull > 0 && sh.s !== 'proj') for (const t of hit) zone.push(t, (o.x - t.x) * 0.25, (o.y - t.y) * 0.25);
   return hit;
 }
@@ -48,11 +48,12 @@ export function execEffects(zone, a, effs, ctx, now) {
 }
 
 function hitOpts(a, e, lvM, el) {
-  return { m: (e.m || 1) * lvM, el: e.el || el || undefined, pen: e.pen, critAdd: e.critAdd, st: e.st || 2, kb: e.kb, status: e.status, ls: e.ls, exec: e.exec, vs: e.vs, mark: e.mark, consumeMark: e.consumeMark, launch: e.launch, pull: e.pull, isSkill: 1, strip: e.strip };
+  return { vfx: e._vfx, m: (e.m || 1) * lvM, el: e.el || el || undefined, pen: e.pen, critAdd: e.critAdd, st: e.st || 2, kb: e.kb, status: e.status, ls: e.ls, exec: e.exec, vs: e.vs, mark: e.mark, consumeMark: e.consumeMark, launch: e.launch, pull: e.pull, isSkill: 1, strip: e.strip };
 }
 
 function execOne(zone, a, e, ctx, lvM, el, now) {
   if (a.dead) return;
+  if (ctx.id && !e._vfx) e = { ...e, _vfx: ctx.id };
   switch (e.t) {
     case 'hit': {
       const sh = e.shape; const opt = hitOpts(a, e, lvM, el);
@@ -77,7 +78,7 @@ function execOne(zone, a, e, ctx, lvM, el, now) {
         zone.moveActor(a, Math.cos(ang) * e.d / steps, Math.sin(ang) * e.d / steps);
         if (e.hit) meleeHit(zone, a, e.hit, { ...hitOpts(a, e, lvM, el), hitSet: set }, zone.now, { x: a.x, y: a.y, a: a.facing });
       });
-      zone.fx({ t: 'dash', id: a.id });
+      zone.fx({ t: 'dash', id: a.id, v: e._vfx });
       break;
     }
     case 'blink': {
@@ -111,8 +112,8 @@ function execOne(zone, a, e, ctx, lvM, el, now) {
       for (let i = 0; i < n; i++) {
         const ang = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * (e.spread || 0);
         const x = c.x + Math.cos(ang) * rr, y = c.y + Math.sin(ang) * rr; const at = now + (e.interval || 100) * i;
-        zone.schedule(at, () => zone.fx({ t: 'tele', s: 'circle', x: Math.round(x), y: Math.round(y), r: e.r, d: e.delay || 500, e: e.el || el || 'phys' }));
-        zone.schedule(at + (e.delay || 500), () => { if (!a.dead || a.kind === 'monster') meleeHit(zone, a, { s: 'circle', r: e.r }, hitOpts(a, e, lvM, el), zone.now, { x, y, a: 0 }); zone.fx({ t: 'boom', x: Math.round(x), y: Math.round(y), r: e.r, e: e.el || el || 'phys' }); });
+        zone.schedule(at, () => zone.fx({ t: 'tele', s: 'circle', x: Math.round(x), y: Math.round(y), r: e.r, d: e.delay || 500, e: e.el || el || 'phys', ally: a.team === 'ally' ? 1 : 0, v: e._vfx }));
+        zone.schedule(at + (e.delay || 500), () => { if (!a.dead || a.kind === 'monster') meleeHit(zone, a, { s: 'circle', r: e.r }, hitOpts(a, e, lvM, el), zone.now, { x, y, a: 0 }); zone.fx({ t: 'boom', x: Math.round(x), y: Math.round(y), r: e.r, e: e.el || el || 'phys', v: e._vfx }); });
       }
       break;
     }
