@@ -209,7 +209,7 @@ export class World {
     switch (m.t) {
       case 'in': a.input = { mx: clampN(m.mx), my: clampN(m.my), atk: !!m.atk, spc: !!m.spc }; if (Number.isFinite(m.ax) && Number.isFinite(m.ay)) { a.aimX = m.ax; a.aimY = m.ay; } else { a.aimX = a.aimY = null; } break;
       case 'dodge': a.dodge(a.zone, clampN(m.dx), clampN(m.dy)); break;
-      case 'skill': { const id = s.ch.skills.slots[m.i | 0]; if (!id || a.dead) break; if (!knownSkills(s.ch).includes(id)) break; const tx = Number.isFinite(m.tx) ? m.tx : undefined, ty = Number.isFinite(m.ty) ? m.ty : undefined; const r = a.useSkill(id, a.zone, { tx, ty }); if (r !== 'ok') s.send({ t: 'skillfail', i: m.i, r }); break; }
+      case 'skill': { const id = s.ch.skills.slots[m.i | 0]; if (!id || a.dead) break; if (!knownSkills(s.ch).includes(id)) break; const tx = Number.isFinite(m.tx) ? m.tx : undefined, ty = Number.isFinite(m.ty) ? m.ty : undefined; if (tx !== undefined && ty !== undefined && (tx !== a.x || ty !== a.y) && a.canAct(a.zone.now)) { a.facing = Math.atan2(ty - a.y, tx - a.x); a.aimX = tx; a.aimY = ty; } const r = a.useSkill(id, a.zone, { tx, ty }); if (r !== 'ok') s.send({ t: 'skillfail', i: m.i, r }); break; }
       case 'potion': { const it = s.ch.inventory.find(i => i.kind === 'potion' && i.ref === m.ref && i.n > 0); if (!it || a.dead || (a.potCd || 0) > a.zone.now) break; a.potCd = a.zone.now + 3000; it.n--; if (it.n <= 0) s.ch.inventory = s.ch.inventory.filter(i => i !== it); const k = 1 + (a.stats.mods.potion || 0); if (m.ref === 'hp') a.heal(a.maxHp * 0.35 * k, a.zone); else a.sp = Math.min(a.maxSp, a.sp + a.maxSp * 0.4 * k); this.sendSelf(s); break; }
       case 'interact': this.interact(s); break;
       case 'respawn': this.respawn(s); break;

@@ -23,8 +23,9 @@ export class Input {
     // Floating joystick: touching anywhere on the left half spawns the stick under the finger.
     const root = document.createElement('div'); root.id = 'touch';
     root.innerHTML = `<div id="joyzone"><div id="joy"><div id="knob"></div></div><span class="joyhint">左側どこでも移動</span></div>
-      <div id="tleft"><button data-t="q" class="tsm"><b>⚗</b><small id="tpot">回復</small></button><button data-t="spc" class="tsm"><b>◆</b><small id="tspc">特殊</small></button><button data-t="f" class="tsm"><b>💬</b><small>会話</small></button></div>
+      <div id="tleft"><button data-t="f" class="tsm"><b>💬</b><small>会話</small></button></div>
       <div id="tright"><button data-t="dodge" class="tsk dodge"><b>≋</b><small>回避</small></button>
+        <button data-t="spc" class="tsk tspcb"><b>◆</b><small id="tspc">特殊</small></button><button data-t="q" class="tsk tpotb"><b>⚗</b><small id="tpot">回復</small></button>
         ${[0, 1, 2, 3].map(i => `<button data-t="s${i}" class="tsk s${i}"><small class="tsn" id="tsn${i}">${i + 1}</small><i class="tcd" id="tcd${i}"></i></button>`).join('')}
         <button data-t="atk" class="tatk">攻撃</button></div>`;
     document.body.appendChild(root); this.touchRoot = root;
