@@ -33,6 +33,8 @@ test('full loop', async () => {
   // enter dungeon
   a.send({ t: 'menu', op: 'dungeon', id: 'd01', diff: 'NORMAL', floor: 1 });
   const z = a.s.actor.zone; assert.equal(z.kind, 'dungeon');
+  // stepping on the exit tile must NOT leave the dungeon; interacting opens a confirmation
+  { const ex = z.map.exit; assert.ok(ex); const c = z.tileCenter(ex); a.s.actor.x = c.x; a.s.actor.y = c.y; world.checkTiles(a.s); assert.equal(a.s.actor.zone, z); a.send({ t: 'interact' }); assert.equal(a.last('open').service, 'exit'); const st = z.tileCenter(z.map.start); a.s.actor.x = st.x; a.s.actor.y = st.y; }
   const p = a.s.actor; const mons = [...z.actors.values()].filter(m => m.kind === 'monster');
   // kill monsters by fighting
   let killed = 0;

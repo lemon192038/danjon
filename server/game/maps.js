@@ -110,17 +110,20 @@ export function genDungeonFloor(dungeon, floor, diff) {
   let far = start, fd = -1;
   for (let k = 0; k < 300; k++) { const c = cells[Math.floor(r() * cells.length)]; const d = (c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2; if (d > fd) { fd = d; far = c; } }
   for (const [x, y] of [start, far]) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (g.get(x + i, y + j) !== T.WALL && !BLOCKING.has(g.get(x + i, y + j))) g.set(x + i, y + j, T.FLOOR);
-  const stairs = boss ? [g.bossAt[0], g.bossAt[1] - 3] : far;
+  const stairs = boss ? [g.bossAt[0], g.bossAt[1] - 3] : far; const stairsPos = stairs;
   g.set(stairs[0], stairs[1], boss ? T.FLOOR : T.STAIRS);
   // exit portal placed next to (not on) the spawn point
-  let ex = null; for (const [dx, dy] of [[0, 2], [2, 0], [-2, 0], [0, -2], [1, 1], [-1, 1]]) if (!BLOCKING.has(g.get(start[0] + dx, start[1] + dy))) { ex = [start[0] + dx, start[1] + dy]; break; }
+  // exit portal: placed 5-9 tiles away from the arrival point so it can't be stepped on by accident
+  let ex = null; const cand = floorCells(g).filter(([x, y]) => { const d = Math.hypot(x - start[0], y - start[1]); return d >= 5 && d <= 9 && (x !== stairsPos[0] || y !== stairsPos[1]); });
+  if (cand.length) ex = cand[Math.floor(r() * cand.length)];
+  else { const any = floorCells(g).filter(([x, y]) => Math.hypot(x - start[0], y - start[1]) >= 4); if (any.length) ex = any[0]; }
   if (ex) g.set(ex[0], ex[1], T.EXIT);
   cells = floorCells(g);
   const spawns = []; const nMon = boss ? 0 : (floor <= 3 && dungeon.minLv < 10 ? 6 : 10) + Math.floor(floor / 8) + Math.floor(r() * 6);
   for (let k = 0; k < nMon * 3 && spawns.length < nMon; k++) { const c = cells[Math.floor(r() * cells.length)]; if ((c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2 > 100) spawns.push(c); }
   const chests = []; if (!boss) for (let k = 0; k < 1 + Math.floor(r() * 3); k++) chests.push(cells[Math.floor(r() * cells.length)]);
   const lights = []; for (let k = 0; k < 10; k++) lights.push(cells[Math.floor(r() * cells.length)]);
-  return { w: g.w, h: g.h, tiles: g.t, pal: band.pal, band, start, stairs, stairsOpen: !boss, spawns, chests, lights, boss, bossAt: g.bossAt, seed, grid: g };
+  return { w: g.w, h: g.h, tiles: g.t, pal: band.pal, band, start, stairs, exit: ex, stairsOpen: !boss, spawns, chests, lights, boss, bossAt: g.bossAt, seed, grid: g };
 }
 
 // Overworld: towns & fields

@@ -58,7 +58,7 @@ export class UI {
     this.$('#bossbar').style.display = boss ? 'block' : 'none'; if (boss) { this.$('#bossname').textContent = boss.d.name; this.$('.bar.boss i').style.width = boss.hp / 10 + '%'; }
     // interaction hint
     const z = this.state.zone; let hint = '';
-    if (z && this.state.me) { const p = this.state.me; for (const n of z.npcs) if (Math.hypot(n.x * 16 + 8 - p.x, n.y * 16 + 8 - p.y) < 30) hint = `[F] ${n.name}`; for (const gt of z.gates) if (Math.hypot(gt.x * 16 + 8 - p.x, gt.y * 16 + 8 - p.y) < 30) hint = `[F] ${D.dungeons[gt.dungeon]?.name}へ`; for (const e of this.state.ents.values()) if (e.seen && e.d.kind === 'npc' && Math.hypot(e.x - p.x, e.y - p.y) < 30) hint = `[F] ${e.d.name}と話す`; for (const d of this.state.drops) if (d[3] === 'chest' && Math.hypot(d[1] - p.x, d[2] - p.y) < 26) hint = '[F] 宝箱を開ける'; }
+    if (z && this.state.me) { const p = this.state.me; for (const n of z.npcs) if (Math.hypot(n.x * 16 + 8 - p.x, n.y * 16 + 8 - p.y) < 30) hint = `[F] ${n.name}`; for (const gt of z.gates) if (Math.hypot(gt.x * 16 + 8 - p.x, gt.y * 16 + 8 - p.y) < 30) hint = `[F] ${D.dungeons[gt.dungeon]?.name}へ`; for (const e of this.state.ents.values()) if (e.seen && e.d.kind === 'npc' && Math.hypot(e.x - p.x, e.y - p.y) < 30) hint = `[F] ${e.d.name}と話す`; for (const d of this.state.drops) if (d[3] === 'chest' && Math.hypot(d[1] - p.x, d[2] - p.y) < 26) hint = '[F] 宝箱を開ける'; if (z.exit && Math.hypot(z.exit[0] * 16 + 8 - p.x, z.exit[1] * 16 + 8 - p.y) < 30) hint = '[F] 出口：街へ帰還'; }
     const ih = this.$('#interact'); ih.textContent = hint; ih.style.display = hint ? 'block' : 'none';
   }
   bar(sel, f, txt) { const b = this.$('.bar' + sel); b.querySelector('i').style.width = Math.max(0, Math.min(100, f * 100)) + '%'; const s = b.querySelector('span'); if (s) s.textContent = txt; }
@@ -108,6 +108,7 @@ export class UI {
   openService(s, data) {
     this.svc = data;
     if (s === 'inn') { this.toast('宿屋で休息し、HPとSPが全回復した'); return; }
+    if (s === 'exit') { this.open('exitConfirm'); return; }
     const p = { weapon: 'shopW', armor: 'shopA', item: 'shopI', smith: 'smith', guild: 'jobs', quest: 'quests', gate: 'dungeon', npc: 'npc' }[s];
     if (s === 'weapon') { const wts = [...new Set(data.stock.map(wtOfWeapon))]; this.shopWt = wts.includes(this.self.d.wt) ? this.self.d.wt : wts[0]; loadType(this.shopWt).then(() => this.render()); }
     this.open(p, s);
@@ -278,6 +279,7 @@ export class UI {
     const z = this.state.zone; setTimeout(() => { const cv = this.modal.querySelector('#bigmap'); if (!cv) return; const g = cv.getContext('2d'); const s = Math.min(cv.width / z.w, cv.height / z.h); g.imageSmoothingEnabled = false; g.drawImage(this.ctx.renderer.mini, 0, 0, z.w * s, z.h * s); g.fillStyle = '#fff'; const me = this.state.me; g.fillRect(me.x / 16 * s - 2, me.y / 16 * s - 2, 5, 5); g.font = '11px sans-serif'; g.fillStyle = '#ffd070'; for (const n of z.npcs) g.fillText(n.name, n.x * s, n.y * s); g.fillStyle = '#c0a0ff'; for (const gt of z.gates) g.fillText(D.dungeons[gt.dungeon]?.name, gt.x * s - 20, gt.y * s - 4); g.fillStyle = '#80c0ff'; for (const e of z.exits) g.fillText('→' + e.to, e.x * s - 30, e.y * s); }, 0);
     return this.wrap(`マップ ― ${esc(z.name)}`, `<div class="split"><canvas id="bigmap" width="520" height="420"></canvas><div><h3>世界</h3><ul class="world"><li>始まりの街ヘイヴン ⇄ 翠風の平原（翠緑の古洞・紅蓮の火山窟・黄昏の死都）</li><li>翠風の平原 ⇄ 港町マリナ（深海神殿・凍てつく氷獄）</li><li>翠風の平原 ⇄ 霧の高原（天空の浮遊遺跡・機巧の大迷宮・魔神の封印窟・星霜の時計塔）</li><li>霧の高原 ⇄ 天空都市セレスティア（神々の試練場・虚無の境界・終焉の深淵）</li></ul><p class="dim">各街のダンジョン門番からは全ダンジョンに入場できます。</p>${z.kind === 'dungeon' ? `<p>${z.floor}F / ${z.diff}</p><button data-act="leave">帰還する</button>` : ''}</div></div>`);
   }
+  p_exitConfirm() { const d = this.svc || {}; return `<div class="panel small"><div class="ph"><h2>ダンジョンから帰還</h2><button data-act="close" class="x">✕</button></div><div class="pb"><p>${esc(d.name || '')} ${d.floor || ''}階から街へ帰還しますか？</p><p class="dim">到達した階層は記録され、次回は10階ごとの区切りから再開できます。</p><div class="btns"><button class="primary" data-act="leave">帰還する</button> <button data-act="close">キャンセル</button></div></div></div>`; }
   p_settings() {
     const s = this.ctx.settings;
     return this.wrap('設定', `<div class="settings"><label>効果音 <input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-setting="sfx"></label><label><input type="checkbox" ${s.dmgNumbers ? 'checked' : ''} data-setting="dmgNumbers"> ダメージ数値表示</label><label><input type="checkbox" ${s.shake ? 'checked' : ''} data-setting="shake"> 画面揺れ</label><label><input type="checkbox" ${s.lighting ? 'checked' : ''} data-setting="lighting"> ライティング</label>

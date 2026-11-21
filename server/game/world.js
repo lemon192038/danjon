@@ -75,7 +75,7 @@ export class World {
     if (z.blocked(a.x, a.y)) { const st = z.tileCenter(z.map.start); a.x = st.x; a.y = st.y; }
     z.add(a); s.actor = a; s.zone = z;
     if (z.kind !== 'dungeon') s.ch.pos = { zone: z.id, x: null, y: null };
-    s.send({ t: 'zone', id: z.id, name: z.name, kind: z.kind, w: z.map.w, h: z.map.h, tiles: Buffer.from(z.map.tiles).toString('base64'), pal: z.map.pal, lights: z.map.lights, npcs: z.map.npcs || [], gates: z.map.gates || [], exits: z.map.exits || [], darkness: !!z.darkness, curses: z.curses?.list || [], floor: z.floor || 0, diff: z.diff || null, dungeon: z.dungeon?.id || null, stairsOpen: z.map.stairsOpen, gim: z.gim });
+    s.send({ t: 'zone', exit: z.map.exit || null, id: z.id, name: z.name, kind: z.kind, w: z.map.w, h: z.map.h, tiles: Buffer.from(z.map.tiles).toString('base64'), pal: z.map.pal, lights: z.map.lights, npcs: z.map.npcs || [], gates: z.map.gates || [], exits: z.map.exits || [], darkness: !!z.darkness, curses: z.curses?.list || [], floor: z.floor || 0, diff: z.diff || null, dungeon: z.dungeon?.id || null, stairsOpen: z.map.stairsOpen, gim: z.gim });
     this.sendSelf(s);
     // party NPCs follow the player
     for (const nid of this.partyOf(s.ch.id)?.npcs || []) { const n = this.npcs.byId.get(nid); if (!n) continue; this.npcs.despawn(n); this.npcs.spawn(n, z, { x: a.x + 12, y: a.y + 10 }); }
@@ -92,7 +92,7 @@ export class World {
     const a = s.actor, z = a.zone; if (a.dead) return;
     const tx = Math.floor(a.x / TILE), ty = Math.floor(a.y / TILE); const tile = z.map.tiles[ty * z.map.w + tx];
     if (tile === T.EXIT) {
-      if (z.kind === 'dungeon') return this.leaveDungeon(s);
+      if (z.kind === 'dungeon') return; // dungeon exits require interaction + confirmation
       const ex = z.map.exits.find(e => Math.abs(e.x - tx) <= 2 && Math.abs(e.y - ty) <= 2); if (!ex) return;
       const to = this.zones.get(ex.to); const back = to.map.exits.find(e => e.to === z.id);
       const p = back ? to.tileCenter([back.x + (back.dir === 'east' ? -3 : back.dir === 'west' ? 3 : 0), back.y + (back.dir === 'south' ? -3 : back.dir === 'north' ? 3 : 0)]) : null;
@@ -230,6 +230,7 @@ export class World {
     const a = s.actor, z = a.zone;
     if (a.dead) return;
     for (const n of z.map.npcs || []) { const p = z.tileCenter([n.x, n.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return this.openService(s, n.service); }
+    if (z.kind === 'dungeon' && z.map.exit) { const p = z.tileCenter(z.map.exit); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return s.send({ t: 'open', service: 'exit', data: { name: z.dungeon.name, floor: z.floor } }); }
     for (const g of z.map.gates || []) { const p = z.tileCenter([g.x, g.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return this.openService(s, 'gate', g.dungeon); }
     for (const d of z.drops) if (d.chest && Math.hypot(d.x - a.x, d.y - a.y) < 26) { d.chest = false; d.until = 0; const loot = rollLoot({ floor: z.floor || 1, diff: z.diff || 'NORMAL', chest: true, preferWt: a.wt.id }); for (const it of loot) addItem(s.ch, it, n => this.note(s, n)); z.fx({ t: 'boom', x: Math.round(d.x), y: Math.round(d.y), r: 14, e: 'holy' }); this.sendSelf(s); return; }
     // NPC adventurers

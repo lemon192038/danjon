@@ -72,3 +72,5 @@ body.touchui #skillbar, body.touchui #chat { display: none; }
 #tutorial { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); width: min(560px, 92vw); background: rgba(14,10,28,.92); border: 1px solid var(--gold); border-radius: 8px; padding: 10px 14px; pointer-events: auto; display: none; box-shadow: 0 0 20px rgba(255,200,80,.25); z-index: 25; position: fixed; }
 #tutorial .th { display: flex; justify-content: space-between; color: var(--gold); } #tutorial p { font-size: 13px; margin: 6px 0; } #tutorial .tb { display: flex; gap: 8px; align-items: center; } #tutorial button { min-height: 36px; min-width: 80px; font-size: 14px !important; } #tutorial .wait { color: #a0e0ff; font-size: 12px; animation: pulse 1.2s infinite; } #tutorial button { padding: 3px 12px; font-size: 12px; }
 @media (max-width: 760px) { #tutorial { top: 96px; } }
+
+.panel.small { width: min(420px, 92vw); height: auto; }
