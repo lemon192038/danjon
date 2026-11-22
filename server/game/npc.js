@@ -17,7 +17,7 @@ const PERS = [
   { k: 'lone', n: '孤高', bravery: 0.7, caution: 0.5, social: 0.1, greed: 0.5, lines: ['…一人の方が気楽だ。', '邪魔はするな。', '強さだけが真実だ。'] },
   { k: 'scholar', n: '探究', bravery: 0.4, caution: 0.7, social: 0.6, greed: 0.5, lines: ['この迷宮の構造は興味深い。', '古代文明の痕跡を探しているんだ。', '知識は最大の武器さ。'] },
 ];
-const TOWNS = ['haven', 'marina', 'celestia'];
+const TOWNS = ['haven', 'marina', 'celestia', 'vulcan', 'arcanum', 'lumina'];
 
 export class NpcManager {
   constructor(world, saved) {
@@ -96,7 +96,7 @@ export class NpcManager {
   }
   spawn(n, z, at) {
     const f = new Fighter(n.ch, { kind: 'npc', team: 'ally', npcId: n.id, look: n.ch.look });
-    const p = at || (() => { const c = z.map.npcs?.length && Math.random() < 0.5 ? z.map.npcs[Math.floor(Math.random() * z.map.npcs.length)] : { x: z.map.start[0] + (Math.random() * 10 - 5 | 0), y: z.map.start[1] - 4 + (Math.random() * 6 | 0) }; return z.tileCenter([c.x + (Math.random() * 4 - 2) | 0, c.y + 1]); })();
+    const p = at || (() => { const pl = z.map.plazas?.length ? z.map.plazas : z.map.npcs; const c = pl?.length && Math.random() < 0.35 ? pl[Math.floor(Math.random() * pl.length)] : z.map.doors?.length ? (d => ({ x: d.x, y: d.y + 1 }))(z.map.doors[Math.floor(Math.random() * z.map.doors.length)]) : { x: z.map.start[0] + (Math.random() * 10 - 5 | 0), y: z.map.start[1] - 4 + (Math.random() * 6 | 0) }; return z.tileCenter([c.x + (Math.random() * 4 - 2) | 0, c.y + 1]); })();
     f.x = p.x; f.y = p.y; if (z.blocked(f.x, f.y)) { const s = z.tileCenter(z.map.start); f.x = s.x; f.y = s.y; }
     z.add(f); n.actorId = f.id; n.actorZone = z.id; f.npc = n; f.wander = null; return f;
   }
@@ -135,7 +135,7 @@ export class NpcManager {
     // follow party leader
     if (leader) { const dx = leader.x - a.x, dy = leader.y - a.y, d = Math.hypot(dx, dy); if (d > 300) { a.x = leader.x; a.y = leader.y; } else if (d > 40) { const nd = z.navDir(a, leader); a.vx = nd.x * 85 * a.stats.move; a.vy = nd.y * 85 * a.stats.move; } else a.vx = a.vy = 0; return; }
     // town/field wandering
-    if (!a.wander || now > a.wander.until) { const pts = z.map.npcs?.length ? z.map.npcs : null; const tgt = pts && Math.random() < 0.5 ? z.tileCenter([pts[Math.floor(Math.random() * pts.length)].x, pts[0].y + 2]) : { x: a.x + (Math.random() - 0.5) * 120, y: a.y + (Math.random() - 0.5) * 120 }; a.wander = { x: tgt.x, y: tgt.y, until: now + 4000 + Math.random() * 6000 }; if (Math.random() < 0.15) z.fx({ t: 'say', id: a.id, v: this.pers(n).lines[Math.floor(Math.random() * 3)] }); }
+    if (!a.wander || now > a.wander.until) { const pts = z.map.plazas?.length ? z.map.plazas : z.map.npcs?.length ? z.map.npcs : null; const pk = pts && pts[Math.floor(Math.random() * pts.length)]; const tgt = pk && Math.random() < 0.5 ? z.tileCenter([pk.x + (Math.random() * 6 - 3 | 0), pk.y + 2]) : { x: a.x + (Math.random() - 0.5) * 120, y: a.y + (Math.random() - 0.5) * 120 }; a.wander = { x: tgt.x, y: tgt.y, until: now + 4000 + Math.random() * 6000 }; if (Math.random() < 0.15) z.fx({ t: 'say', id: a.id, v: this.pers(n).lines[Math.floor(Math.random() * 3)] }); }
     const dx = a.wander.x - a.x, dy = a.wander.y - a.y, d = Math.hypot(dx, dy);
     if (d > 8) { a.vx = dx / d * 40; a.vy = dy / d * 40; a.facing = Math.atan2(dy, dx); } else a.vx = a.vy = 0;
   }

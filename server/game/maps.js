@@ -1,8 +1,9 @@
 // Procedural map generation: towns, fields and 1,200 dungeon floors (seeded, layout varies per biome band).
 import { rng, hash32 } from '../../shared/util.js';
 import { TILE } from '../../shared/constants.js';
-export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21 };
-export const BLOCKING = new Set([T.VOID, T.WALL, T.WATER, T.TREE, T.HOUSE, T.PILLAR, T.ROOF]);
+export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21, BLOCK: 22, MARBLE: 23, COBBLE: 24, RUBBLE: 25, PLANK: 26, CARPET: 27, STONEF: 28, IWALL: 29, STEPS: 30, MAT: 31 };
+export const BLOCKING = new Set([T.VOID, T.WALL, T.WATER, T.TREE, T.HOUSE, T.PILLAR, T.ROOF, T.BLOCK, T.IWALL]);
+export { Grid, floorCells };
 
 class Grid {
   constructor(w, h, fill) { this.w = w; this.h = h; this.t = new Uint8Array(w * h).fill(fill); }
@@ -128,11 +129,17 @@ export function genDungeonFloor(dungeon, floor, diff) {
 
 // Overworld: towns & fields
 export const WORLD = {
-  haven: { name: '始まりの街ヘイヴン', kind: 'town', pal: 'town', links: { east: 'field_green' }, gates: [], services: ['weapon', 'armor', 'item', 'smith', 'guild', 'quest', 'inn', 'gate'] },
-  field_green: { name: '翠風の平原', kind: 'field', pal: 'grass', links: { west: 'haven', east: 'marina', north: 'field_highland' }, gates: ['d01', 'd02', 'd04'], lv: [1, 18] },
-  marina: { name: '港町マリナ', kind: 'town', pal: 'town', links: { west: 'field_green' }, gates: ['d06', 'd03'], services: ['weapon', 'armor', 'item', 'smith', 'guild', 'quest', 'inn', 'gate'] },
-  field_highland: { name: '霧の高原', kind: 'field', pal: 'highland', links: { south: 'field_green', north: 'celestia' }, gates: ['d05', 'd07', 'd08', 'd09'], lv: [20, 60] },
-  celestia: { name: '天空都市セレスティア', kind: 'town', pal: 'town', links: { south: 'field_highland' }, gates: ['d10', 'd11', 'd12'], services: ['weapon', 'armor', 'item', 'smith', 'guild', 'quest', 'inn', 'gate'] },
+  haven: { name: '始まりの街ヘイヴン', kind: 'town', links: { east: 'field_green' }, gates: [] },
+  field_green: { name: '翠風の平原', kind: 'field', pal: 'grass', links: { west: 'haven', east: 'marina', north: 'field_highland' }, gates: ['d01', 'd02', 'd04'], lv: [1, 18], fams: [['slime', 'rat', 'bat'], ['slime', 'rat', 'goblin', 'wolf', 'goblinArcher', 'bat', 'spider']] },
+  marina: { name: '交易港湾都市マリナ', kind: 'town', links: { west: 'field_green', east: 'field_coast' }, gates: [] },
+  field_highland: { name: '霧の高原', kind: 'field', pal: 'highland', links: { south: 'field_green', north: 'celestia', east: 'field_mine', west: 'field_lake' }, gates: ['d05', 'd07', 'd08', 'd09'], lv: [20, 60], fams: [['wolf', 'harpy', 'lizard', 'golem', 'imp', 'treant', 'knight', 'elemThunder']] },
+  celestia: { name: '王都セレスティア', kind: 'town', links: { south: 'field_highland' }, gates: [] },
+  field_mine: { name: '鉄錆の山道', kind: 'field', pal: 'highland', links: { west: 'field_highland', east: 'vulcan' }, gates: ['d07', 'd02'], lv: [25, 55], fams: [['golem', 'construct', 'elemFire', 'goblin', 'spider']] },
+  vulcan: { name: '鉄鋼都市ヴァルカンブルク', kind: 'town', links: { west: 'field_mine' }, gates: [] },
+  field_lake: { name: '月鏡湖の岸辺', kind: 'field', pal: 'grass', links: { east: 'field_highland', west: 'arcanum' }, gates: ['d11', 'd09'], lv: [30, 65], fams: [['wisp', 'mage', 'voidling', 'elemIce', 'treant']] },
+  arcanum: { name: '魔導学術都市アルカナリア', kind: 'town', links: { east: 'field_lake' }, gates: [] },
+  field_coast: { name: '灰の海岸道', kind: 'field', pal: 'grass', links: { west: 'marina', east: 'lumina' }, gates: ['d06', 'd04'], lv: [15, 45], fams: [['lizard', 'harpy', 'zombie', 'shade', 'cultist']] },
+  lumina: { name: '歓楽都市ルクスガルド', kind: 'town', links: { west: 'field_coast' }, gates: [] },
 };
 export function genOverworld(id) {
   const def = WORLD[id]; const r = rng(hash32('world:' + id));
@@ -159,9 +166,11 @@ export function genOverworld(id) {
   const edge = { east: [W - 2, cy], west: [1, cy], north: [cx, 1], south: [cx, H - 2] };
   for (const [dir, to] of Object.entries(def.links)) { const [x, y] = edge[dir]; g.rect(dir === 'east' ? W - 3 : dir === 'west' ? 0 : cx - 2, dir === 'north' ? 0 : dir === 'south' ? H - 3 : cy - 2, dir === 'east' || dir === 'west' ? 3 : 5, dir === 'east' || dir === 'west' ? 5 : 3, T.PATH); for (let k = -2; k <= 2; k++) g.set(dir === 'east' || dir === 'west' ? x : x + k, dir === 'east' || dir === 'west' ? y + k : y, T.EXIT); exits.push({ dir, to, x, y }); }
   for (const gt of gates) g.set(gt.x, gt.y, T.PORTAL);
-  const cells = floorCells(g); const spawns = [];
+  const cells = floorCells(g); const spawns = []; const objects = [], props = [];
   if (def.kind === 'field') for (let k = 0; k < 26; k++) { const c = cells[Math.floor(r() * cells.length)]; if (Math.abs(c[0] - cx) + Math.abs(c[1] - cy) > 8) spawns.push(c); }
-  return { w: W, h: H, tiles: g.t, pal: def.pal, start: [cx, cy + 2], spawns, npcs, gates, exits, lights, grid: g, kind: def.kind, name: def.name, lv: def.lv };
+  if (def.kind === 'field') { const mats = { field_green: ['herb', 'herb', 'wood'], field_highland: ['herb', 'gem', 'crystal'], field_mine: ['gem', 'gem', 'wood'], field_lake: ['crystal', 'herb', 'wood'], field_coast: ['herb', 'wood', 'gem'] }[id] || ['herb'];
+    for (let k = 0; k < 14; k++) { const c = cells[Math.floor(r() * cells.length)]; const mat = mats[k % mats.length]; g.set(c[0], c[1], T.BLOCK); objects.push({ k: 'node', mat, x: c[0], y: c[1] + 1 }); props.push({ k: 'node', mat, x: c[0], y: c[1], w: 1, h: 1 }); } }
+  return { w: W, h: H, tiles: g.t, pal: def.pal, start: [cx, cy + 2], spawns, npcs, gates, exits, lights, grid: g, kind: def.kind, name: def.name, lv: def.lv, objects, props };
 }
 export const tileAt = (map, px, py) => { const x = Math.floor(px / TILE), y = Math.floor(py / TILE); return x < 0 || y < 0 || x >= map.w || y >= map.h ? T.VOID : map.tiles[y * map.w + x]; };
 export const blockedAt = (map, px, py) => BLOCKING.has(tileAt(map, px, py));

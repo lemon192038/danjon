@@ -1,5 +1,5 @@
 // Renderer: low-res pixel layer (scaled crisp) + full-res text overlay. Lighting, shadows, animations, effects.
-import { renderTileMap, charSprite, weaponSprite, monsterSprite, PALETTES, T, EL_COL, shade } from './sprites.js';
+import { renderTileMap, charSprite, weaponSprite, monsterSprite, PALETTES, T, EL_COL, shade, windows } from './sprites.js';
 import { ELEMENT_COLORS, RARITIES, STATUS } from '/shared/constants.js';
 import { WT_BY_ID } from '/shared/data/weaponTypes.js';
 import { vfxProfile, motifParticles, drawMotifParticle } from './vfx.js';
@@ -23,13 +23,14 @@ export class Renderer {
     this.g.imageSmoothingEnabled = false;
   }
   setZone(z) {
-    this.zone = z; this.tileCanvas = renderTileMap(z, z.pal); this.pal = PALETTES[z.pal] || PALETTES.moss;
+    this.zone = z; this.tileCanvas = renderTileMap(z, z.pal); this.windows = windows.slice(); this.pal = PALETTES[z.pal] || PALETTES.moss; this.wxParts = []; this.fade = 1;
     this.anim = []; for (let y = 0; y < z.h; y++) for (let x = 0; x < z.w; x++) { const v = z.tiles[y * z.w + x]; if (v === T.WATER || v === T.SHALLOW || v === T.LAVA || v === T.PORTAL || v === T.EXIT || v === T.STAIRS) this.anim.push([x, y, v]); }
     this.mini = document.createElement('canvas'); this.mini.width = z.w; this.mini.height = z.h; const mg = this.mini.getContext('2d'); const id = mg.createImageData(z.w, z.h);
-    const MC = { 0: [5, 4, 10], 2: [60, 55, 70], 12: [30, 70, 30], 13: [140, 110, 80], 19: [150, 60, 50], 18: [60, 55, 70], 3: [40, 90, 180], 4: [60, 120, 200], 5: [220, 80, 20], 8: [255, 220, 80], 9: [80, 160, 255], 17: [180, 100, 255] };
+    const MC = { 22: [120, 90, 70], 23: [220, 215, 205], 24: [150, 145, 135], 25: [110, 100, 85], 29: [60, 50, 45], 30: [170, 165, 155], 31: [200, 160, 80], 14: [255, 220, 120], 0: [5, 4, 10], 2: [60, 55, 70], 12: [30, 70, 30], 13: [140, 110, 80], 19: [150, 60, 50], 18: [60, 55, 70], 3: [40, 90, 180], 4: [60, 120, 200], 5: [220, 80, 20], 8: [255, 220, 80], 9: [80, 160, 255], 17: [180, 100, 255] };
     for (let i = 0; i < z.tiles.length; i++) { const c = MC[z.tiles[i]] || [150, 140, 120]; id.data.set([...c, 255], i * 4); }
     mg.putImageData(id, 0, 0); this.fx = []; this.parts = []; this.texts = [];
   }
+  rerender() { this.tileCanvas = renderTileMap(this.zone, this.zone.pal); this.windows = windows.slice(); }
   updateTile(x, y, v) { const z = this.zone; z.tiles[y * z.w + x] = v; this.tileCanvas = renderTileMap(z, z.pal); if (v === T.STAIRS) this.anim.push([x, y, v]); }
   addFx(f, ents, me) {
     const now = this.time; const E = id => ents.get(id);
@@ -107,6 +108,8 @@ export class Renderer {
     // fog
     if (this.pal.fog) { g.fillStyle = this.pal.fog; for (let i = 0; i < 6; i++) { g.globalAlpha = 0.05; const fx = ((now / 60 + i * 97) % (W + 120)) - 60, fy = (i * 53 + Math.sin(now / 3000 + i) * 20) % H; g.beginPath(); g.ellipse(fx, fy, 80, 26, 0, 0, TAU); g.fill(); } g.globalAlpha = 1; }
     this.drawLighting(state, ox, oy, now);
+    if (z.kind === 'town' || z.kind === 'field') this.drawWeather(state.env?.wx, dt, now);
+    if (this.fade > 0) { g.fillStyle = `rgba(0,0,0,${this.fade})`; g.fillRect(0, 0, W, H); this.fade = Math.max(0, this.fade - dt / 450); }
     this.drawOverlay(state, list, ox, oy, now);
   }
   drawArea(a, ox, oy, now) {
@@ -126,9 +129,9 @@ export class Renderer {
     const path = (k) => { g.beginPath(); if (f.s === 'circle') g.arc(0, 0, f.r * k, 0, TAU); else if (f.s === 'arc') { g.moveTo(0, 0); g.arc(0, 0, f.r * k, f.a - f.ar * Math.PI / 360, f.a + f.ar * Math.PI / 360); g.closePath(); } else if (f.s === 'slam') g.arc(Math.cos(f.a) * f.dd, Math.sin(f.a) * f.dd, f.r * k, 0, TAU); else { g.rotate(f.a); g.rect(0, -f.w / 2, f.l * k, f.w); } };
     path(1); g.globalAlpha = 0.15; g.fill(); g.globalAlpha = 0.55; g.lineWidth = 1; g.stroke(); g.restore(); g.save(); g.translate(f.x + ox, f.y + oy); g.fillStyle = col; path(p); g.globalAlpha = 0.3; g.fill(); g.restore(); g.globalAlpha = 1;
   }
-  drawShadow(e, ox, oy) { const g = this.g; const r = e.d.boss ? 14 : (e.d.r || 6); g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(Math.round(e.x + ox), Math.round(e.y + oy + 1), r, r * 0.45, 0, 0, TAU); g.fill(); }
+  drawShadow(e, ox, oy) { if (e.svc && this.zone.kind === 'interior') return; const g = this.g; const r = e.d.boss ? 14 : (e.d.r || 6); g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(Math.round(e.x + ox), Math.round(e.y + oy + 1), r, r * 0.45, 0, 0, TAU); g.fill(); }
   drawEntity(e, ox, oy, now, state) {
-    const g = this.g; const d = e.d; const x = Math.round(e.x + ox), y = Math.round(e.y + oy);
+    const g = this.g; const d = e.d; if (e.svc && this.zone.kind === 'interior') return; const x = Math.round(e.x + ox), y = Math.round(e.y + oy);
     if (x < -40 || y < -40 || x > this.w + 40 || y > this.h + 40) return;
     const dead = e.flags & 1; if (dead && e.dieAt && now - e.dieAt > 900 && d.kind === 'monster') return;
     const air = e.flags & 32 ? -8 : 0; const stealth = e.flags & 256;
@@ -230,10 +233,25 @@ export class Renderer {
     g.fillStyle = pv.c3; for (let i = 0; i < pv.sides; i++) { const a = -rot + i * TAU / pv.sides; g.fillRect(Math.cos(a) * r - 1, Math.sin(a) * r - 1, 2, 2); }
     g.restore(); g.globalAlpha = 1;
   }
+  drawWeather(wx, dt, now) {
+    if (!wx || wx === 'clear' || wx === 'cloud') return; const g = this.g, W = this.w, H = this.h; const P = this.wxParts ||= [];
+    const rate = { rain: 6, storm: 10, snow: 2, wind: 3, smog: 1, aurora: 0, fog: 0 }[wx] || 0;
+    for (let i = 0; i < rate; i++) P.push({ x: Math.random() * (W + 60) - 30, y: -5, vx: wx === 'wind' || wx === 'storm' ? -120 : wx === 'snow' ? (Math.random() - 0.5) * 20 : -30, vy: wx === 'snow' ? 25 + Math.random() * 15 : wx === 'wind' ? 30 : 260 + Math.random() * 60, life: 2500 });
+    const k = dt / 1000; g.globalAlpha = 0.55;
+    for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.x += p.vx * k; p.y += p.vy * k; p.life -= dt; if (p.y > H || p.life <= 0) { P.splice(i, 1); continue; }
+      if (wx === 'snow') { g.fillStyle = '#fff'; g.fillRect(p.x | 0, p.y | 0, 1, 1); } else if (wx === 'wind') { g.fillStyle = '#e0e8f0'; g.fillRect(p.x | 0, p.y | 0, 4, 1); } else if (wx === 'smog') { g.fillStyle = 'rgba(80,70,60,.5)'; g.fillRect(p.x | 0, p.y | 0, 3, 3); } else { g.fillStyle = '#a0c0e8'; g.fillRect(p.x | 0, p.y | 0, 1, 3); } }
+    if (P.length > 600) P.splice(0, P.length - 600);
+    g.globalAlpha = 1;
+    if (wx === 'fog' || wx === 'smog') { g.fillStyle = wx === 'fog' ? 'rgba(220,225,235,.22)' : 'rgba(90,80,70,.22)'; g.fillRect(0, 0, W, H); }
+    if (wx === 'storm' && Math.random() < 0.004) this.flashT = now; if (this.flashT && now - this.flashT < 120) { g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(0, 0, W, H); }
+    if (wx === 'aurora' && this.night > 0.3) { for (let i = 0; i < 3; i++) { const grd = g.createLinearGradient(0, 0, W, 0); grd.addColorStop(0, 'rgba(80,255,180,0)'); grd.addColorStop(0.5, `rgba(${100 + i * 60},${200 - i * 40},255,.18)`); grd.addColorStop(1, 'rgba(80,255,180,0)'); g.fillStyle = grd; g.fillRect(0, 10 + i * 12 + Math.sin(now / 1500 + i) * 8, W, 10); } }
+  }
   drawLighting(state, ox, oy, now) {
     if (!this.settings.lighting) return;
     const z = this.zone; let dark = this.pal.dark + (z.darkness ? 0.3 : 0);
-    if (z.kind === 'town' || z.kind === 'field') { const hr = (Date.now() / 60000) % 24; dark = Math.max(dark, Math.max(0, Math.cos(hr / 24 * TAU) * 0.5)); }
+    const hr = state.env ? state.env.h + state.env.m / 60 : 12; this.night = Math.max(0, Math.cos(hr / 24 * TAU)); // 1 at midnight, 0 by day
+    if (z.kind === 'town' || z.kind === 'field') { dark = Math.max(dark, this.night * 0.62); const wx = state.env?.wx; if (wx === 'rain' || wx === 'storm' || wx === 'smog') dark += 0.12; if (wx === 'fog') dark += 0.06; }
+    if (z.kind === 'interior') dark = Math.max(0.12, dark * 0.6);
     if (dark <= 0.02) return;
     const L = this.lg, W = this.w, H = this.h; L.globalCompositeOperation = 'source-over'; L.clearRect(0, 0, W, H); L.fillStyle = `rgba(4,3,14,${Math.min(0.92, dark)})`; L.fillRect(0, 0, W, H);
     L.globalCompositeOperation = 'destination-out';
@@ -241,6 +259,7 @@ export class Renderer {
     const me = state.me; if (me) hole(me.x + ox, me.y + oy - 8, z.darkness ? 70 : 110);
     for (const e of state.ents.values()) if (e.seen && (e.d.kind === 'player' || e.d.kind === 'npc') && e !== state.meEnt) hole(e.x + ox, e.y + oy - 8, 50, 0.7);
     for (const [lx, ly] of z.lights || []) hole(lx * 16 + 8 + ox, ly * 16 + 8 + oy, 54 + Math.sin(now / 120 + lx) * 4, 0.9);
+    if (this.night > 0.25) for (const [wx, wy, ww, wh, k] of this.windows || []) if (k) hole(wx + ww / 2 + ox, wy + wh / 2 + oy, k === 3 ? 60 : 14, k === 2 ? 0.9 : 0.6);
     for (const p of state.projs || []) hole(p[0] + ox, p[1] + oy, 22, 0.8);
     for (const f of this.fx) if (f.k === 'flash' || f.k === 'ring') hole(f.x + ox, f.y + oy, f.r * 1.5, 1 - (now - f.t0) / f.dur);
     for (const [x, y, v] of this.anim) if (v === T.LAVA || v === T.PORTAL || v === T.STAIRS || v === T.EXIT) hole(x * 16 + 8 + ox, y * 16 + 8 + oy, v === T.LAVA ? 22 : 30, 0.6);
@@ -248,6 +267,8 @@ export class Renderer {
     // colored glow
     const g = this.g; g.globalCompositeOperation = 'lighter';
     for (const [lx, ly] of z.lights || []) { const x = lx * 16 + 8 + ox, y = ly * 16 + 8 + oy; if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue; const grd = g.createRadialGradient(x, y, 0, x, y, 40); grd.addColorStop(0, 'rgba(255,170,80,.25)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grd; g.fillRect(x - 40, y - 40, 80, 80); g.fillStyle = '#ffd080'; g.fillRect(x - 1, y - 3 - (Math.sin(now / 90 + lx) > 0 ? 1 : 0), 2, 3); }
+    if (this.night > 0.2) for (const [wx, wy, ww, wh, k] of this.windows || []) { const x = wx + ox, y = wy + oy; if (x < -60 || y < -60 || x > W + 60 || y > H + 60 || !k) continue; const lit = k === 2 ? ['#ff40a0', '#40e0ff', '#ffd040'][(wx + Math.floor(now / 700)) % 3] : k === 3 ? '#ffd060' : (((wx * 7 + wy) % 5) < 3 ? '#ffd890' : null); if (!lit) continue; g.globalAlpha = Math.min(1, this.night * 1.4) * (k === 2 ? 0.8 + Math.sin(now / 90 + wx) * 0.2 : 0.85); g.fillStyle = lit; g.fillRect(x, y, ww, wh); }
+    g.globalAlpha = 1;
     for (const p of state.projs || []) { const x = p[0] + ox, y = p[1] + oy; const grd = g.createRadialGradient(x, y, 0, x, y, 14); grd.addColorStop(0, ec(p[4] || 'phys') + '88'); grd.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grd; g.fillRect(x - 14, y - 14, 28, 28); }
     g.globalCompositeOperation = 'source-over';
   }
@@ -258,6 +279,7 @@ export class Renderer {
       const dead = e.flags & 1; const top = y - (d.boss ? 48 : d.kind === 'monster' ? 24 : 28) * S;
       if (!dead && (d.kind !== 'player' || e !== state.meEnt)) {
         if (d.kind === 'monster' && (e.hp < 1000 || d.boss || d.elite)) { const w = d.boss ? 60 * S / 2 : 14 * S; o.fillStyle = 'rgba(0,0,0,.6)'; o.fillRect(x - w / 2 - 1, top - 1, w + 2, 5); o.fillStyle = d.boss ? '#ff3050' : '#e04040'; o.fillRect(x - w / 2, top, w * e.hp / 1000, 3); }
+        if (d.kind === 'resident') { if (state.me && Math.hypot(e.x - state.me.x, e.y - state.me.y) < 56) { o.font = '10px sans-serif'; o.fillStyle = '#e8e0c8'; o.strokeStyle = 'rgba(0,0,0,.8)'; o.lineWidth = 3; const l = `${d.name}（${d.job}）`; o.strokeText(l, x, top + 4); o.fillText(l, x, top + 4); } continue; }
         if (d.service) { o.font = 'bold 12px sans-serif'; o.fillStyle = '#ffd070'; o.strokeStyle = 'rgba(0,0,0,.85)'; o.lineWidth = 3; o.strokeText('▼ ' + d.name, x, top - 4); o.fillText('▼ ' + d.name, x, top - 4); continue; }
         if (d.kind !== 'monster' || d.boss || d.elite || e.hover) { o.font = `${d.boss ? 'bold 14px' : '11px'} sans-serif`; o.fillStyle = d.kind === 'player' ? '#ffffff' : d.kind === 'npc' ? '#a0e0ff' : d.boss ? '#ffb040' : d.elite ? '#ffd070' : '#ddd'; o.strokeStyle = 'rgba(0,0,0,.8)'; o.lineWidth = 3; const label = `${d.kind === 'npc' ? '◆' : ''}${d.name}${d.lv ? ' Lv' + d.lv : ''}`; o.strokeText(label, x, top - 4); o.fillText(label, x, top - 4); if (d.affix?.length) { o.font = '10px sans-serif'; o.fillStyle = '#ff80c0'; o.strokeText(d.affix.join('・'), x, top - 16); o.fillText(d.affix.join('・'), x, top - 16); } }
         if (d.kind !== 'monster' && e.hp < 1000) { o.fillStyle = 'rgba(0,0,0,.6)'; o.fillRect(x - 15, top, 30, 4); o.fillStyle = '#50e070'; o.fillRect(x - 15, top, 30 * e.hp / 1000, 3); }
@@ -265,6 +287,7 @@ export class Renderer {
       if (e.sts) { let i = 0; o.font = '9px sans-serif'; for (const s of e.sts.split(',')) { if (!s) continue; o.fillStyle = STATUS[s]?.color || '#fff'; o.fillText(STATUS[s]?.name || s, x - 20 + i * 20, top + 14); i++; } }
       if (e.say && now - e.say.t0 < 3500) { o.font = '12px sans-serif'; const w = Math.min(220, o.measureText(e.say.v).width + 12); o.fillStyle = 'rgba(255,255,255,.92)'; o.fillRect(x - w / 2, top - 36, w, 20); o.fillStyle = '#222'; o.fillText(e.say.v.slice(0, 30), x, top - 22); }
     }
+    if (state.me) { o.font = '11px sans-serif'; o.lineWidth = 3; o.strokeStyle = 'rgba(0,0,0,.85)'; for (const d of this.zone.doors || []) { if (d.home && !d.mine) continue; const dxw = d.x * 16 + 8, dyw = d.y * 16; if (Math.abs(dxw - state.me.x) > 170 || Math.abs(dyw - state.me.y) > 120) continue; const x = (dxw + ox) * S, y = (dyw - 18 + oy) * S; const n = d.mine ? '🏠 マイホーム' : d.name; o.fillStyle = d.mine ? '#a0ffb0' : '#fff0c8'; o.strokeText(n, x, y); o.fillText(n, x, y); } }
     o.font = 'bold 12px sans-serif'; o.fillStyle = '#d0b0ff'; o.strokeStyle = '#000'; o.lineWidth = 3;
     for (const gt of this.zone.gates || []) { const x = (gt.x * 16 + 8 + ox) * S, y = (gt.y * 16 - 10 + oy) * S; const n = '◆ ' + (this.dungeonNames?.[gt.dungeon] || gt.dungeon); o.strokeText(n, x, y); o.fillText(n, x, y); }
     this.texts = this.texts.filter(t => now - t.t0 < (t.skill ? 1100 : 900));

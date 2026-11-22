@@ -1,5 +1,5 @@
 // Procedural pixel-art: tilesets per biome palette, characters (look), weapons (86 type visuals), monsters, items.
-export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21 };
+export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21, BLOCK: 22, MARBLE: 23, COBBLE: 24, RUBBLE: 25, PLANK: 26, CARPET: 27, STONEF: 28, IWALL: 29, STEPS: 30, MAT: 31 };
 const P = (floor, floor2, wallTop, wallFace, water, accent, dark, fog) => ({ floor, floor2, wallTop, wallFace, water, accent, dark, fog });
 export const PALETTES = {
   town: P('#7a6a52', '#6e5e48', '#5b4d3c', '#3f342a', '#3a78c8', '#e8c070', 0.0, null), grass: P('#4f8a3a', '#467d33', '#2f5a2a', '#24461f', '#3a78c8', '#f0e070', 0.0, null), highland: P('#6b8a5a', '#5f7d50', '#4a5a4a', '#353f35', '#4a80b8', '#d0e0ff', 0.1, '#c8d0e0'),
@@ -11,6 +11,7 @@ export const PALETTES = {
   coral: P('#3a6a7a', '#32606e', '#2a4a5a', '#1a323e', '#2a80c0', '#ff80a0', 0.45, '#103850'), wreck: P('#5a4a3a', '#504232', '#3a3026', '#241e18', '#2a5a8a', '#e0c080', 0.5, '#103040'), temple: P('#4a7a8a', '#407080', '#2e5a6a', '#1e3e4a', '#2a90d0', '#ffe080', 0.4, '#104060'),
   abyssSea: P('#1e2e4a', '#1a2842', '#121c30', '#0a1020', '#102a5a', '#60a0ff', 0.7, '#081830'), metal: P('#5a6068', '#50565e', '#3a3e46', '#24282e', '#3a6a9a', '#60e0ff', 0.45, null), circuit: P('#2a3a4a', '#243442', '#18242e', '#0e161e', '#2a6aaa', '#40ffd0', 0.5, null),
   rust: P('#6a4a3a', '#5e4232', '#463026', '#2e2018', '#4a6a5a', '#ff9040', 0.5, '#403020'), hell: P('#4a1a1e', '#40161a', '#2a0e10', '#180608', '#ff3010', '#ff5030', 0.55, '#300808'), clock: P('#6a5a4a', '#5e5042', '#46382e', '#2e241e', '#4a6aaa', '#ffd070', 0.45, null),
+  industrial: P('#5a5048', '#524840', '#3a3430', '#2a2420', '#3a5a6a', '#ff9040', 0.15, '#6a6058'), arcane: P('#5a6a8a', '#52627e', '#3a4a6a', '#2a3450', '#3a6ad0', '#a0e0ff', 0.1, '#a0b0d0'), neon: P('#4a4450', '#423c48', '#2a2630', '#1a1820', '#2a3a6a', '#ff40a0', 0.1, null), interior: P('#8a6a4a', '#7e6044', '#5a4030', '#3a2a20', '#3a6aa0', '#ffd080', 0.25, null),
   sand: P('#c8a870', '#bc9c66', '#9a7c4e', '#6e5636', '#4a90c0', '#fff0a0', 0.2, '#d0b080'), void: P('#2a2440', '#241f38', '#16122a', '#0c0a18', '#000000', '#a080ff', 0.6, '#100820'), abyss: P('#2a1a34', '#24162e', '#4a3060', '#100818', '#2a0040', '#c040ff', 0.75, '#0a0010'),
 };
 export const SKIN = ['#f6d7b8', '#e8b890', '#c88a60', '#8a5a3a', '#e0c8f0'];
@@ -22,6 +23,8 @@ function shade(hex, f) { const n = parseInt(hex.slice(1), 16); let r = n >> 16, 
 export { shade };
 
 // ---------- tile map prerender (static layer)
+import { drawFloor, drawIWall, drawBuilding, drawLandmark, drawDecor, windows, FLOORS } from './citysprites.js';
+export { windows };
 export function renderTileMap(map, palKey) {
   const pal = PALETTES[palKey] || PALETTES.moss; const S = 16;
   const c = document.createElement('canvas'); c.width = map.w * S; c.height = map.h * S; const g = c.getContext('2d');
@@ -32,7 +35,10 @@ export function renderTileMap(map, palKey) {
   for (let i = 0; i < map.tiles.length; i++) if (map.tiles[i] === T.ROOF && !roofCol.has(i)) { const st = [i]; roofCol.set(i, rc); while (st.length) { const c = st.pop(); const cx = c % map.w, cy = (c / map.w) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (cy + dy) * map.w + cx + dx; if (cx + dx >= 0 && cx + dx < map.w && map.tiles[n] === T.ROOF && !roofCol.has(n)) { roofCol.set(n, rc); st.push(n); } } } rc++; }
   const ROOFS = ['#a03a2a', '#2a5aa0', '#3a7a3a', '#8a4a9a', '#a07a2a'];
   for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
-    const v = at(x, y), px = x * S, py = y * S, r = rnd(x, y);
+    let v = at(x, y); const px = x * S, py = y * S, r = rnd(x, y);
+    if (v === T.BLOCK) { v = map.floorTile || [at(x - 1, y), at(x + 1, y), at(x, y + 1), at(x, y - 1)].find(n => n !== T.BLOCK && n !== T.WALL && n !== T.IWALL && n !== T.VOID) || T.COBBLE; if (v === T.BLOCK) v = T.COBBLE; }
+    if (FLOORS[v]) { drawFloor(g, v, px, py, x, y, v === map.floorTile && map.kind === 'interior' ? null : null); continue; }
+    if (v === T.IWALL) { drawIWall(g, px, py, map.wallCol || '#6a4a3a', at(x, y + 1) !== T.IWALL); continue; }
     const floorBase = (col1, col2) => { g.fillStyle = r < 0.5 ? col1 : col2; g.fillRect(px, py, S, S); for (let k = 0; k < 5; k++) { const a = rnd(x, y, k + 1); g.fillStyle = shade(col1, 0.82 + rnd(x, y, k + 9) * 0.3); g.fillRect(px + Math.floor(a * 15), py + Math.floor(rnd(x, y, k + 20) * 15), 1 + (a > 0.8 ? 1 : 0), 1); } if (r > 0.9) { g.fillStyle = shade(col1, 0.7); g.fillRect(px + 3, py + 8, 4, 1); g.fillRect(px + 9, py + 4, 1, 3); } };
     switch (v) {
       case T.VOID: { g.fillStyle = palKey === 'sky' ? '#7aa0d8' : '#05040a'; g.fillRect(px, py, S, S); if (palKey === 'sky' && r > 0.85) { g.fillStyle = '#e8f0ff'; g.fillRect(px + 2, py + 6, 8, 3); } else if (r > 0.97) { g.fillStyle = '#a0a0ff'; g.fillRect(px + 7, py + 7, 1, 1); } break; }
@@ -67,6 +73,10 @@ export function renderTileMap(map, palKey) {
     // ambient occlusion near walls
     if (!isWallish(v) && v !== T.VOID && v !== T.TREE && isWallish(at(x, y - 1))) { g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(px, py, S, 4); }
   }
+  // props: decor/furniture first, then buildings & landmarks sorted by bottom edge (painter's order)
+  windows.length = 0;
+  const props = (map.props || []).slice().sort((a, b) => (a.y + a.h) - (b.y + b.h));
+  for (const p of props) { if (p.k === 'bldg') drawBuilding(g, p); else if (p.k === 'landmark') drawLandmark(g, p); else drawDecor(g, p); }
   return c;
 }
 

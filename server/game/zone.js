@@ -1,6 +1,8 @@
 // Zone: one simulated map instance (town, field or dungeon floor). Authoritative 20Hz simulation.
 import { TILE, STATUS, TICK_MS } from '../../shared/constants.js';
-import { T, BLOCKING, genDungeonFloor, genOverworld, tileAt } from './maps.js';
+import { T, BLOCKING, genDungeonFloor, genOverworld, tileAt, WORLD } from './maps.js';
+import { genCity, genInterior } from './city.js';
+import { CITIES } from '../../shared/data/cities.js';
 import { Actor, Fighter, statusMoveMul } from './actor.js';
 import { dealDamage, applyStatus } from './combat.js';
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
@@ -35,6 +37,17 @@ export class Zone {
       this.gim = this.map.band.gim; this.nextHazard = 3000;
       if (opts.diff === 'ABYSS') this.curses = abyssCurses(opts.floor);
       this.populate();
+    } else if (opts.kind === 'interior') {
+      // building interior (or player home): its own map, shared by everyone inside so players see each other
+      this.cityId = opts.city; this.bldgId = opts.bldg.id; this.door = opts.door; this.home = opts.home || null;
+      this.genArgs = [id, opts.bldg, opts.city, opts.homeTier ?? null]; this.map = genInterior(...this.genArgs); this.kind = 'interior'; this.name = opts.home ? `${opts.home.ownerName}の家（${this.map.name}）` : opts.bldg.name; this.gim = [];
+      this.map.npcs = [];
+      const spots = this.map.spots; const s0 = spots.find(x => x.fixed) || spots[0];
+      if (opts.bldg.svc && s0) this.map.npcs.push({ service: opts.bldg.svc, name: opts.bldg.name, x: s0.x, y: s0.y });
+      if (opts.bldg.guild) { const s1 = opts.bldg.svc ? spots.find(x => !x.fixed) || s0 : s0; if (s1) this.map.npcs.push({ service: 'guildhq', guild: opts.bldg.guild, name: 'ギルド窓口', x: s1.x, y: s1.y }); }
+      if (opts.bldg.story && s0) this.map.npcs.push({ service: 'story', story: opts.bldg.story, name: opts.bldg.name, x: s0.x, y: s0.y });
+    } else if (WORLD[id]?.kind === 'town') {
+      this.cityId = id; this.map = genCity(id, WORLD[id].links); this.kind = 'town'; this.name = this.map.name; this.gim = [];
     } else {
       this.map = genOverworld(id); this.kind = this.map.kind; this.name = this.map.name; this.gim = [];
       if (this.kind === 'field') { this.lv = this.map.lv; for (const s of this.map.spawns) this.spawnFieldMonster(s); }
@@ -112,7 +125,7 @@ export class Zone {
   }
   spawnFieldMonster(s) {
     const [lo, hi] = this.lv; const t = this.id === 'field_green' ? s[0] / this.map.w : 1 - s[1] / this.map.h; const lv = Math.max(1, Math.round(lo + (hi - lo) * Math.pow(t, 1.6) + Math.random() * 2));
-    const fams = this.id === 'field_green' ? (lv < 5 ? ['slime', 'rat', 'bat'] : ['slime', 'rat', 'goblin', 'wolf', 'goblinArcher', 'bat', 'spider']) : ['wolf', 'harpy', 'lizard', 'golem', 'imp', 'treant', 'knight', 'elemThunder'];
+    const fl = WORLD[this.id]?.fams || [['slime']]; const fams = lv < 5 && fl.length > 1 ? fl[0] : fl[fl.length - 1];
     const m = makeMonster(fams[Math.floor(Math.random() * fams.length)], lv, 'NORMAL', { elite: lv > 6 && Math.random() < 0.04 });
     const p = this.tileCenter(s); m.x = p.x; m.y = p.y; m.home = [p.x, p.y]; m.spawnCell = s; this.add(m);
   }
@@ -219,6 +232,7 @@ export class Zone {
     else if (a.kind === 'summon') this.summonTick(a, now);
     else if (a.kind === 'npc') this.world.npcs.fighterTick(this, a, now);
     else if (a.kind === 'player') this.playerTick(a, now);
+    else if (a.kind === 'resident') this.world.life.tick(this, a, now);
     // integrate velocity
     if (a.vx || a.vy) {
       let mul = statusMoveMul(a); if (a.stopped || now < a.staggerUntil) mul = 0;
@@ -381,6 +395,7 @@ export class Zone {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
     if (a.kind === 'player' || a.kind === 'npc') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
     else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; }
+    else if (a.kind === 'resident') { d.look = a.look; d.job = a.job; }
     else { d.sk = a.sumKind; d.look = a.look; d.wt = a.owner?.wt?.id; }
     return d;
   }

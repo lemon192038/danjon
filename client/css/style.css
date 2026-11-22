@@ -74,3 +74,8 @@ body.touchui #skillbar, body.touchui #chat { display: none; }
 @media (max-width: 760px) { #tutorial { top: 96px; } }
 
 .panel.small { width: min(420px, 92vw); height: auto; }
+
+#clock { background: rgba(10,8,20,.6); padding: 2px 8px; border-radius: 4px; margin-bottom: 4px; font-size: 12px; color: #ffe8b0; }
+#loadingov { position: fixed; inset: 0; z-index: 60; background: #05040a; display: flex; align-items: center; justify-content: center; text-align: center; color: #e8e0ff; font-size: 16px; opacity: 0; pointer-events: none; transition: opacity .25s; }
+#loadingov.on { opacity: 1; pointer-events: auto; } #loadingov .lmode { font-size: 48px; margin-bottom: 10px; } #loadingov .lbar { width: 260px; height: 4px; background: #2a2240; margin: 14px auto 0; border-radius: 2px; overflow: hidden; } #loadingov .lbar i { display: block; height: 100%; width: 100%; background: var(--acc); transform-origin: left; animation: lbar linear forwards; } @keyframes lbar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.lore { background: #1e1830; padding: 10px 12px; border-left: 3px solid var(--gold); line-height: 1.7; } table.wide { width: 100%; } table.wide td { padding: 4px 6px; } table.wide button { padding: 2px 6px; font-size: 11px; margin: 1px; } .casino { font-size: 28px; margin-top: 12px; }

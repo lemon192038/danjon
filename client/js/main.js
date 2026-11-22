@@ -14,7 +14,7 @@ const net = new Net();
 const state = { ents: new Map(), me: null, meEnt: null, self: null, zone: null, projs: [], areas: [], drops: [], lastSnap: 0, myId: null, input: {} };
 window.__state = state;
 let renderer, input, ui;
-const BLOCK = new Set([T.VOID, T.WALL, T.WATER, T.TREE, T.HOUSE, T.PILLAR, T.ROOF]);
+const BLOCK = new Set([T.VOID, T.WALL, T.WATER, T.TREE, T.HOUSE, T.PILLAR, T.ROOF, T.BLOCK, T.IWALL]);
 const settings = Object.assign({ sfx: 0.35, dmgNumbers: true, shake: true, lighting: true, touch: 'auto' }, (() => { try { return JSON.parse(localStorage.getItem('aef_settings') || '{}'); } catch { return {}; } })());
 export function saveSettings() { try { localStorage.setItem('aef_settings', JSON.stringify(settings)); } catch {} applySettings(); }
 function applySettings() { setVolume(settings.sfx); if (renderer) Object.assign(renderer.settings, { dmgNumbers: settings.dmgNumbers, shake: settings.shake, lighting: settings.lighting }); if (input) input.showTouch(settings.touch === 'on' || (settings.touch === 'auto' && input.isTouch)); }
@@ -72,10 +72,13 @@ function createScreen() {
 // ---------- game
 net.on('zone', m => {
   const tiles = Uint8Array.from(atob(m.tiles), c => c.charCodeAt(0));
-  state.zone = { ...m, tiles }; state.ents.clear(); state.me = null; state.meEnt = null;
+  state.zone = { ...m, tiles }; state.ents.clear(); state.me = null; state.meEnt = null; state.env = { h: m.clock?.h ?? 12, m: m.clock?.m ?? 0, wx: m.wx, city: m.cityId };
   if (!renderer) startGame();
   renderer.setZone(state.zone); ui.onZone(state.zone); screen('');
 });
+net.on('env', m => { state.env = { h: m.h, m: m.m, wx: m.wx, city: m.city }; ui?.onEnv?.(state.env); });
+net.on('loading', m => { ui?.loading(m.v, m.ms || 600, m.mode); });
+net.on('homeRefresh', m => { if (!state.zone) return; state.zone.props = m.props; state.zone.tiles = Uint8Array.from(atob(m.tiles), c => c.charCodeAt(0)); renderer.rerender(); });
 net.on('self', m => { state.self = m; const w = m.ch.inventory.find(i => i.uid === m.ch.equip.weapon); const wts = new Set(m.ch.inventory.filter(i => i.kind === 'weapon').map(i => +i.ref.split('_')[0])); wts.add(m.d.wt); Promise.all([...wts].map(loadType)).then(() => ui.onSelf(m)); ui.onSelf(m); });
 net.on('s', m => {
   state.lastSnap = performance.now(); state.myId = m.me.id;
@@ -94,8 +97,8 @@ net.on('s', m => {
   ui.onSnap(m);
 });
 function playSfx(f, myId) { if (f.t === 'atk' && f.id === myId) (f.sh === 'proj' || f.sh === 'beam' ? sfx.shoot : f.sh === 'slam' ? sfx.heavy : sfx.swing)(); else if (f.t === 'dmg' && !f.a && !f.h && !f.dot) (f.c ? sfx.crit : sfx.hit)(); else if (f.t === 'boom') sfx.boom(); else if (f.t === 'skill' && f.id === myId) sfx.skill(); else if (f.t === 'parry' || f.t === 'counter') sfx.parry(); else if (f.t === 'dodge' && f.id === myId) sfx.dodge(); }
-net.on('note', m => ui.note(m));
-net.on('toast', m => ui.toast(m.v));
+net.on('note', m => ui?.note(m));
+net.on('toast', m => ui?.toast(m.v, m.cls));
 net.on('open', () => {});
 net.on('closed', () => { if (ui) ui.toast('サーバーとの接続が切れました。再接続中…', 'err'); });
 

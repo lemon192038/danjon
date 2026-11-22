@@ -7,6 +7,8 @@ import { xpToNext, masteryXpToNext, jobXpToNext, enhanceCost, armorDef } from '/
 import { weaponSprite } from './sprites.js';
 import { sfx } from './sfx.js';
 import { Tutorial } from './tutorial.js';
+import { installCity } from './uicity.js';
+import { ITEMS } from '/shared/data/guilds.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rar = r => RARITIES[r] || RARITIES[1];
@@ -17,14 +19,15 @@ const DODGE = { roll: 'ローリング', dash: 'ダッシュ', step: 'ステッ�
 const SPECIAL_NAMES = { guard: 'ガード/盾撃', charge: '溜め斬り', iai: '居合', frenzy: '乱舞', parry: 'パリィ', riposte: '受け流し', dashStrike: '突進斬り', execute: '処刑', throwSpin: '回転投擲', backstab: '背面取り', bloodPact: '血の契約', orbit: '周回刃', vault: '棒高跳び', guardCharge: '盾突進', hook: '鉤引き', sweepTrip: '足払い', tide: '激流', spinGuard: '回転防御', leap: '跳躍斬り', brace: '迎撃構え', reap: '刈り取り', rage: '激昂', whirl: '大旋回', spin: '遠心回転', volley: '一斉投擲', armorBreak: '鎧砕き', superArmor: '不動', blessStrike: '祝福打', spikeBurst: '棘爆', tauntRoar: '咆哮', roll: '鉄球転がし', pileLoad: '杭装填', chi: '気功解放', grab: '掴み投げ', pounce: '飛びかかり', tempo: 'テンポ解放', launch: '蹴り上げ', overclock: '過駆動', auraBurst: '闘気解放', aim: '引き絞り', boltSwap: '矢弾切替', barrage: '制圧射撃', manaArrow: '魔力矢', spirit: '精霊召喚', pinThrow: '縫い止め', ricochet: '跳弾', recallStrike: '呼び戻し', heatVent: '排熱爆破', channel: '詠唱', elemShift: '属性切替', quickcast: '高速詠唱', pageSummon: '頁召喚', spellChain: '連鎖詠唱', orbBarrier: '魔力障壁', ringSwap: '指輪切替', rune: 'ルーン刻印', library: '書架展開', modeToggle: '形態切替', transform: '変形', lash: '絡め取り', wireTrap: '鋼線罠', hammerThrow: '鉄球投擲', drill: '穿孔', rev: '回転鋸', umbrellaGuard: '傘防御・反射', rally: '軍旗', song: '旋律', puppet: '人形召喚', divineJudgment: '神の裁き', demonForm: '魔神化', dragonBreath: '竜の吐息', wings: '光翼', soulHarvest: '魂の解放', timeStop: '時間停止', gravityWell: '重力井戸', erase: '消去', meteor: '流星群', unlock: '解錠' };
 
 export class UI {
+  static install() { installCity(UI); }
   constructor(net, state, ctx) {
     this.net = net; this.state = state; this.ctx = ctx; this.modalOpen = false; this.chatOpen = false; this.panel = null; this.service = null; this.sel = {};
     const hud = document.getElementById('hud');
     hud.innerHTML = `<div id="pinfo"><div id="pname"></div><div class="bar hp"><i></i><span></span></div><div class="bar sp"><i></i><span></span></div><div class="bar xp"><i></i></div><div id="gauges"></div><div id="buffs"></div></div>
-      <div id="zinfo"><div id="zname"></div><canvas id="mini" width="140" height="110"></canvas><div id="curses"></div></div>
+      <div id="zinfo"><div id="zname"></div><div id="clock"></div><canvas id="mini" width="140" height="110"></canvas><div id="curses"></div></div>
       <div id="bossbar"><div id="bossname"></div><div class="bar boss"><i></i></div></div>
       <div id="skillbar"></div><div id="notes"></div><div id="toasts"></div>
-      <div id="menubtns">${[['i', '所持品'], ['c', 'ステータス'], ['k', 'スキル'], ['j', '職業'], ['b', '図鑑'], ['l', 'クエスト'], ['p', 'パーティー'], ['n', '冒険者'], ['m', 'マップ'], ['o', '設定']].map(([k, n]) => `<button data-key="${k}" title="${n} [${k.toUpperCase()}]">${n}</button>`).join('')}</div>
+      <div id="menubtns">${[['u', '都市'], ['i', '所持品'], ['c', 'ステータス'], ['k', 'スキル'], ['j', '職業'], ['b', '図鑑'], ['l', 'クエスト'], ['p', 'パーティー'], ['n', '冒険者'], ['m', 'マップ'], ['o', '設定']].map(([k, n]) => `<button data-key="${k}" title="${n} [${k.toUpperCase()}]">${n}</button>`).join('')}</div>
       <div id="chat"><div id="chatlog"></div><input id="chatin" maxlength="120" placeholder="Enterでチャット"></div>
       <div id="deadov"><h2>戦闘不能</h2><button id="respawn" class="primary">街へ帰還する</button></div><div id="interact"></div>`;
     this.$ = s => hud.querySelector(s);
@@ -34,7 +37,7 @@ export class UI {
     this.$('#respawn').onclick = () => net.send({ t: 'respawn' });
     const ci = this.$('#chatin'); ci.addEventListener('keydown', e => { if (e.key === 'Enter') { if (ci.value.trim()) net.send({ t: 'chat', v: ci.value }); ci.value = ''; ci.blur(); } if (e.key === 'Escape') ci.blur(); e.stopPropagation(); });
     ci.addEventListener('focus', () => this.chatOpen = true); ci.addEventListener('blur', () => this.chatOpen = false);
-    net.on('chat', m => this.chat(m.from, m.v)); net.on('open', m => m.service && this.openService(m.service, m.data)); net.on('party', m => { if (this.state.self) this.state.self.party = m.v; if (this.panel === 'party') this.render(); });
+    net.on('chat', m => this.chat(m.from, m.v)); net.on('cityInfo', m => { this.cityInfo = m; if (this.panel === 'city') this.render(); }); net.on('casinoResult', m => { this.casinoRes = m; if (this.panel === 'casino') this.render(); }); net.on('open', m => m.service && this.openService(m.service, m.data)); net.on('party', m => { if (this.state.self) this.state.self.party = m.v; if (this.panel === 'party') this.render(); });
     net.on('invite', m => { if (confirm(`${m.from} からパーティーに招待されました。参加しますか？`)) net.menu('accept', { pid: m.pid }); });
     net.on('npcList', m => { this.npcList = m.list; if (this.panel === 'party' || this.panel === 'npcs') this.render(); });
     net.on('players', m => { this.players = m.list; if (this.panel === 'party') this.render(); });
@@ -43,7 +46,7 @@ export class UI {
     this.tut = new Tutorial(net, () => !!ctx.input.touchOn);
   }
   // ---------- events from net
-  onZone(z) { this.tut.event('zone:' + z.kind); this.closeModal(); this.$('#zname').textContent = z.name; this.$('#curses').innerHTML = (z.curses || []).map(c => `<span>${esc(c)}</span>`).join(''); this.drawMini(); this.toast(z.name, 'zone', 2200); }
+  onZone(z) { this.tut.event('zone:' + z.kind); this.onEnv(this.state.env || { h: 12, m: 0, wx: z.wx }); this.closeModal(); this.$('#zname').textContent = z.name; this.$('#curses').innerHTML = (z.curses || []).map(c => `<span>${esc(c)}</span>`).join(''); this.drawMini(); this.toast(z.name, 'zone', 2200); }
   onSelf(m) { this.self = m; this.renderSkillbar(); this.tut.sync(m.ch); this.$('#pname').innerHTML = `<b>${esc(m.ch.name)}</b> Lv${m.ch.level} <small>${esc(D.jobMap.get(m.ch.job)?.name || '')} / ${esc(WT_BY_ID[m.d.wt].name)}</small>${m.ch.statPoints ? ` <em class="pts">+${m.ch.statPoints}</em>` : ''} <span class="gold">${m.ch.gold.toLocaleString()}G</span>`; if (this.modalOpen) this.render(); }
   onSnap(m) {
     const me = m.me; this.me = me;
@@ -58,7 +61,7 @@ export class UI {
     this.$('#bossbar').style.display = boss ? 'block' : 'none'; if (boss) { this.$('#bossname').textContent = boss.d.name; this.$('.bar.boss i').style.width = boss.hp / 10 + '%'; }
     // interaction hint
     const z = this.state.zone; let hint = '';
-    if (z && this.state.me) { const p = this.state.me; for (const n of z.npcs) if (Math.hypot(n.x * 16 + 8 - p.x, n.y * 16 + 8 - p.y) < 30) hint = `[F] ${n.name}`; for (const gt of z.gates) if (Math.hypot(gt.x * 16 + 8 - p.x, gt.y * 16 + 8 - p.y) < 30) hint = `[F] ${D.dungeons[gt.dungeon]?.name}へ`; for (const e of this.state.ents.values()) if (e.seen && e.d.kind === 'npc' && Math.hypot(e.x - p.x, e.y - p.y) < 30) hint = `[F] ${e.d.name}と話す`; for (const d of this.state.drops) if (d[3] === 'chest' && Math.hypot(d[1] - p.x, d[2] - p.y) < 26) hint = '[F] 宝箱を開ける'; if (z.exit && Math.hypot(z.exit[0] * 16 + 8 - p.x, z.exit[1] * 16 + 8 - p.y) < 30) hint = '[F] 出口：街へ帰還'; }
+    if (z && this.state.me) { const p = this.state.me; for (const n of z.npcs) if (Math.hypot(n.x * 16 + 8 - p.x, n.y * 16 + 8 - p.y) < 30) hint = `[F] ${n.name}`; for (const gt of z.gates) if (Math.hypot(gt.x * 16 + 8 - p.x, gt.y * 16 + 8 - p.y) < 30) hint = `[F] ${D.dungeons[gt.dungeon]?.name}へ`; for (const e of this.state.ents.values()) if (e.seen && e.d.kind === 'npc' && Math.hypot(e.x - p.x, e.y - p.y) < 30) hint = `[F] ${e.d.name}と話す`; for (const d of this.state.drops) if (d[3] === 'chest' && Math.hypot(d[1] - p.x, d[2] - p.y) < 26) hint = '[F] 宝箱を開ける'; if (z.exit && Math.hypot(z.exit[0] * 16 + 8 - p.x, z.exit[1] * 16 + 8 - p.y) < 30) hint = '[F] 出口：街へ帰還'; hint = this.cityHint(z, p) || hint; }
     const ih = this.$('#interact'); ih.textContent = hint; ih.style.display = hint ? 'block' : 'none';
   }
   bar(sel, f, txt) { const b = this.$('.bar' + sel); b.querySelector('i').style.width = Math.max(0, Math.min(100, f * 100)) + '%'; const s = b.querySelector('span'); if (s) s.textContent = txt; }
@@ -98,14 +101,15 @@ export class UI {
   }
   // ---------- keys & modal
   key(k) {
-    const map = { i: 'inventory', tab: 'inventory', c: 'status', k: 'skills', j: 'jobs', b: 'codex', l: 'quests', p: 'party', n: 'npcs', m: 'map', o: 'settings' };
+    const map = { u: 'city', i: 'inventory', tab: 'inventory', c: 'status', k: 'skills', j: 'jobs', b: 'codex', l: 'quests', p: 'party', n: 'npcs', m: 'map', o: 'settings' };
     if (k === 'escape') { if (this.modalOpen) this.closeModal(); else this.open('settings'); return; }
     if (k === 'enter') { this.$('#chatin').focus(); return; }
     if (map[k]) { if (this.panel === map[k] && this.modalOpen) this.closeModal(); else this.open(map[k]); }
   }
-  open(p, service = null) { if (p === 'skills') this.tut.event('menu'); this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
+  open(p, service = null) { if (p === 'skills') this.tut.event('menu'); if (p === 'city') this.cityInfo = null; this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
   closeModal() { this.modalOpen = false; this.modal.style.display = 'none'; this.panel = null; this.service = null; }
   openService(s, data) {
+    if (this.cityPanel(s, data)) return;
     this.svc = data;
     if (s === 'inn') { this.toast('宿屋で休息し、HPとSPが全回復した'); return; }
     if (s === 'exit') { this.open('exitConfirm'); return; }
@@ -119,7 +123,7 @@ export class UI {
   onInputEv(e) { const t = e.target; if (t.dataset.search) { this.sel.search = t.value; clearTimeout(this._st); this._st = setTimeout(() => { this.render(); const n = this.modal.querySelector('[data-search]'); if (n) { n.focus(); n.selectionStart = n.value.length; } }, 250); } }
   onClick(e) {
     const t = e.target.closest('[data-act]'); if (!t) { if (e.target === this.modal) this.closeModal(); return; }
-    const a = t.dataset.act, v = t.dataset.v, m = this.net.menu.bind(this.net); sfx.ui();
+    const a = t.dataset.act, v = t.dataset.v, m = this.net.menu.bind(this.net); sfx.ui(); if (this.cityAct(a, t)) return;
     switch (a) {
       case 'close': return this.closeModal();
       case 'tab': this.sel[t.dataset.k] = v; return this.render();
@@ -148,16 +152,17 @@ export class UI {
   p_inventory() {
     const ch = this.self.ch; const eq = new Set(Object.values(ch.equip)); const inTown = this.state.zone.kind === 'town';
     const items = ch.inventory.slice().sort((a, b) => (eq.has(b.uid) - eq.has(a.uid)) || (a.kind > b.kind ? 1 : -1));
-    const name = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : { hp: '回復薬', sp: '魔力薬', ore: '強化鉱石', abyssShard: '深淵の欠片' }[it.ref] || it.ref;
+    const name = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : ITEMS[it.ref]?.name || it.ref;
     const list = items.map(it => { const w = it.kind === 'weapon' ? D.weapons.get(it.ref) : null; const col = w ? rar(w.rar).color : it.kind === 'armor' ? '#a0c0ff' : '#ccc'; return `<div class="irow ${this.sel.item === it.uid ? 'sel' : ''}" data-act="item" data-v="${it.uid}"><span style="color:${col}">${eq.has(it.uid) ? '[E] ' : ''}${esc(name(it))}${it.plus ? ' +' + it.plus : ''}${it.n ? ' ×' + it.n : ''}</span><small>${w ? `${rar(w.rar).key} ${WT_BY_ID[w.wt].name} Lv${w.lvl}` : it.kind === 'armor' ? (it.slot === 'armor' ? '鎧' : '装飾') : '消耗/素材'}</small></div>`; }).join('');
     const it = ch.inventory.find(i => i.uid === this.sel.item); let det = '<p class="dim">アイテムを選択してください</p>';
     if (it) {
       if (it.kind === 'weapon') det = this.weaponDetail(D.weapons.get(it.ref), it);
       else if (it.kind === 'armor') { const a = armorDef(it.slot, it.tier); det = `<h3>${a.name}${it.plus ? ' +' + it.plus : ''}</h3><p>防御 ${a.def} / HP+${a.hp}${a.sp ? ` / SP+${a.sp}` : ''}${a.crit ? ` / 会心+${pct(a.crit)}` : ''} ・ 必要Lv${Math.max(1, a.lvl - 10)}</p>`; }
-      else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${it.ref === 'ore' ? '鍛冶屋で装備を強化する素材' : it.ref === 'hp' ? 'HPを35%回復 [Q]' : it.ref === 'sp' ? 'SPを40%回復 [E]' : '深淵の力を宿した欠片'}</p>`;
+      else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${esc(ITEMS[it.ref]?.desc || '')}${it.ref === 'hp' ? ' [Q]' : it.ref === 'sp' ? ' [E]' : ''}</p>${ITEMS[it.ref]?.use ? `<button class="primary" data-act="useItem" data-v="${it.ref}">使う</button>` : ''}`;
       det += `<div class="btns">${(it.kind === 'weapon' || it.kind === 'armor') && !eq.has(it.uid) ? `<button class="primary" data-act="equip" data-v="${it.uid}">装備</button>` : ''}${inTown && (it.kind === 'weapon' || it.kind === 'armor') ? `<button data-act="enhance" data-v="${it.uid}">強化 (${(() => { const c = enhanceCost(it.kind === 'weapon' ? D.weapons.get(it.ref) : { lvl: it.tier * 15 + 1 }, it.plus || 0); return `${c.gold}G 鉱石${c.ore} 成功率${pct(c.rate)}`; })()})</button>` : ''}${inTown && !eq.has(it.uid) ? `<button data-act="sell" data-v="${it.uid}">売却</button>` : ''}</div>`;
     }
-    return this.wrap(`所持品・装備 <small>${ch.inventory.length}/200 ・ ${ch.gold.toLocaleString()}G</small>`, `<div class="split"><div class="list">${list}</div><div class="det">${det}</div></div>`);
+    const cargo = Object.entries(ch.cargo || {}).filter(([, n]) => n > 0).map(([g, n]) => `${({ wheat: '小麦', fish: '干物', spice: '香辛料', silk: '絹織物', ore: '星鉄鉱石', steel: '鋼材', crystal: '魔晶石', book: '魔導写本', wine: '葡萄酒' })[g]}×${n}`).join('、');
+    return this.wrap(`所持品・装備 <small>${ch.inventory.length}/200 ・ ${ch.gold.toLocaleString()}G${ch.bank?.bal ? ` ・ 預金${ch.bank.bal.toLocaleString()}G` : ''}</small>`, `${cargo ? `<p class="dim">積荷：${cargo}</p>` : ''}<div class="split"><div class="list">${list}</div><div class="det">${det}</div></div>`);
   }
   weaponDetail(w, it) {
     if (!w || w.stub) { loadType(w?.wt || 1).then(() => this.render()); return '<p>読み込み中…</p>'; }
@@ -288,3 +293,5 @@ export class UI {
       <button data-act="tutReset">チュートリアルを最初から</button> <button data-act="logout">ログアウト</button></div>`);
   }
 }
+
+UI.install();

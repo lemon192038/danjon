@@ -13,7 +13,7 @@ export function newCharacter(id, name, wtId, look) {
   const w = DATA.wtWeapons.get(wtId)[0];
   const wu = uid(), au = uid();
   const ch = {
-    id, name, look, created: Date.now(), level: 1, xp: 0, statPoints: 0, stats: Object.fromEntries(STATS.map(s => [s, 0])), gold: 300,
+    id, name, look, created: Date.now(), level: 1, xp: 0, statPoints: 0, stats: Object.fromEntries(STATS.map(s => [s, 0])), gold: +(process.env.DEV_START_GOLD || 300),
     inventory: [{ uid: wu, kind: 'weapon', ref: w.id, plus: 0 }, { uid: au, kind: 'armor', slot: 'armor', tier: 0, plus: 0 }, { uid: uid(), kind: 'potion', ref: 'hp', n: 5 }, { uid: uid(), kind: 'mat', ref: 'ore', n: 3 }],
     equip: { weapon: wu, armor: au, accessory: null }, starterType: wtId,
     mastery: { [wtId]: { lv: 1, xp: 0 } }, job: 'warrior_0', jobs: {}, skills: { slots: [null, null, null, null], levels: {} },
@@ -134,7 +134,7 @@ export function enhance(ch, itemUid) {
 
 // ---- shops (data-driven from weapon acquisition table)
 export function shopStock(town, kind) {
-  const tier = { haven: 0, marina: 1, celestia: 2 }[town] ?? 0;
+  const tier = { haven: 0, marina: 1, celestia: 2, vulcan: 2, arcanum: 2, lumina: 1 }[town] ?? 0;
   if (kind === 'weapon') { const out = []; for (const list of DATA.wtWeapons.values()) for (const w of list) if (w.acq.src === 'shop' && w.acq.minFloor <= [15, 40, 100][tier] && w.acq.minFloor >= [0, 5, 20][tier]) out.push(w.id); return out; }
   if (kind === 'armor') return Array.from({ length: 4 }, (_, i) => Math.min(9, tier * 3 + i));
   return ['hp', 'sp', 'ore'];
