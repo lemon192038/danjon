@@ -1,3 +1,4 @@
+import { EXITS } from '/shared/data/slum.js';
 // Renderer: low-res pixel layer (scaled crisp) + full-res text overlay. Lighting, shadows, animations, effects.
 import { renderTileMap, charSprite, weaponSprite, monsterSprite, PALETTES, T, EL_COL, shade, windows } from './sprites.js';
 import { ELEMENT_COLORS, RARITIES, STATUS } from '/shared/constants.js';
@@ -279,7 +280,7 @@ export class Renderer {
       const dead = e.flags & 1; const top = y - (d.boss ? 48 : d.kind === 'monster' ? 24 : 28) * S;
       if (!dead && (d.kind !== 'player' || e !== state.meEnt)) {
         if (d.kind === 'monster' && (e.hp < 1000 || d.boss || d.elite)) { const w = d.boss ? 60 * S / 2 : 14 * S; o.fillStyle = 'rgba(0,0,0,.6)'; o.fillRect(x - w / 2 - 1, top - 1, w + 2, 5); o.fillStyle = d.boss ? '#ff3050' : '#e04040'; o.fillRect(x - w / 2, top, w * e.hp / 1000, 3); }
-        if (d.kind === 'resident') { if (state.me && Math.hypot(e.x - state.me.x, e.y - state.me.y) < 56) { o.font = '10px sans-serif'; o.fillStyle = '#e8e0c8'; o.strokeStyle = 'rgba(0,0,0,.8)'; o.lineWidth = 3; const l = `${d.name}（${d.job}）`; o.strokeText(l, x, top + 4); o.fillText(l, x, top + 4); } continue; }
+        if (d.kind === 'resident' || d.kind === 'slumnpc') { if (state.me && Math.hypot(e.x - state.me.x, e.y - state.me.y) < (d.kind === 'slumnpc' ? 90 : 56)) { o.font = '10px sans-serif'; o.fillStyle = d.kind === 'slumnpc' ? '#ffd8a0' : '#e8e0c8'; o.strokeStyle = 'rgba(0,0,0,.8)'; o.lineWidth = 3; const l = `${d.name}（${d.job}）`; o.strokeText(l, x, top + 4); o.fillText(l, x, top + 4); } continue; }
         if (d.service) { o.font = 'bold 12px sans-serif'; o.fillStyle = '#ffd070'; o.strokeStyle = 'rgba(0,0,0,.85)'; o.lineWidth = 3; o.strokeText('▼ ' + d.name, x, top - 4); o.fillText('▼ ' + d.name, x, top - 4); continue; }
         if (d.kind !== 'monster' || d.boss || d.elite || e.hover) { o.font = `${d.boss ? 'bold 14px' : '11px'} sans-serif`; o.fillStyle = d.kind === 'player' ? '#ffffff' : d.kind === 'npc' ? '#a0e0ff' : d.boss ? '#ffb040' : d.elite ? '#ffd070' : '#ddd'; o.strokeStyle = 'rgba(0,0,0,.8)'; o.lineWidth = 3; const label = `${d.kind === 'npc' ? '◆' : ''}${d.name}${d.lv ? ' Lv' + d.lv : ''}`; o.strokeText(label, x, top - 4); o.fillText(label, x, top - 4); if (d.affix?.length) { o.font = '10px sans-serif'; o.fillStyle = '#ff80c0'; o.strokeText(d.affix.join('・'), x, top - 16); o.fillText(d.affix.join('・'), x, top - 16); } }
         if (d.kind !== 'monster' && e.hp < 1000) { o.fillStyle = 'rgba(0,0,0,.6)'; o.fillRect(x - 15, top, 30, 4); o.fillStyle = '#50e070'; o.fillRect(x - 15, top, 30 * e.hp / 1000, 3); }
@@ -288,6 +289,11 @@ export class Renderer {
       if (e.say && now - e.say.t0 < 3500) { o.font = '12px sans-serif'; const w = Math.min(220, o.measureText(e.say.v).width + 12); o.fillStyle = 'rgba(255,255,255,.92)'; o.fillRect(x - w / 2, top - 36, w, 20); o.fillStyle = '#222'; o.fillText(e.say.v.slice(0, 30), x, top - 22); }
     }
     if (state.me) { o.font = '11px sans-serif'; o.lineWidth = 3; o.strokeStyle = 'rgba(0,0,0,.85)'; for (const d of this.zone.doors || []) { if (d.home && !d.mine) continue; const dxw = d.x * 16 + 8, dyw = d.y * 16; if (Math.abs(dxw - state.me.x) > 170 || Math.abs(dyw - state.me.y) > 120) continue; const x = (dxw + ox) * S, y = (dyw - 18 + oy) * S; const n = d.mine ? '🏠 マイホーム' : d.name; o.fillStyle = d.mine ? '#a0ffb0' : '#fff0c8'; o.strokeText(n, x, y); o.fillText(n, x, y); } }
+    if (this.zone.kind === 'slum' && state.me) { o.font = 'bold 11px sans-serif'; o.lineWidth = 3; o.strokeStyle = 'rgba(0,0,0,.85)';
+      for (const ob of this.zone.objects || []) { const wx = ob.x * 16 + 8, wy = ob.y * 16 - 4; const dd = Math.hypot(wx - state.me.x, wy - state.me.y); if (dd > 200) continue; const x = (wx + ox) * S, y = (wy - 14 + oy) * S; let t = '', col = '#fff';
+        if (ob.k === 'exit') { t = '⇪ 脱出：' + (EXITS[ob.type]?.name || ob.type); col = '#70ff90'; } else if (ob.k === 'ladder') { t = ob.dir > 0 ? '▲ 上の層へ' : '▼ 下の層へ'; col = ob.temp ? '#ff90c0' : '#ffe070'; } else if (ob.k === 'entry') { t = '潜入口'; col = '#a0c8ff'; } else if (ob.k === 'hideout') { t = '隠れ家への抜け道'; col = '#ffb070'; }
+        else if (ob.k === 'cont' && dd < 90) { t = ob.looted ? '（漁り済み）' : '◇ 調べる'; col = ob.looted ? '#888' : '#ffd070'; }
+        if (t) { o.fillStyle = col; o.strokeText(t, x, y); o.fillText(t, x, y); } } }
     o.font = 'bold 12px sans-serif'; o.fillStyle = '#d0b0ff'; o.strokeStyle = '#000'; o.lineWidth = 3;
     for (const gt of this.zone.gates || []) { const x = (gt.x * 16 + 8 + ox) * S, y = (gt.y * 16 - 10 + oy) * S; const n = '◆ ' + (this.dungeonNames?.[gt.dungeon] || gt.dungeon); o.strokeText(n, x, y); o.fillText(n, x, y); }
     this.texts = this.texts.filter(t => now - t.t0 < (t.skill ? 1100 : 900));

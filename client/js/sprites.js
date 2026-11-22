@@ -2,6 +2,8 @@
 export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21, BLOCK: 22, MARBLE: 23, COBBLE: 24, RUBBLE: 25, PLANK: 26, CARPET: 27, STONEF: 28, IWALL: 29, STEPS: 30, MAT: 31 };
 const P = (floor, floor2, wallTop, wallFace, water, accent, dark, fog) => ({ floor, floor2, wallTop, wallFace, water, accent, dark, fog });
 export const PALETTES = {
+  sewer: P('#3a4440', '#343e3a', '#2a3230', '#1a201e', '#3a5a4a', '#90ffb0', 0.6, '#203028'), slumground: P('#5a5048', '#524840', '#4a3e36', '#2e2620', '#3a5060', '#ffb060', 0.25, '#3a3028'),
+  slummid: P('#5a4a40', '#50423a', '#46383a', '#2a2026', '#3a4a6a', '#ff60b0', 0.35, '#2a2030'), slumroof: P('#6a6468', '#5e585c', '#4a4448', '#302c30', '#4a6a8a', '#80d0ff', 0.1, '#5a5a6a'),
   town: P('#7a6a52', '#6e5e48', '#5b4d3c', '#3f342a', '#3a78c8', '#e8c070', 0.0, null), grass: P('#4f8a3a', '#467d33', '#2f5a2a', '#24461f', '#3a78c8', '#f0e070', 0.0, null), highland: P('#6b8a5a', '#5f7d50', '#4a5a4a', '#353f35', '#4a80b8', '#d0e0ff', 0.1, '#c8d0e0'),
   moss: P('#3d5a3a', '#344f32', '#5a7a4a', '#22301f', '#2a5a7a', '#9aff7a', 0.45, null), fungus: P('#4a3d5a', '#40344f', '#6a5a80', '#241c30', '#3a4a8a', '#e080ff', 0.5, '#402060'), dirt: P('#6a5038', '#5e4630', '#8a6c4c', '#3a2a1c', '#3a5a7a', '#ffb060', 0.45, null),
   lake: P('#4a6a6a', '#405e5e', '#2e4a4a', '#1e3232', '#2a7ab0', '#80e0ff', 0.4, null), lava: P('#4a2a22', '#40241e', '#6a3a2a', '#221010', '#ff5a10', '#ff9030', 0.45, '#401008'), obsidian: P('#2e2a36', '#28242f', '#1a1820', '#100e14', '#ff5a10', '#c080ff', 0.55, null),

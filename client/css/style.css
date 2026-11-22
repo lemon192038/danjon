@@ -79,3 +79,12 @@ body.touchui #skillbar, body.touchui #chat { display: none; }
 #loadingov { position: fixed; inset: 0; z-index: 60; background: #05040a; display: flex; align-items: center; justify-content: center; text-align: center; color: #e8e0ff; font-size: 16px; opacity: 0; pointer-events: none; transition: opacity .25s; }
 #loadingov.on { opacity: 1; pointer-events: auto; } #loadingov .lmode { font-size: 48px; margin-bottom: 10px; } #loadingov .lbar { width: 260px; height: 4px; background: #2a2240; margin: 14px auto 0; border-radius: 2px; overflow: hidden; } #loadingov .lbar i { display: block; height: 100%; width: 100%; background: var(--acc); transform-origin: left; animation: lbar linear forwards; } @keyframes lbar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .lore { background: #1e1830; padding: 10px 12px; border-left: 3px solid var(--gold); line-height: 1.7; } table.wide { width: 100%; } table.wide td { padding: 4px 6px; } table.wide button { padding: 2px 6px; font-size: 11px; margin: 1px; } .casino { font-size: 28px; margin-top: 12px; }
+/* slum extraction */
+#raidhud{display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);text-align:center;background:rgba(10,8,14,.82);border:1px solid #6a4a3a;border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.55;color:#e8dcc8;pointer-events:auto;max-width:300px}
+#raidhud .rt{font-size:18px;font-weight:bold;color:#ffd070}#raidhud .rt.warn{color:#ff5050;animation:blink 1s infinite}#raidhud button{font-size:11px;padding:3px 8px}
+@keyframes blink{50%{opacity:.4}}
+#progbar{display:none;position:absolute;left:50%;bottom:28%;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:6px 14px;border-radius:6px;color:#fff;font-size:13px;text-align:center;min-width:220px}
+#progbar .lbar{height:6px;background:#333;margin-top:5px;border-radius:3px;overflow:hidden}#progbar .lbar i{display:block;height:100%;width:0;background:#ffc040;animation:lfill linear forwards}
+@keyframes lfill{to{width:100%}}
+svg.spark{vertical-align:middle}ul.rules{padding-left:18px;margin:4px 0}ul.rules li{margin:2px 0}.tip{background:#2a2630;padding:6px;border-radius:4px}
+@media (max-width:900px),(pointer:coarse){#raidhud{top:4px;font-size:11px;max-width:300px;padding:4px 6px}#raidhud .rt{font-size:15px}}

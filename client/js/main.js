@@ -93,7 +93,7 @@ net.on('s', m => {
   state.projs = m.projs; state.areas = m.areas; state.drops = m.drops;
   const meE = state.ents.get(m.me.id); state.meEnt = meE; state.meServer = m.me;
   if (!state.me) state.me = { x: m.me.x, y: m.me.y };
-  for (const f of m.fx) { renderer.addFx(f, state.ents, state.me); if (f.t === 'tiles') renderer.updateTile(f.x, f.y, f.v); playSfx(f, m.me.id); if (f.t === 'bossdown') ui.toast(`${f.n} を撃破した！ 階段が開いた`, 'big'); }
+  for (const f of m.fx) { renderer.addFx(f, state.ents, state.me); if (f.t === 'tiles') renderer.updateTile(f.x, f.y, f.v); if (f.t === 'objUpdate' && state.zone) { const ob = state.zone.objects.find(o => o.x === f.x && (o.y === f.y + 1 || o.y === f.y)); if (f.looted && ob) ob.looted = 1; if (f.add) { state.zone.objects.push({ k: 'cont', ck: f.add, x: f.x, y: f.y + 1 }); state.zone.props.push({ k: 'cont', ck: f.add, x: f.x, y: f.y, w: 1, h: 1 }); renderer.rerender(); } } playSfx(f, m.me.id); if (f.t === 'bossdown') ui.toast(`${f.n} を撃破した！ 階段が開いた`, 'big'); }
   ui.onSnap(m);
 });
 function playSfx(f, myId) { if (f.t === 'atk' && f.id === myId) (f.sh === 'proj' || f.sh === 'beam' ? sfx.shoot : f.sh === 'slam' ? sfx.heavy : sfx.swing)(); else if (f.t === 'dmg' && !f.a && !f.h && !f.dot) (f.c ? sfx.crit : sfx.hit)(); else if (f.t === 'boom') sfx.boom(); else if (f.t === 'skill' && f.id === myId) sfx.skill(); else if (f.t === 'parry' || f.t === 'counter') sfx.parry(); else if (f.t === 'dodge' && f.id === myId) sfx.dodge(); }

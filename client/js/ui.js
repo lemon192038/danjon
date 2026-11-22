@@ -8,6 +8,8 @@ import { weaponSprite } from './sprites.js';
 import { sfx } from './sfx.js';
 import { Tutorial } from './tutorial.js';
 import { installCity } from './uicity.js';
+import { installSlum } from './uislum.js';
+import { LOOT, PROV } from '/shared/data/slum.js';
 import { ITEMS } from '/shared/data/guilds.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,7 +21,7 @@ const DODGE = { roll: 'ローリング', dash: 'ダッシュ', step: 'ステッ�
 const SPECIAL_NAMES = { guard: 'ガード/盾撃', charge: '溜め斬り', iai: '居合', frenzy: '乱舞', parry: 'パリィ', riposte: '受け流し', dashStrike: '突進斬り', execute: '処刑', throwSpin: '回転投擲', backstab: '背面取り', bloodPact: '血の契約', orbit: '周回刃', vault: '棒高跳び', guardCharge: '盾突進', hook: '鉤引き', sweepTrip: '足払い', tide: '激流', spinGuard: '回転防御', leap: '跳躍斬り', brace: '迎撃構え', reap: '刈り取り', rage: '激昂', whirl: '大旋回', spin: '遠心回転', volley: '一斉投擲', armorBreak: '鎧砕き', superArmor: '不動', blessStrike: '祝福打', spikeBurst: '棘爆', tauntRoar: '咆哮', roll: '鉄球転がし', pileLoad: '杭装填', chi: '気功解放', grab: '掴み投げ', pounce: '飛びかかり', tempo: 'テンポ解放', launch: '蹴り上げ', overclock: '過駆動', auraBurst: '闘気解放', aim: '引き絞り', boltSwap: '矢弾切替', barrage: '制圧射撃', manaArrow: '魔力矢', spirit: '精霊召喚', pinThrow: '縫い止め', ricochet: '跳弾', recallStrike: '呼び戻し', heatVent: '排熱爆破', channel: '詠唱', elemShift: '属性切替', quickcast: '高速詠唱', pageSummon: '頁召喚', spellChain: '連鎖詠唱', orbBarrier: '魔力障壁', ringSwap: '指輪切替', rune: 'ルーン刻印', library: '書架展開', modeToggle: '形態切替', transform: '変形', lash: '絡め取り', wireTrap: '鋼線罠', hammerThrow: '鉄球投擲', drill: '穿孔', rev: '回転鋸', umbrellaGuard: '傘防御・反射', rally: '軍旗', song: '旋律', puppet: '人形召喚', divineJudgment: '神の裁き', demonForm: '魔神化', dragonBreath: '竜の吐息', wings: '光翼', soulHarvest: '魂の解放', timeStop: '時間停止', gravityWell: '重力井戸', erase: '消去', meteor: '流星群', unlock: '解錠' };
 
 export class UI {
-  static install() { installCity(UI); }
+  static install() { installCity(UI); installSlum(UI); }
   constructor(net, state, ctx) {
     this.net = net; this.state = state; this.ctx = ctx; this.modalOpen = false; this.chatOpen = false; this.panel = null; this.service = null; this.sel = {};
     const hud = document.getElementById('hud');
@@ -43,7 +45,7 @@ export class UI {
     net.on('players', m => { this.players = m.list; if (this.panel === 'party') this.render(); });
     net.on('skillfail', m => { const r = { cd: 'クールダウン中', sp: 'SPが足りない', busy: '行動中', ng: '使用できない' }[m.r]; if (r) this.toast(r, 'err', 900); });
     this.slotSel = null; this.skillTab = 'wtype'; this.codexType = 1; this.codexTab = 'profile';
-    this.tut = new Tutorial(net, () => !!ctx.input.touchOn);
+    this.tut = new Tutorial(net, () => !!ctx.input.touchOn); this.initSlum();
   }
   // ---------- events from net
   onZone(z) { this.tut.event('zone:' + z.kind); this.onEnv(this.state.env || { h: 12, m: 0, wx: z.wx }); this.closeModal(); this.$('#zname').textContent = z.name; this.$('#curses').innerHTML = (z.curses || []).map(c => `<span>${esc(c)}</span>`).join(''); this.drawMini(); this.toast(z.name, 'zone', 2200); }
@@ -152,12 +154,13 @@ export class UI {
   p_inventory() {
     const ch = this.self.ch; const eq = new Set(Object.values(ch.equip)); const inTown = this.state.zone.kind === 'town';
     const items = ch.inventory.slice().sort((a, b) => (eq.has(b.uid) - eq.has(a.uid)) || (a.kind > b.kind ? 1 : -1));
-    const name = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : ITEMS[it.ref]?.name || it.ref;
+    const name = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : it.kind === 'loot' ? `${LOOT[it.ref]?.name}${it.prov === 'laundered' ? '' : '〔' + PROV[it.prov] + '〕'}` : ITEMS[it.ref]?.name || it.ref;
     const list = items.map(it => { const w = it.kind === 'weapon' ? D.weapons.get(it.ref) : null; const col = w ? rar(w.rar).color : it.kind === 'armor' ? '#a0c0ff' : '#ccc'; return `<div class="irow ${this.sel.item === it.uid ? 'sel' : ''}" data-act="item" data-v="${it.uid}"><span style="color:${col}">${eq.has(it.uid) ? '[E] ' : ''}${esc(name(it))}${it.plus ? ' +' + it.plus : ''}${it.n ? ' ×' + it.n : ''}</span><small>${w ? `${rar(w.rar).key} ${WT_BY_ID[w.wt].name} Lv${w.lvl}` : it.kind === 'armor' ? (it.slot === 'armor' ? '鎧' : '装飾') : '消耗/素材'}</small></div>`; }).join('');
     const it = ch.inventory.find(i => i.uid === this.sel.item); let det = '<p class="dim">アイテムを選択してください</p>';
     if (it) {
       if (it.kind === 'weapon') det = this.weaponDetail(D.weapons.get(it.ref), it);
       else if (it.kind === 'armor') { const a = armorDef(it.slot, it.tier); det = `<h3>${a.name}${it.plus ? ' +' + it.plus : ''}</h3><p>防御 ${a.def} / HP+${a.hp}${a.sp ? ` / SP+${a.sp}` : ''}${a.crit ? ` / 会心+${pct(a.crit)}` : ''} ・ 必要Lv${Math.max(1, a.lvl - 10)}</p>`; }
+      else if (it.kind === 'loot') { const L = LOOT[it.ref]; det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${['', '一般', '良品', '希少', '貴重', '伝説'][L.r]}・${L.w}kg・基準価値${L.v}G・品質${it.q}</p><p>出所：${PROV[it.prov]}（${it.prov === 'legal' || it.prov === 'laundered' ? '正規店で売却可' : '闇市・故買屋・鑑定屋で扱える'}）</p>`; }
       else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${esc(ITEMS[it.ref]?.desc || '')}${it.ref === 'hp' ? ' [Q]' : it.ref === 'sp' ? ' [E]' : ''}</p>${ITEMS[it.ref]?.use ? `<button class="primary" data-act="useItem" data-v="${it.ref}">使う</button>` : ''}`;
       det += `<div class="btns">${(it.kind === 'weapon' || it.kind === 'armor') && !eq.has(it.uid) ? `<button class="primary" data-act="equip" data-v="${it.uid}">装備</button>` : ''}${inTown && (it.kind === 'weapon' || it.kind === 'armor') ? `<button data-act="enhance" data-v="${it.uid}">強化 (${(() => { const c = enhanceCost(it.kind === 'weapon' ? D.weapons.get(it.ref) : { lvl: it.tier * 15 + 1 }, it.plus || 0); return `${c.gold}G 鉱石${c.ore} 成功率${pct(c.rate)}`; })()})</button>` : ''}${inTown && !eq.has(it.uid) ? `<button data-act="sell" data-v="${it.uid}">売却</button>` : ''}</div>`;
     }

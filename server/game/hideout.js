@@ -43,7 +43,6 @@ export class Hideout {
     const h = opts.owner.hideout; const L = HIDEOUT_LEVELS[h.lv]; const [W, H] = L.size; const g = new Grid(W, H, T.PLANK);
     g.rect(0, 0, W, 2, T.IWALL); g.rect(0, 0, 1, H, T.IWALL); g.rect(W - 1, 0, 1, H, T.IWALL); g.rect(0, H - 1, W, 1, T.IWALL); const mx = W >> 1; g.set(mx, H - 1, T.MAT); g.set(mx - 1, H - 1, T.MAT);
     for (let k = 1; k < L.rooms; k++) { const x = Math.round(k * W / L.rooms); for (let y = 2; y < H - 1; y++) if (y % 6 !== 4 && y % 6 !== 5) g.set(x, y, T.IWALL); }
-    for (let y = 2; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (g.get(x, y) === T.PLANK && (x + y * 3) % 11 === 0) g.set(x, y, T.STONEF);
     const props = [{ k: 'sdecor', v: 'wires', x: 1, y: 0, w: W - 2, h: 2, wall: 1 }, { k: 'lantern', x: mx, y: 2, w: 1, h: 1 }], objects = [], lights = [[mx, 3], [2, H - 3], [W - 3, H - 3]];
     const keys = Object.keys(h.fac); keys.forEach((f, i) => { const p = FAC_POS[i]; if (!p || p[0] >= W - 2 || p[1] >= H - 2) return; g.set(p[0], p[1], T.BLOCK); g.set(p[0] + 1, p[1], T.BLOCK); props.push({ k: 'hfac', f, lv: h.fac[f], x: p[0], y: p[1], w: 2, h: 1 }); objects.push({ k: 'fac', f, x: p[0] + 1, y: p[1] + 1 }); if (['forge', 'alchemy', 'lab', 'terminal'].includes(f)) lights.push([p[0], p[1]]); });
     props.push({ k: 'chest', x: W - 3, y: H - 4, w: 1, h: 1 }); g.set(W - 3, H - 4, T.BLOCK); objects.push({ k: 'hstore', x: W - 3, y: H - 3 });
@@ -73,8 +72,8 @@ export class Hideout {
       case 'workbench': { const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'loot'); if (!it) return s.send({ t: 'open', service: 'hfac', data: { f, lv, items: ch.inventory.filter(i => i.kind === 'loot' && Object.keys(LOOT[i.ref].use || {}).some(k => ['ore', 'hide', 'herb', 'crystal', 'gem', 'wood', 'relic'].includes(k))) } });
         const u = LOOT[it.ref].use; const got = []; for (const [k, v] of Object.entries(u)) { if (!['ore', 'hide', 'herb', 'crystal', 'gem', 'wood', 'relic'].includes(k)) continue; const n = Math.max(1, Math.round(v * (it.q || 1) * (1 + lv * 0.25) * it.n)); addItem(ch, { kind: 'mat', ref: k, n }); got.push(`${k}×${n}`); }
         ch.inventory = ch.inventory.filter(i => i !== it); return ok('分解した：' + got.join(' ')); }
-      case 'forge': { if (!m.wt) return s.send({ t: 'open', service: 'hfac', data: { f, lv, parts: this.have(ch, 'parts'), tune: this.have(ch, 'tuning') } });
-        if (m.act === 'tune') { const w = ch.inventory.find(i => i.uid === ch.equip.weapon); if (!w || !this.takeLoot(ch, 'tuning', 1)) return this.err(s, '調律キットが必要'); w.plus = Math.min(20, (w.plus || 0) + 1); return ok(`武器を調律した（+${w.plus}）`); }
+      case 'forge': { if (!m.wt && m.sub !== 'tune') return s.send({ t: 'open', service: 'hfac', data: { f, lv, parts: this.have(ch, 'parts'), tune: this.have(ch, 'tuning') } });
+        if (m.sub === 'tune') { const w = ch.inventory.find(i => i.uid === ch.equip.weapon); if (!w || !this.takeLoot(ch, 'tuning', 1)) return this.err(s, '調律キットが必要'); w.plus = Math.min(20, (w.plus || 0) + 1); return ok(`武器を調律した（+${w.plus}）`); }
         const wt = m.wt | 0; if (!WT_BY_ID[wt] || WT_BY_ID[wt].myth) return this.err(s, 'その武器種は鍛造できません'); const need = 3 + lv; if (!this.takeLoot(ch, 'parts', 3)) return this.err(s, '非合法武器部品×3が必要');
         const rar = Math.min(5, 2 + lv + (Math.random() < 0.15 ? 1 : 0)); const pool = [...DATA.weapons.values()].filter(w => w.wt === wt && w.rar === rar && w.lvl <= ch.level + 15); const w = pool[Math.floor(Math.random() * pool.length)] || [...DATA.weapons.values()].find(x => x.wt === wt);
         addItem(ch, { kind: 'weapon', ref: w.id, plus: 0 }, n => this.world.note(s, n)); void need; return ok(`闇鍛冶炉で${w.name}を鍛えた`); }

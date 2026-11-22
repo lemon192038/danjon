@@ -66,7 +66,9 @@ export function drawLandmark(g, p, S = 16) {
   }
 }
 // Small decor & furniture (1x1 unless noted)
+import { drawSlumProp, SLUM_PROPS } from './slumsprites.js';
 export function drawDecor(g, p, S = 16) {
+  if (SLUM_PROPS.has(p.k)) return drawSlumProp(g, p, S);
   const x = p.x * S, y = p.y * S; const c = (col, a, b, w, h) => { g.fillStyle = col; g.fillRect(x + a, y + b, w, h); };
   switch (p.k) {
     case 'lamp': case 'brokenlamp': c('#2a2a30', 7, 2, 2, 14); c(p.k === 'lamp' ? '#ffe8a0' : '#5a5a50', 5, 0, 6, 4); break;
