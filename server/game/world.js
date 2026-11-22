@@ -15,6 +15,11 @@ import { Guilds } from './guildsys.js';
 import { Econ } from './econ.js';
 import { ITEMS } from '../../shared/data/guilds.js';
 import { CITIES, ROUTES, TRANSPORT, WEATHER } from '../../shared/data/cities.js';
+import { Slum, regionOfCity, weight, value } from './slum.js';
+import { Hideout } from './hideout.js';
+import { Market } from './market.js';
+import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
+import { dangerAt, skeleton, SW, SH } from './slumgen.js';
 export const isTown = z => z.kind === 'town' || z.kind === 'interior';
 
 const day = () => Math.floor(Date.now() / 86400000);
@@ -24,6 +29,7 @@ export class World {
     this.life = new Life(this); this.life.rollWeather(); this.guilds = new Guilds(this); this.guildEvent = (s, ev) => this.guilds.event(s, ev);
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
+    this.market = new Market(store.worldState()?.market); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
@@ -46,8 +52,9 @@ export class World {
     if (this.tick % 20 === 0) this.npcs.syncZones();
     if (this.tick % 20 === 0) this.life.step();
     if (this.tick % 40 === 0) this.econ.hourly();
+    if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
     if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); ss.send({ t: 'env', h: c.hour, m: c.minute, wx: cid ? this.life.weatherOf(cid) : 'clear', city: cid || null }); } }
-    if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
+    if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
   }
   broadcast(z) {
     const fx = z.fxq;
@@ -55,7 +62,7 @@ export class World {
       const s = p.session; if (!s || s.ws.readyState !== 1) continue;
       const snap = z.snapshot(p);
       const now = z.now; const cds = {}; for (const id of p.ch.skills.slots) if (id && p.cds[id] > now) cds[id] = Math.round(p.cds[id] - now);
-      s.send({ t: 's', me: { id: p.id, x: Math.round(p.x), y: Math.round(p.y), hp: Math.round(p.hp), mhp: p.maxHp, sp: Math.round(p.sp), msp: p.maxSp, cds, g: p.gauge || null, alt: p.altMode ? 1 : 0, sh: p.shield ? Math.round(p.shield.amt) : 0, dead: p.dead ? 1 : 0, bm: Object.keys(p.buffMods).length ? p.buffMods : null }, ...snap, fx });
+      s.send({ t: 's', me: { id: p.id, x: Math.round(p.x), y: Math.round(p.y), hp: Math.round(p.hp), mhp: p.maxHp, sp: Math.round(p.sp), msp: p.maxSp, cds, g: p.gauge || null, alt: p.altMode ? 1 : 0, sh: p.shield ? Math.round(p.shield.amt) : 0, dead: p.dead ? 1 : 0, bm: Object.keys(p.buffMods).length ? p.buffMods : null, raid: p.ch.raid && z.kind === 'slum' ? this.raidHud(p.ch, z) : null }, ...snap, fx });
     }
   }
   // ---------- sessions
@@ -66,7 +73,7 @@ export class World {
     for (const o of this.sessions.values()) if (o.ch?.id === cid) { o.send({ t: 'err', v: '別の接続でログインしました' }); this.detach(o); o.ws.close(); }
     migrate(ch); s.ch = ch; this.sessions.set(cid, s); this.econ.catchUp(ch);
     const zid = this.zones.has(ch.pos.zone) && WORLD[ch.pos.zone] ? ch.pos.zone : 'haven';
-    this.enterZone(s, this.zones.get(zid), ch.pos.zone === zid ? ch.pos : null);
+    if (!(ch.raid && this.slum.rejoin(s))) { this.enterZone(s, this.zones.get(zid), ch.pos.zone === zid ? ch.pos : null); if (ch.raid) this.slum.fail(s, 'dc'); }
     s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` });
   }
   detach(s) {
@@ -78,7 +85,8 @@ export class World {
   }
   save(s) {
     if (!s.ch) return; const z = s.actor?.zone;
-    if (z) { if (z.kind === 'dungeon' || z.kind === 'arena') s.ch.pos = { zone: z.returnTo || 'haven', x: null, y: null }; else if (z.kind === 'interior') { const p = z.door ? this.zones.get(z.cityId).tileCenter([z.door.x, z.door.y + 1]) : null; s.ch.pos = { zone: z.cityId, x: p?.x ?? null, y: p?.y ?? null }; } else s.ch.pos = { zone: z.id, x: Math.round(s.actor.x), y: Math.round(s.actor.y) }; }
+    if (z?.kind === 'slum' && s.ch.raid) { s.ch.raid.pos = { x: Math.round(s.actor.x), y: Math.round(s.actor.y) }; s.ch.raid.layer = z.layer; s.ch.pos = { zone: z.cityId, x: null, y: null }; }
+    else if (z) { if (z.kind === 'dungeon' || z.kind === 'arena') s.ch.pos = { zone: z.returnTo || 'haven', x: null, y: null }; else if (z.kind === 'interior') { const p = z.door ? this.zones.get(z.cityId).tileCenter([z.door.x, z.door.y + 1]) : null; s.ch.pos = { zone: z.cityId, x: p?.x ?? null, y: p?.y ?? null }; } else s.ch.pos = { zone: z.id, x: Math.round(s.actor.x), y: Math.round(s.actor.y) }; }
     store.saveChar(s.ch);
   }
   cityNear(z) { if (!z) return null; if (z.cityId) return z.cityId; if (z.returnTo) return z.returnTo; const l = WORLD[z.id]?.links; if (l) for (const v of Object.values(l)) if (WORLD[v]?.kind === 'town') return v; return null; }
@@ -105,11 +113,18 @@ export class World {
       case 'forge': return s.send({ t: 'open', service: 'craft', data: { cost: 200 + s.ch.level * 15, rank: s.ch.guilds?.smiths?.rank || 0 } });
       case 'bed': case 'chest': case 'kitchen': return z.home ? this.econ.openHome(s) : false;
       case 'myshop': return this.econ.openMyShop(s, z);
+      case 'cont': if (z.kind === 'slum' && s.ch.raid) return this.slum.search(s, z, o); return false;
+      case 'ladder': if (z.kind === 'slum' && s.ch.raid) return this.slum.ladder(s, o); return false;
+      case 'exit': if (z.kind === 'slum' && s.ch.raid) return this.slum.exitCheck(s, z, o); return false;
+      case 'entry': if (z.kind !== 'slum' || !s.ch.raid) return false; if (REGIONS[z.inst.rid].tier <= 1 || Date.now() - s.ch.raid.started < 120000) return this.slum.exitCheck(s, z, { type: 'entry' }); return s.send({ t: 'err', v: '入口は封鎖された。脱出地点を探せ（地図：M）' });
+      case 'hideout': if (z.kind !== 'slum' || !s.ch.raid) return false; if (s.ch.hideout?.rid !== z.inst.rid) return s.send({ t: 'err', v: 'ここは誰かの隠れ家への抜け道だ（この地域に隠れ家を持てば脱出口になる）' }); return this.slum.exitCheck(s, z, { type: 'hideout' });
+      case 'fac': if (z.hideout === s.ch.id) return this.hideout.use(s, o.f); return false;
+      case 'hstore': if (z.hideout === s.ch.id) return this.hideout.view(s); return false;
     }
     return false;
   }
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
-  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState() }); }
+  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save() }); }
   enterZone(s, z, pos) {
     const old = s.actor;
     let hp = 1, sp = 1; if (old) { hp = old.hp / old.maxHp; sp = old.sp / old.maxSp; old.zone.remove(old); if (old.dead) hp = 1; }
@@ -118,15 +133,16 @@ export class World {
     a.onSkillUsed = sk => skillUsed(s.ch, sk.id, n => this.note(s, n));
     const p = pos?.x != null ? pos : z.tileCenter(z.map.start); a.x = p.x; a.y = p.y;
     if (z.blocked(a.x, a.y)) { const st = z.tileCenter(z.map.start); a.x = st.x; a.y = st.y; }
+    if (z.kind === 'slum') a.team = this.slum.teamFor(s, z);
     z.add(a); s.actor = a; s.zone = z;
     if (z.kind === 'town' || z.kind === 'field') s.ch.pos = { zone: z.id, x: null, y: null };
     if (z.cityId) { s.ch.progress.visited ||= []; if (!s.ch.progress.visited.includes(z.cityId)) { s.ch.progress.visited.push(z.cityId); this.note(s, { t: 'msg', v: `新しい都市を訪れた：${CITIES[z.cityId].name}` }); this.guildEvent?.(s, { kind: 'visit', city: z.cityId }); } }
     const c = clock(); const cid = z.cityId || this.cityNear(z);
     const owned = new Set((s.ch.homes || []).filter(h => h.city === z.cityId).map(h => h.bldg));
-    s.send({ t: 'zone', cityId: z.cityId || null, doors: (z.map.doors || []).map(d => ({ ...d, mine: owned.has(d.id) })), stops: z.map.stops || [], plazas: z.map.plazas || [], props: z.map.props || [], objects: z.map.objects || [], floorTile: z.map.floor || null, wallCol: z.map.wallCol || null, clock: { h: c.hour, m: c.minute }, wx: cid ? this.life.weatherOf(cid) : 'clear', home: z.home ? { owner: z.home.owner, slots: z.map.slots } : null, exit: z.map.exit || null, id: z.id, name: z.name, kind: z.kind, w: z.map.w, h: z.map.h, tiles: Buffer.from(z.map.tiles).toString('base64'), pal: z.map.pal, lights: z.map.lights, npcs: z.map.npcs || [], gates: z.map.gates || [], exits: z.map.exits || [], darkness: !!z.darkness, curses: z.curses?.list || [], floor: z.floor || 0, diff: z.diff || null, dungeon: z.dungeon?.id || null, stairsOpen: z.map.stairsOpen, gim: z.gim });
+    s.send({ t: 'zone', cityId: z.cityId || null, doors: (z.map.doors || []).map(d => ({ ...d, mine: owned.has(d.id) })), stops: z.map.stops || [], plazas: z.map.plazas || [], props: z.map.props || [], objects: z.map.objects || [], floorTile: z.map.floor || null, wallCol: z.map.wallCol || null, clock: { h: c.hour, m: c.minute }, wx: cid ? this.life.weatherOf(cid) : 'clear', home: z.home ? { owner: z.home.owner, slots: z.map.slots } : null, exit: z.map.exit || null, id: z.id, name: z.name, kind: z.kind, w: z.map.w, h: z.map.h, tiles: Buffer.from(z.map.tiles).toString('base64'), pal: z.map.pal, lights: z.map.lights, npcs: z.map.npcs || [], gates: z.map.gates || [], exits: z.map.exits || [], darkness: !!z.darkness, curses: z.curses?.list || [], floor: z.floor || 0, diff: z.diff || null, dungeon: z.dungeon?.id || null, stairsOpen: z.map.stairsOpen, gim: z.gim, slum: z.kind === 'slum' ? this.slumInfo(s, z) : null, hideout: z.hideout ? { owner: z.hideout } : null });
     this.sendSelf(s);
     // party NPCs follow the player
-    for (const nid of this.partyOf(s.ch.id)?.npcs || []) { const n = this.npcs.byId.get(nid); if (!n) continue; this.npcs.despawn(n); this.npcs.spawn(n, z, { x: a.x + 12, y: a.y + 10 }); }
+    for (const nid of this.partyOf(s.ch.id)?.npcs || []) { const n = this.npcs.byId.get(nid); if (!n) continue; this.npcs.despawn(n); this.npcs.spawn(n, z, { x: a.x + 12, y: a.y + 10 }); const na = n.actorId && z.actors.get(n.actorId); if (na) na.team = a.team; }
     if (z.kind === 'dungeon') this.onFloorReached(s, z);
   }
   sendSelf(s) {
@@ -148,7 +164,7 @@ export class World {
     } else if (tile === T.STAIRS && z.kind === 'dungeon' && z.map.stairsOpen) this.nextFloor(s, z);
     else if (tile === T.MAT && (z.kind === 'interior' || z.kind === 'arena')) { if (z.kind === 'arena') this.econ?.leaveArena(s); else this.exitBuilding(s); }
     // auto pickup drops
-    for (const d of z.drops) if (!d.chest && d.owner === a.id && Math.hypot(d.x - a.x, d.y - a.y) < 18) { d.until = 0; addItem(s.ch, d.it, n => this.note(s, n)); }
+    for (const d of z.drops) if (!d.chest && d.owner === a.id && Math.hypot(d.x - a.x, d.y - a.y) < 18) { if (d.it.kind === 'sloot') { if (!s.ch.raid) continue; d.until = 0; const { kind, ...it } = d.it; void kind; this.slum.toBag(s, it, z); continue; } d.until = 0; addItem(s.ch, d.it, n => this.note(s, n)); }
   }
   // ---------- dungeon flow
   enterDungeon(s, dId, diff, floor) {
@@ -192,11 +208,12 @@ export class World {
       if (f.npc) { f.npc.gold += m.gold; if (f.npc.partyWith) f.npc.bond[f.npc.partyWith] = Math.min(100, (f.npc.bond[f.npc.partyWith] || 0) + 0.2); continue; }
       ch.gold += Math.round(m.gold * (1 + (mods.gold || 0))); ch.progress.kills++; s.dirty = true; ch.progress.famKills[m.fam] = (ch.progress.famKills[m.fam] || 0) + 1;
       const floor = z.floor || Math.round((m.level || 1) * 0.8);
-      const loot = rollLoot({ floor, diff: z.diff || 'NORMAL', boss: false, luck: mods.drop ? mods.drop * 0.03 : 0, preferWt: f.wt.id });
+      const loot = z.kind === 'slum' ? [] : rollLoot({ floor, diff: z.diff || 'NORMAL', boss: false, luck: mods.drop ? mods.drop * 0.03 : 0, preferWt: f.wt.id });
       if (loot.length) z.dropLoot(f, m.x, m.y, loot);
       this.questCheck(s, { kind: 'kill', fam: m.fam }); this.guilds.event(s, { kind: 'kill', fam: m.fam, elite: !!m.elite }); this.econ.monsterMat(s, m); this.econ.requestKill(s, m.fam); this.econ.storyEvent(s, { kind: 'kill', fam: m.fam });
     }
     if (z.arena) this.econ.arenaKill(z);
+    if (z.kind === 'slum') this.slum.onKill(z, m, killer?.kind === 'player' ? killer : [...z.players][0]);
     for (const p of z.players) { const pt = this.partyOf(p.ch.id); for (const nid of pt?.npcs || []) { const n = this.npcs.byId.get(nid); if (n) p.ch.progress.npcBond[nid] = n.bond[p.ch.id] = Math.min(100, (n.bond[p.ch.id] || 0) + 0.2); } }
   }
   onBossKilled(z, b) {
@@ -216,7 +233,7 @@ export class World {
     for (const n of this.npcs.list) if (n.actorZone === z.id && n.partyWith) this.npcs.log(n, `${z.dungeon.name}${z.floor}階のボス「${b.name}」を討伐した`);
   }
   onFighterDied(z, a) {
-    if (a.kind === 'player') { a.ch.progress.deaths++; this.note(a.session, { t: 'dead' }); if (z.kind === 'dungeon') a.ch.gold = Math.floor(a.ch.gold * 0.95); }
+    if (a.kind === 'player') { a.ch.progress.deaths++; this.note(a.session, { t: 'dead' }); if (z.kind === 'slum') this.slum.onDeath(a.session); if (z.kind === 'dungeon') a.ch.gold = Math.floor(a.ch.gold * 0.95); }
     else if (a.npc) { const n = a.npc; this.npcs.log(n, '戦闘不能になり街へ戻った'); z.schedule(z.now + 1500, () => z.remove(a)); n.actorId = null; const owner = n.partyWith; if (owner) { const p = this.partyOf(owner); if (p) p.npcs = p.npcs.filter(x => x !== n.id); this.pushParty(owner); } this.npcs.leaveParty(n); }
   }
   respawn(s) {
@@ -246,6 +263,92 @@ export class World {
     if (p.leader === cid) { for (const nid of p.npcs) { const n = this.npcs.byId.get(nid); if (n) { this.npcs.despawn(n); this.npcs.leaveParty(n); } } p.npcs = []; p.leader = p.members[0]; }
     if (!p.members.length) this.parties.delete(p.id);
     for (const m of p.members) this.pushParty(m); if (!silent) this.pushParty(cid);
+  }
+  // ---------- slum / market / hideout glue
+  raidHud(ch, z) { const r = ch.raid; return { t: Math.max(0, Math.round((r.ends - Date.now()) / 1000)), w: weight(r.bag), cap: this.slum.capacity(ch), v: value(r.bag) + value(r.pouch), n: r.bag.length, pn: r.pouch.length, L: z.layer, ex: r.extracting ? Math.max(0, Math.round((r.extracting.until - Date.now()) / 100) / 10) : null }; }
+  slumInfo(s, z) {
+    const I = z.inst; const R = REGIONS[I.rid]; const sk = skeleton(I.rid); const grid = [];
+    for (let y = 0; y < SH; y += 8) { const row = []; for (let x = 0; x < SW; x += 8) row.push(dangerAt(R.tier, z.layer, x + 4, y + 4, sk.entry[0], sk.entry[1])); grid.push(row); }
+    const key = I.rid + ':' + z.layer; s.ch.progress.slumMap ||= {}; s.ch.progress.slumMap[key] = 1;
+    return { rid: I.rid, region: R.name, tier: R.tier, layer: z.layer, layers: LAYERS.map(l => l.name), danger: grid, cell: 8, events: I.events, fixedMap: !!s.ch.hideout?.fac?.maptable, pvp: R.tier >= 3, team: s.actor?.team, factions: R.factions.map(f => ({ k: f, name: FACTIONS[f].name, rep: FACTIONS[f].guild ? this.guilds.rep(s.ch, FACTIONS[f].guild) : null, hostileBelow: FACTIONS[f].hostileBelow })) };
+  }
+  slumQuest(s, ev) {
+    const ch = s.ch; ch.squests ||= {};
+    for (const q of Object.values(ch.squests)) {
+      if (q.ready) continue; let inc = 0;
+      if (q.kind === 'search' && ev.kind === 'search') inc = 1;
+      if (q.kind === 'faction' && ev.kind === 'faction' && ev.faction === q.faction) inc = 1;
+      if (q.kind === 'sell' && ev.kind === 'sell') inc = ev.n || 1;
+      if (q.kind === 'hideout' && ev.kind === 'hideout' && (ch.hideout?.lv ?? -1) + 1 >= q.lv + 1) inc = 99;
+      if (ev.kind === 'extract' && ev.rid === q.rid) {
+        if (q.kind === 'collect') inc = ev.items.filter(i => i.ref === q.ref).reduce((a, i) => a + (i.n || 1), 0);
+        if (q.kind === 'artifact' && ev.items.some(i => LOOT[i.ref].cat === 'artifact' && LOOT[i.ref].r >= 3)) inc = 99;
+        if (q.kind === 'exitvia' && ev.via === q.via) inc = 99;
+      }
+      if (inc) { q.prog = Math.min(q.n || 1, (q.prog || 0) + inc); if (q.prog >= (q.n || 1)) { q.ready = true; this.note(s, { t: 'quest', v: `スラム依頼「${q.desc}」達成！入口で報告しよう` }); } }
+    }
+    if (ev.kind === 'extract' && ch.raid?.client && ev.items.some(i => i.ref === 'guildbox')) { ch.gold += 5000; const it = ch.inventory.find(i => i.kind === 'loot' && i.ref === 'guildbox'); if (it) { it.n--; if (it.n <= 0) ch.inventory = ch.inventory.filter(i => i !== it); } this.note(s, { t: 'msg', v: '謎の依頼人から5,000Gが届いた' }); }
+  }
+  slumMenu(s, m) {
+    const ch = s.ch, a = s.actor; const err = v => s.send({ t: 'err', v });
+    switch (m.act) {
+      case 'start': if (a.zone.kind !== 'interior' || !a.zone.map.npcs?.some(n => n.service === 'slum')) return err('スラム深部への入口から潜入できます'); return this.slum.start(s, { insure: !!m.insure });
+      case 'bag': return this.slum.bagView(s);
+      case 'pouch': this.slum.pouch(s, m.i | 0, !!m.to); return;
+      case 'drop': return this.slum.drop(s, m.i | 0);
+      case 'accept': { const rid = regionOfCity(a.zone.cityId); const q = this.slum.board(ch, rid).find(x => x.id === m.id); ch.squests ||= {}; if (!q || ch.squests[q.id]) return; if (Object.keys(ch.squests).length >= 5) return err('スラム依頼は5件まで'); ch.squests[q.id] = { ...q, prog: 0 }; if (q.kind === 'hideout' && ch.hideout && ch.hideout.lv + 1 >= q.lv + 1) { ch.squests[q.id].ready = true; } s.send({ t: 'toast', v: '依頼を受けた' }); return this.slum.open(s, a.zone, null); }
+      case 'turnin': { const q = ch.squests?.[m.id]; if (!q?.ready) return err('未達成です'); delete ch.squests[m.id]; ch.gold += q.reward.gold; grantXp(ch, q.reward.xp, n => this.note(s, n)); if (q.reward.guild) this.guilds.addRep(ch, q.reward.guild, 3); this.sendSelf(s); s.send({ t: 'toast', v: `報酬 ${q.reward.gold}G` }); return this.slum.open(s, a.zone, null); }
+      case 'abandon': if (ch.squests) delete ch.squests[m.id]; return this.slum.open(s, a.zone, null);
+      case 'hideout': return ch.hideout ? (ch.hideout.rid === regionOfCity(a.zone.cityId) ? this.hideout.enter(s) : err(`隠れ家は${REGIONS[ch.hideout.rid].name}にある`)) : this.hideout.view(s);
+    }
+  }
+  // market view: region prices + the player's loot with prices per channel (black / regular / guild / fence) and laundering
+  openMarket(s, rid, opts = {}) {
+    rid ||= regionOfCity(s.actor.zone.cityId) || 'haven_old'; const ch = s.ch; const v = this.market.view(rid); const inraid = !!opts.inraid;
+    const items = inraid ? ch.raid.bag.map((it, i) => ({ i, ...it, name: LOOT[it.ref].name, prov: it.prov, provName: PROV[it.prov], black: this.market.sellPrice(rid, it, 'black'), cat: LOOT_CAT[LOOT[it.ref].cat], r: LOOT[it.ref].r, w: LOOT[it.ref].w }))
+      : ch.inventory.filter(i => i.kind === 'loot').map(it => ({ uid: it.uid, ...it, name: LOOT[it.ref].name, provName: PROV[it.prov], cat: LOOT_CAT[LOOT[it.ref].cat], r: LOOT[it.ref].r, black: this.market.sellPrice(rid, it, opts.fence ? 'fence' : 'black'), regular: this.market.sellPrice(rid, it, 'regular'), guild: this.market.sellPrice(rid, it, 'guild'), guildName: this.market.guildFor(it.ref) }));
+    s.send({ t: 'open', service: 'market', data: { ...v, who: opts.who || '闇市', inraid, fence: !!opts.fence, mine: items, gold: ch.gold, launder: inraid ? null : { pawn: 0.35, appraise: 0.15, fence: 0.25 } } });
+  }
+  marketMenu(s, m) {
+    const ch = s.ch, a = s.actor, z = a.zone; const err = v => s.send({ t: 'err', v }); const inraid = z.kind === 'slum' && !!ch.raid;
+    const rid = inraid ? z.inst.rid : m.fence ? ch.hideout?.rid : regionOfCity(z.cityId); if (!rid) return;
+    const atBlack = inraid ? [...z.actors.values()].some(o => o.kind === 'slumnpc' && (o.role === 'merchant' || o.role === 'trader') && Math.hypot(o.x - a.x, o.y - a.y) < 60) : (z.map.npcs || []).some(n => ['blackmarket', 'slum', 'hfence'].includes(n.service)) || z.hideout === ch.id;
+    if (!atBlack && m.act !== 'view') return err('闇商人の近くで取引してください');
+    const role = this.slum.role(ch);
+    switch (m.act) {
+      case 'view': return this.openMarket(s, rid, { inraid, fence: !!m.fence });
+      case 'sell': {
+        if (inraid) { const it = ch.raid.bag[m.i | 0]; if (!it) return; const p = Math.round(this.market.sellPrice(rid, it, 'black') * 0.85 * (1 + (role.sell || 0))); ch.raid.bag.splice(m.i | 0, 1); ch.gold += p; this.market.trade(rid, it.ref, 1, 'sell', p, ch.name); this.slumQuest(s, { kind: 'sell', n: 1 }); this.sendSelf(s); s.send({ t: 'toast', v: `${p}Gで売った（探索中の売却は手数料15%）` }); return this.openMarket(s, rid, { inraid, who: m.who }); }
+        const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'loot'); if (!it) return; const n = Math.max(1, Math.min(it.n, m.n | 0 || it.n)); const ch2 = m.channel === 'guild' ? 'guild' : m.fence ? 'fence' : 'black';
+        if (ch2 === 'guild') { const g = this.market.guildFor(it.ref); if (!(z.map.npcs || []).some(x => x.service === 'guildhq' && x.guild === g)) return err(`${g}ギルドの窓口で売却できます`); }
+        const unit = this.market.sellPrice(rid, it, ch2); if (!unit) return err('この経路では売れない'); const p = Math.round(unit * n * (1 + (role.sell || 0)));
+        it.n -= n; if (it.n <= 0) ch.inventory = ch.inventory.filter(i => i !== it); ch.gold += p; this.market.trade(rid, it.ref, n, 'sell', p, ch.name); this.slumQuest(s, { kind: 'sell', n });
+        if (ch2 !== 'guild') { this.guilds.addRep(ch, 'blackmarket', 0.5); if (['illegal'].includes(it.prov)) this.guilds.addRep(ch, 'knights', -0.5); } else this.guilds.addRep(ch, this.market.guildFor(it.ref), 1);
+        this.market.shift(rid, this.market.controller(rid), 0.2); this.sendSelf(s); s.send({ t: 'toast', v: `${LOOT[it.ref].name}×${n}を${p}Gで売却` }); return this.openMarket(s, rid, { fence: !!m.fence }); }
+      case 'buy': { const k = m.ref; const e = this.market.m[rid][k]; if (!e || !LOOT[k] || ['guildbox', 'deed'].includes(k)) return; if (e.stock <= 0) return err('在庫切れ'); const p = Math.round(e.price * 1.25 * (1 - (role.buy || 0))); if (ch.gold < p) return err('ゴールドが足りません'); ch.gold -= p; this.market.trade(rid, k, 1, 'buy', p, ch.name);
+        if (inraid) this.slum.toBag(s, { ref: k, n: 1, q: 1, prov: 'illegal' }, z); else this.slum.addLoot(ch, { ref: k, n: 1, q: 1, prov: 'illegal' }); this.sendSelf(s); return this.openMarket(s, rid, { inraid }); }
+      case 'launder': { // pawn: sell anything cheaply / appraise: unknown & ruins → laundered for a fee / fence: illegal → laundered (fee, rep risk)
+        const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'loot'); if (!it) return; const L = LOOT[it.ref]; const base = L.v * (it.q || 1) * it.n;
+        if (m.how === 'pawn') { const p = Math.round(base * 0.35); ch.gold += p; ch.inventory = ch.inventory.filter(i => i !== it); this.sendSelf(s); s.send({ t: 'toast', v: `質屋に${p}Gで流した` }); return this.openMarket(s, rid); }
+        if (m.how === 'appraise') { if (!['unknown', 'ruins', 'slum'].includes(it.prov)) return err('鑑定屋は出所不明・遺跡由来・スラム発見品のみ扱う'); const fee = Math.round(base * 0.15 * (1 - (role.appraise || 0))); if (ch.gold < fee) return err(`鑑定料${fee}G`); ch.gold -= fee; it.prov = 'laundered'; this.guilds.addRep(ch, 'ancients', 0.5); this.sendSelf(s); s.send({ t: 'toast', v: `鑑定書付きになった（${fee}G）。正規店でも売れる` }); return this.openMarket(s, rid); }
+        if (m.how === 'fence') { if (it.prov !== 'illegal') return err('故買屋の洗浄は非合法品のみ'); const fee = Math.round(base * 0.25); if (ch.gold < fee) return err(`手数料${fee}G`); ch.gold -= fee; it.prov = 'laundered'; this.guilds.addRep(ch, 'knights', -1); this.guilds.addRep(ch, 'thieves', 1); if (ch.hideout) ch.hideout.exposure = Math.min(100, ch.hideout.exposure + 2); this.sendSelf(s); s.send({ t: 'toast', v: `出所を洗浄した（${fee}G）` }); return this.openMarket(s, rid); }
+        return; }
+    }
+  }
+  hideoutMenu(s, m) {
+    const ch = s.ch, z = s.actor.zone; const inside = z.hideout === ch.id;
+    switch (m.act) {
+      case 'view': return this.hideout.view(s);
+      case 'acquire': { const rid = REGIONS[m.rid] ? m.rid : regionOfCity(z.cityId); return this.hideout.acquire(s, m.k, rid); }
+      case 'enter': return this.slumMenu(s, { act: 'hideout' });
+      case 'upgrade': if (!inside) return s.send({ t: 'err', v: '隠れ家の中で行ってください' }); return this.hideout.upgrade(s);
+      case 'install': if (!inside) return s.send({ t: 'err', v: '隠れ家の中で行ってください' }); return this.hideout.install(s, String(m.k));
+      case 'use': if (!inside) return; return this.hideout.use(s, String(m.f), m);
+      case 'store': return this.hideout.store(s, m.uid, m.to === 'stash' ? 'stash' : 'storage');
+      case 'take': return this.hideout.take(s, m.i, m.from === 'stash' ? 'stash' : 'storage');
+      case 'vis': return this.hideout.setVis(s, m.v);
+      case 'visit': return this.hideout.visit(s, String(m.name || ''));
+    }
   }
   // ---------- client messages
   handle(s, m) {
@@ -282,11 +385,13 @@ export class World {
     for (const n of z.map.npcs || []) { const p = z.tileCenter([n.x, n.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < (z.kind === 'interior' ? 44 : 30)) return this.openService(s, n.service, n); }
     for (const d of z.map.doors || []) { const p = z.tileCenter([d.x, d.y]); if (Math.hypot(p.x - a.x, p.y - (a.y - 6)) < 22) return this.enterBuilding(s, d); }
     for (const st of z.map.stops || []) { const p = z.tileCenter([st.x, st.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 26) return s.send({ t: 'open', service: 'stops', data: { here: st.district, stops: z.map.stops.map(x => ({ district: x.district, name: x.name })), fee: 10 } }); }
-    for (const o of z.map.objects || []) { const p = z.tileCenter([o.x, o.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 24) { const r = this.useObject(s, z, o); if (r !== false) return; } }
+    const near = (z.map.objects || []).map(o => { const p = z.tileCenter([o.x, o.y]); return [Math.hypot(p.x - a.x, p.y - a.y), o]; }).filter(x => x[0] < 24).sort((x, y) => x[0] - y[0]);
+    for (const [, o] of near) { const r = this.useObject(s, z, o); if (r !== false) return; }
     for (const o of z.actors.values()) if (o.kind === 'resident' && Math.hypot(o.x - a.x, o.y - a.y) < 26) { const c = o.cit; o.facing = Math.atan2(a.y - o.y, a.x - o.x); return s.send({ t: 'open', service: 'resident', data: { id: c.id, name: c.name, job: c.job, pers: c.pers, line: this.life.talk(c, s.ch, c.city), guild: c.guild, family: c.family || null, req: this.econ?.residentRequest?.(s, c) || null } }); }
     if (z.kind === 'dungeon' && z.map.exit) { const p = z.tileCenter(z.map.exit); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return s.send({ t: 'open', service: 'exit', data: { name: z.dungeon.name, floor: z.floor } }); }
     for (const g of z.map.gates || []) { const p = z.tileCenter([g.x, g.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return this.openService(s, 'gate', g.dungeon); }
     for (const d of z.drops) if (d.chest && Math.hypot(d.x - a.x, d.y - a.y) < 26) { d.chest = false; d.until = 0; const loot = rollLoot({ floor: z.floor || 1, diff: z.diff || 'NORMAL', chest: true, preferWt: a.wt.id }); for (const it of loot) addItem(s.ch, it, n => this.note(s, n)); z.fx({ t: 'boom', x: Math.round(d.x), y: Math.round(d.y), r: 14, e: 'holy' }); this.sendSelf(s); return; }
+    for (const o of z.actors.values()) if (o.kind === 'slumnpc' && Math.hypot(o.x - a.x, o.y - a.y) < 28) { o.facing = Math.atan2(a.y - o.y, a.x - o.x); return this.slum.talk(s, o); }
     // NPC adventurers
     for (const o of z.actors.values()) if (o.kind === 'npc' && Math.hypot(o.x - a.x, o.y - a.y) < 30) { const n = o.npc; return s.send({ t: 'open', service: 'npc', data: { ...this.npcs.info(n), line: this.npcs.talk(n, s.ch), bond: n.bond[s.ch.id] || 0, inParty: n.partyWith === s.ch.id } }); }
   }
@@ -294,6 +399,8 @@ export class World {
     const z = s.actor.zone; const town = z.cityId || z.id; const npc = typeof dungeon === 'object' ? dungeon : null; if (npc) dungeon = null;
     if (this.econ?.services[service]) return this.econ.services[service](s, z, npc);
     if (service === 'guildhq') return this.guilds.open(s, npc.guild);
+    if (service === 'slum') return this.slum.open(s, z, npc);
+    if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
     const data = { service };
     if (service === 'weapon') data.stock = shopStock(town, 'weapon');
     if (service === 'armor') data.stock = shopStock(town, 'armor');
@@ -320,7 +427,8 @@ export class World {
         if (kind === 'armor') { const tier = m.tier | 0; if (!shopStock(town, 'armor').includes(tier)) return; const slot = m.slot === 'accessory' ? 'accessory' : 'armor'; const price = Math.round(200 * Math.pow(2.2, tier)); if (ch.gold < price) return err('ゴールドが足りません'); ch.gold -= price; addItem(ch, { kind: 'armor', slot, tier, plus: 0 }); return ok(`${armorDef(slot, tier).name}を購入しました`); }
         if (kind === 'item') { const n = Math.max(1, Math.min(99, m.n | 0 || 1)); const price = ITEM_PRICES[m.ref]; if (!price) return; if (ch.gold < price * n) return err('ゴールドが足りません'); ch.gold -= price * n; addItem(ch, { kind: m.ref === 'ore' ? 'mat' : 'potion', ref: m.ref, n }); return ok('購入しました'); }
         return; }
-      case 'sell': { if (!inTown) return; const it = ch.inventory.find(i => i.uid === m.uid); if (!it || Object.values(ch.equip).includes(it.uid)) return err('装備中のアイテムは売却できません'); let price = 10; if (it.kind === 'weapon') price = Math.round(DATA.weapons.get(it.ref).price * 0.3); else if (it.kind === 'armor') price = Math.round(60 * Math.pow(2.2, it.tier)); else price = (ITEM_PRICES[it.ref] || 20) * 0.3 * (it.n || 1); ch.gold += Math.round(price); ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${Math.round(price)}Gで売却しました`); }
+      case 'sell': { if (!inTown) return; const it = ch.inventory.find(i => i.uid === m.uid); if (!it || Object.values(ch.equip).includes(it.uid)) return err('装備中のアイテムは売却できません'); if (it.kind === 'loot') { const rid = regionOfCity(a.zone.cityId) || 'haven_old'; const p = this.market.sellPrice(rid, it, 'regular') * it.n; if (!p) return err(`${PROV[it.prov]}の品は正規の店では買い取ってもらえない（闇市・故買屋・鑑定屋へ）`); ch.gold += p; ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${p}Gで売却しました`); }
+        let price = 10; if (it.kind === 'weapon') price = Math.round(DATA.weapons.get(it.ref).price * 0.3); else if (it.kind === 'armor') price = Math.round(60 * Math.pow(2.2, it.tier)); else price = (ITEM_PRICES[it.ref] || 20) * 0.3 * (it.n || 1); ch.gold += Math.round(price); ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${Math.round(price)}Gで売却しました`); }
       case 'enhance': { if (!inTown) return err('鍛冶屋で強化できます'); const r = enhance(ch, m.uid); if (r.error) return err(r.error); return ok(r.ok ? `強化成功！ +${r.plus}` : '強化失敗…（素材は消費されました）'); }
       case 'quest': { const board = questBoard(a.zone.id, day()); const q = board.find(x => x.id === m.id) || ch.progress.quests[m.id]?.def;
         if (m.act === 'accept') { if (!q || ch.progress.quests[q.id]) return; if (Object.values(ch.progress.quests).filter(x => !x.done).length >= 8) return err('同時受注は8件までです'); ch.progress.quests[q.id] = { def: q, prog: 0 }; return ok(`「${q.name}」を受注しました`); }
@@ -359,6 +467,9 @@ export class World {
       case 'story': return this.econ.story(s, m);
       case 'use': { const it = s.ch.inventory.find(i => i.ref === m.ref && i.n > 0 && ITEMS[i.ref]?.use); if (!it) return; const u = ITEMS[it.ref].use; if (u.ret && a.zone.kind !== 'dungeon') return err('ダンジョン内で使えます'); it.n--; if (it.n <= 0) s.ch.inventory = s.ch.inventory.filter(x => x !== it); if (u.heal) a.hp = a.maxHp; if (u.sp) a.sp = a.maxSp; if (u.buff) a.addBuff(u.buff, u.dur, 'item_' + it.ref); if (u.ret) { this.sendSelf(s); return this.leaveDungeon(s); } return ok(`${ITEMS[it.ref].name}を使った`); }
       case 'cityInfo': { const cid = this.cityNear(a.zone); if (!cid) return; const c = CITIES[cid]; const t = clock(); return s.send({ t: 'cityInfo', id: cid, city: { name: c.name, title: c.title, founded: c.founded, history: c.history, origin: c.origin, geography: c.geography, climate: c.climate, architecture: c.architecture, industry: c.industry, economy: c.economy, politics: c.politics, ruler: c.ruler, security: c.security, classes: c.classes, culture: c.culture, lifestyle: c.lifestyle, landmark: c.landmark.name, monsters: c.monsters, events: c.events, districts: c.districts.map(d => ({ name: d.name, type: d.type, buildings: d.buildings.map(b => ({ name: b.name, hours: b.hours || null, guild: b.guild || null })) })) }, weather: WEATHER[this.life.weatherOf(cid)], time: t, state: this.econ.cityState[cid] || null, news: this.econ.news.slice(0, 8).map(n => n.v), prices: Object.keys(c.goods ? {} : {}), guildsHere: [] }); }
+      case 'slum': return this.slumMenu(s, m);
+      case 'market': return this.marketMenu(s, m);
+      case 'hideout': return this.hideoutMenu(s, m);
       case 'players': return s.send({ t: 'players', list: [...this.sessions.values()].filter(o => o.ch).map(o => ({ name: o.ch.name, lv: o.ch.level, zone: o.actor?.zone.name })) });
     }
   }

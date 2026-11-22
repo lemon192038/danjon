@@ -11,6 +11,7 @@ import { onHitHook, onKillHook } from './specials.js';
 import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
 import { rollLoot } from './progress.js';
+import { LOOT } from '../../shared/data/slum.js';
 
 class Heap { constructor() { this.a = []; } push(x) { const a = this.a; a.push(x); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p].at <= a[i].at) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
   pop() { const a = this.a; const top = a[0]; const last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l].at < a[m].at) m = l; if (r < a.length && a[r].at < a[m].at) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
@@ -37,6 +38,8 @@ export class Zone {
       this.gim = this.map.band.gim; this.nextHazard = 3000;
       if (opts.diff === 'ABYSS') this.curses = abyssCurses(opts.floor);
       this.populate();
+    } else if (opts.kind === 'slum') { world.slum.build(this, opts.inst, opts.layer);
+    } else if (opts.kind === 'interior' && opts.hideout) { world.hideout.build(this, opts);
     } else if (opts.kind === 'interior') {
       // building interior (or player home): its own map, shared by everyone inside so players see each other
       this.cityId = opts.city; this.bldgId = opts.bldg.id; this.door = opts.door; this.home = opts.home || null;
@@ -62,7 +65,7 @@ export class Zone {
   enemiesOf(a) { const out = []; for (const o of this.actors.values()) if (!o.dead && o.team !== a.team && o.team !== 'neutral') out.push(o); return out; }
   alliesOf(a) { const out = []; for (const o of this.actors.values()) if (!o.dead && o.team === a.team) out.push(o); return out; }
   nearby(a, r) { const out = []; for (const o of this.actors.values()) if (!o.dead && Math.abs(o.x - a.x) < r && Math.abs(o.y - a.y) < r) out.push(o); return out; }
-  nearestEnemy(a, range, front) { let b = null, bd = range; for (const o of this.enemiesOf(a)) { const d = Math.hypot(o.x - a.x, o.y - a.y) - o.r; if (d < bd && (!front || Math.cos(Math.atan2(o.y - a.y, o.x - a.x) - a.facing) > 0.3)) { bd = d; b = o; } } return b; }
+  nearestEnemy(a, range, front) { let b = null, bd = range; for (const o of this.enemiesOf(a)) { if (o.faction && !o.provoked && this.kind === 'slum' && this.world.slum.passiveFor(o, a)) continue; const d = Math.hypot(o.x - a.x, o.y - a.y) - o.r; if (d < bd && (!front || Math.cos(Math.atan2(o.y - a.y, o.x - a.x) - a.facing) > 0.3)) { bd = d; b = o; } } return b; }
   blocked(x, y, a) { const t = tileAt(this.map, x, y); if (t === T.VOID && (a?.flyUntil > this.now)) return false; return BLOCKING.has(t); }
   moveActor(a, dx, dy) {
     const r = a.r * 0.8;
@@ -203,7 +206,7 @@ export class Zone {
     for (const k in s) {
       const st = s[k]; if (st.until <= now) { delete s[k]; continue; }
       const def = STATUS[k];
-      if (def.dot && (st.nextDot || 0) <= now) { st.nextDot = now + 1000; const src = this.actors.get(st.src) || a; const dmg = Math.max(1, Math.round(Math.min(a.maxHp * def.dot * st.stacks, (st.pow || 50) * 0.4 * st.stacks))); a.hp -= dmg; this.fx({ t: 'dmg', x: Math.round(a.x), y: Math.round(a.y - 10), v: dmg, e: k === 'burn' ? 'fire' : k === 'shock' ? 'thunder' : k === 'poison' ? 'wind' : 'dark', dot: 1, a: a.team === 'ally' ? 1 : 0 }); if (a.hp <= 0) { this.kill(a, src, now); return; } }
+      if (def.dot && (st.nextDot || 0) <= now) { st.nextDot = now + 1000; const src = this.actors.get(st.src) || a; const dmg = Math.max(1, Math.round(Math.min(a.maxHp * def.dot * st.stacks, (st.pow || 50) * 0.4 * st.stacks))); a.hp -= dmg; this.fx({ t: 'dmg', x: Math.round(a.x), y: Math.round(a.y - 10), v: dmg, e: k === 'burn' ? 'fire' : k === 'shock' ? 'thunder' : k === 'poison' ? 'wind' : 'dark', dot: 1, a: a.team !== 'enemy' ? 1 : 0 }); if (a.hp <= 0) { this.kill(a, src, now); return; } }
     }
     if (a.buffs.length && a.buffs.some(b => b.until <= now)) { a.buffs = a.buffs.filter(b => b.until > now); a.recalcBuffs(); }
     if (a.shield && a.shield.until <= now) a.shield = null;
@@ -386,16 +389,16 @@ export class Zone {
       ents.push([a.id, Math.round(a.x), Math.round(a.y), +a.facing.toFixed(2), Math.round(a.hp / a.maxHp * 1000), flags, sts, a.action?.type || '', a.enchant?.until > n ? a.enchant.el : '']);
       if (!viewer.known.has(a.id)) { viewer.known.add(a.id); full.push(this.describe(a)); }
     }
-    const projs = this.projs.filter(p => Math.abs(p.x - vx) < R && Math.abs(p.y - vy) < R).map(p => [Math.round(p.x), Math.round(p.y), +Math.atan2(p.vy, p.vx).toFixed(2), p.sz, p.opt.el || p.owner.weaponEl || '', p.k || '', p.owner.team === 'ally' ? 1 : 0, p.opt.vfx || '']);
-    const areas = this.areas.filter(r => Math.abs(r.x - vx) < R && Math.abs(r.y - vy) < R).map(r => [Math.round(r.x), Math.round(r.y), Math.round(r.r), r.opt?.el || r.e.el || '', r.e.ally ? 1 : r.e.trigger ? 2 : r.orbit ? 3 : r.e.pull ? 4 : r.e.timeZone ? 5 : 0, r.owner.team === 'ally' ? 1 : 0, r.opt?.vfx || '']);
-    const drops = this.drops.filter(d => (d.chest || d.owner === viewer.id) && Math.abs(d.x - vx) < R && Math.abs(d.y - vy) < R).map(d => [d.id, Math.round(d.x), Math.round(d.y), d.chest ? 'chest' : d.it.kind, d.it?.ref ? (DATA.weapons.get(d.it.ref)?.rar || 0) : 0]);
+    const projs = this.projs.filter(p => Math.abs(p.x - vx) < R && Math.abs(p.y - vy) < R).map(p => [Math.round(p.x), Math.round(p.y), +Math.atan2(p.vy, p.vx).toFixed(2), p.sz, p.opt.el || p.owner.weaponEl || '', p.k || '', p.owner.team === viewer.team ? 1 : 0, p.opt.vfx || '']);
+    const areas = this.areas.filter(r => Math.abs(r.x - vx) < R && Math.abs(r.y - vy) < R).map(r => [Math.round(r.x), Math.round(r.y), Math.round(r.r), r.opt?.el || r.e.el || '', r.e.ally ? 1 : r.e.trigger ? 2 : r.orbit ? 3 : r.e.pull ? 4 : r.e.timeZone ? 5 : 0, r.owner.team === viewer.team ? 1 : 0, r.opt?.vfx || '']);
+    const drops = this.drops.filter(d => (d.chest || d.owner === viewer.id) && Math.abs(d.x - vx) < R && Math.abs(d.y - vy) < R).map(d => [d.id, Math.round(d.x), Math.round(d.y), d.chest ? 'chest' : d.it.kind, d.it?.kind === 'sloot' ? (LOOT[d.it.ref]?.r || 1) : d.it?.ref ? (DATA.weapons.get(d.it.ref)?.rar || 0) : 0]);
     return { ents, full, projs, areas, drops };
   }
   describe(a) {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
     if (a.kind === 'player' || a.kind === 'npc') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
-    else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; }
-    else if (a.kind === 'resident') { d.look = a.look; d.job = a.job; }
+    else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; if (a.faction) d.fac = a.faction; }
+    else if (a.kind === 'resident' || a.kind === 'slumnpc') { d.look = a.look; d.job = a.job; if (a.faction) d.fac = a.faction; }
     else { d.sk = a.sumKind; d.look = a.look; d.wt = a.owner?.wt?.id; }
     return d;
   }

@@ -86,13 +86,14 @@ export function dealDamage(zone, src, tgt, o, now) {
   let def = tgt.stats.def * (tgt.statuses.armorbreak ? 0.65 : 1) * (1 + (tgt.buffMods?.def || 0));
   let dmg = dmgFormula(atk, m, def, (o.pen || 0) + (sm.pen || 0));
   dmg *= 1 - Math.min(0.85, (tgt.stats.dr || 0) + (tgt.buffMods?.dr || 0) + (o.guarded || 0));
-  if (zone.diffDmgTaken && tgt.team === 'ally') dmg *= zone.diffDmgTaken;
+  if (zone.diffDmgTaken && tgt.team !== 'enemy') dmg *= zone.diffDmgTaken;
   dmg = Math.max(1, Math.round(dmg * (0.92 + Math.random() * 0.16)));
   if (tgt.shield && tgt.shield.until > now && tgt.shield.amt > 0) { const ab = Math.min(tgt.shield.amt, dmg); tgt.shield.amt -= ab; dmg -= ab; if (ab) zone.fx({ t: 'shield', id: tgt.id }); }
   tgt.hp -= dmg; tgt.lastHitBy = src.ownerId || src.id; tgt.lastHitAt = now; tgt.combatUntil = now + 5000;
   if (tgt.statuses.sleep) delete tgt.statuses.sleep;
   tgt.threat ||= {}; tgt.threat[src.ownerId || src.id] = (tgt.threat[src.ownerId || src.id] || 0) + dmg * (src.tauntUntil > now ? 3 : 1);
-  zone.fx({ t: 'dmg', x: Math.round(tgt.x), y: Math.round(tgt.y - 10), v: dmg, c: crit ? 1 : 0, e: el || 'phys', a: tgt.team === 'ally' ? 1 : 0 });
+  zone.fx({ t: 'dmg', x: Math.round(tgt.x), y: Math.round(tgt.y - 10), v: dmg, c: crit ? 1 : 0, e: el || 'phys', a: tgt.team !== 'enemy' ? 1 : 0 });
+  if (tgt.faction && !tgt.provoked && zone.kind === 'slum') zone.world.slum.provoked(zone, tgt, src);
   // lifesteal
   const ls = (o.ls || 0) + (sm.ls || 0) + (bm.ls || 0);
   if (ls > 0 && !o.dot) src.heal?.(dmg * ls, zone);

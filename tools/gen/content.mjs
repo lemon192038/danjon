@@ -75,6 +75,12 @@ export const FAMILIES = [
   ['dragonkin', '竜人兵', 'brute', 2.2, 2.0, 1.6, 1.1, 30, 'fire', 'humanoid', ['breath', 'charge']],
   ['voidling', '虚無の落とし子', 'erratic', 1.2, 1.8, 0.8, 1.5, 22, 'void', 'blob', ['blink', 'split']],
   ['crystal', 'クリスタル兵', 'guard', 1.8, 1.4, 2.4, 0.8, 24, 'ice', 'golem', ['reflect']],
+  ['thug', 'ごろつき', 'chaser', 1.0, 1.1, 0.8, 1.1, 22, null, 'humanoid', ['dodge']],
+  ['scav', '屑拾い', 'kiter', 0.8, 1.0, 0.6, 1.2, 150, null, 'humanoid', ['shoot']],
+  ['enforcer', '用心棒', 'guard', 1.8, 1.3, 1.4, 0.9, 24, null, 'humanoid', ['guard', 'charge']],
+  ['carrier', '運び屋', 'chaser', 1.2, 0.6, 0.8, 1.0, 20, null, 'humanoid', []],
+  ['heretic', '禁呪信奉者', 'caster', 0.9, 1.4, 0.6, 1.0, 160, 'void', 'humanoid', ['blink', 'curseField']],
+  ['gunman', '黒薔薇の構成員', 'assassin', 1.1, 1.5, 0.8, 1.4, 24, 'dark', 'humanoid', ['backstab', 'blink']],
   ['abyssal', '深淵の眷属', 'assassin', 2.0, 2.6, 1.4, 1.6, 26, 'void', 'demon', ['blink', 'backstab', 'predict']],
 ];
 // Boss archetypes: [key, name, sprite, hp, atk, def, phases(ability lists)]

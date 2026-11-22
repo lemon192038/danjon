@@ -22,7 +22,7 @@ export const CITIES = {
       { id: 'common', name: '石垣通り', type: 'common', at: [0.3, 0.72], buildings: [
         B('h_inn', '宿屋「黄金の麦穂」', 'inn', 'M', { svc: 'inn' }), B('h_tavern', '酒場「最初の一杯」', 'tavern', 'M', { hours: [11, 3] }), B('h_smith', '鍛冶屋ドワイト', 'smithy', 'M', { svc: 'smith', hours: [7, 19] }),
         B('h_armor', '防具工房マルタ', 'shop', 'S', { svc: 'armor', hours: [8, 19] }), B('h_job', '職業ギルド 出張所', 'guildhall', 'M', { svc: 'guild' }), B('h_realty', '開拓地不動産', 'office', 'S', { svc: 'realty', hours: [8, 18] })] },
-      { id: 'old', name: '旧市街の長屋', type: 'slum', at: [0.75, 0.72], buildings: [B('h_clinic', '診療所', 'clinic', 'S', { svc: 'inn' }), B('h_shrine', '風の祠', 'church', 'S', { lore: 'haven_shrine' })] },
+      { id: 'old', name: '旧市街の長屋', type: 'slum', at: [0.75, 0.72], buildings: [B('haven_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'haven_old' }), B('h_clinic', '診療所', 'clinic', 'S', { svc: 'inn' }), B('h_shrine', '風の祠', 'church', 'S', { lore: 'haven_shrine' })] },
     ],
     events: ['門出の祭（新米冒険者の経験値+20%）', '風車の点検日（製粉所の依頼が増える）'],
     goods: { produce: ['wheat'], demand: ['ore', 'spice'] }, wealth: { commerce: 2, common: 2, old: 1 },
@@ -52,7 +52,7 @@ export const CITIES = {
         B('m_port', '海運会社ターミナル', 'station', 'L', { svc: 'travel', guild: 'shipping' }), B('m_tavern', '船員酒場「錨亭」', 'tavern', 'M', { hours: [10, 4] }), B('m_sailor', '船乗りギルド', 'guildhall', 'M', { guild: 'sailors' }),
         B('m_research', '海洋研究所', 'lab', 'M', { guild: 'beastlore', hours: [8, 18] }), B('m_smith', '造船所の鍛冶場', 'smithy', 'M', { svc: 'smith', hours: [6, 18] }), B('m_armor', '船具と防具の店', 'shop', 'S', { svc: 'armor', hours: [7, 20] }),
         B('m_warehouse', '第三倉庫', 'warehouse', 'L', { guild: 'transport' }), B('m_inn', '港の安宿', 'inn', 'S', { svc: 'inn' })] },
-      { id: 'alley', name: '裏路地「猫の小径」', type: 'slum', at: [0.88, 0.62], buildings: [
+      { id: 'alley', name: '裏路地「猫の小径」', type: 'slum', at: [0.88, 0.62], buildings: [B('marina_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'marina_cats' }), 
         B('m_smuggle', '密輸組織「海猫」のアジト', 'blackmarket', 'M', { guild: 'smugglers', hours: [20, 5], svc: 'blackmarket' }), B('m_info', '情報屋の小部屋', 'shack', 'S', { guild: 'infobrokers', svc: 'info' })] },
     ],
     events: ['大商船団の入港（交易品の価格が変動）', '灯台祭（夜に花火）', '嵐の夜（出航停止・酒場が満員）'],
@@ -84,7 +84,7 @@ export const CITIES = {
         B('c_inn', '宿屋「白鳩亭」', 'inn', 'M', { svc: 'inn' }), B('c_tavern', '大衆酒場「騎士の休息」', 'tavern', 'M', { hours: [11, 2] }), B('c_smith', '王都鍛冶組合', 'smithy', 'M', { svc: 'smith', guild: 'smiths', hours: [7, 19] }),
         B('c_armor', '防具職人組合', 'shop', 'M', { svc: 'armor', guild: 'armorers', hours: [8, 19] }), B('c_item', '市民市場の道具屋', 'shop', 'S', { svc: 'item' }), B('c_bath', '公衆浴場', 'bathhouse', 'M', { svc: 'inn', hours: [6, 24] }),
         B('c_realty', '王都不動産', 'office', 'S', { svc: 'realty', hours: [9, 18] }), B('c_arena', '王立闘技場', 'arena', 'L', { guild: 'gladiators', svc: 'arena', hours: [10, 22] })] },
-      { id: 'lower', name: '外壁下層区', type: 'slum', at: [0.8, 0.82], buildings: [
+      { id: 'lower', name: '外壁下層区', type: 'slum', at: [0.8, 0.82], buildings: [B('celestia_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'celestia_lower' }), 
         B('c_shack', '取り壊し予定の長屋', 'shack', 'S', { lore: 'celestia_lower' }), B('c_thieves', '盗賊ギルド「灰鼠」', 'blackmarket', 'M', { guild: 'thieves', hours: [19, 5], svc: 'blackmarket' }),
         B('c_bounty', '賞金稼ぎ組合', 'tavern', 'S', { guild: 'bounty' })] },
     ],
@@ -114,7 +114,7 @@ export const CITIES = {
       { id: 'workers', name: '労働者街', type: 'common', at: [0.3, 0.78], buildings: [
         B('v_tavern', '坑夫酒場「黒い金床」', 'tavern', 'M', { hours: [14, 4] }), B('v_inn', '労働者の宿', 'inn', 'M', { svc: 'inn' }), B('v_item', '組合購買部', 'shop', 'S', { svc: 'item' }),
         B('v_miners', '採掘師ギルド', 'guildhall', 'M', { guild: 'miners' }), B('v_clinic', '坑夫診療所', 'clinic', 'S', { svc: 'inn', guild: 'physicians' }), B('v_memorial', '「黒の日」慰霊碑の礼拝所', 'church', 'S', { lore: 'vulcan_memorial' })] },
-      { id: 'mines', name: '旧坑道スラム', type: 'slum', at: [0.15, 0.25], buildings: [
+      { id: 'mines', name: '旧坑道スラム', type: 'slum', at: [0.15, 0.25], buildings: [B('vulcan_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'vulcan_mines' }), 
         B('v_scrap', 'くず鉄市', 'blackmarket', 'M', { svc: 'blackmarket', guild: 'blackmarket', hours: [18, 6] }), B('v_shack', '坑夫の長屋', 'shack', 'S', { lore: 'vulcan_shack' })] },
     ],
     events: ['溶鉱炉の大火入れ（鍛冶の成功率上昇）', '新鉱脈の発見（鉱石が安くなる）', '坑夫のストライキ'],
@@ -143,7 +143,7 @@ export const CITIES = {
       { id: 'student', name: '学生街', type: 'common', at: [0.75, 0.72], buildings: [
         B('a_tavern', '学生酒場「三つの瓶」', 'tavern', 'M', { hours: [16, 4] }), B('a_inn', '下宿屋「月見草」', 'inn', 'S', { svc: 'inn' }), B('a_smith', '魔導鍛冶工房', 'smithy', 'M', { svc: 'smith', hours: [8, 20] }),
         B('a_ruins', '古代文明研究ギルド', 'museum', 'M', { guild: 'ancients', lore: 'arcanum_ruins' }), B('a_herb', '調合師ギルド', 'lab', 'S', { guild: 'apothecaries' })] },
-      { id: 'forbidden', name: '禁呪跡地', type: 'slum', at: [0.85, 0.22], buildings: [B('a_hex', '呪術師ギルドの隠れ家', 'blackmarket', 'S', { guild: 'hexers', svc: 'blackmarket', hours: [21, 5] }), B('a_ruinshack', '崩れた研究棟', 'shack', 'S', { lore: 'arcanum_forbidden' })] },
+      { id: 'forbidden', name: '禁呪跡地', type: 'slum', at: [0.85, 0.22], buildings: [B('arcanum_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'arcanum_forbidden' }), B('a_hex', '呪術師ギルドの隠れ家', 'blackmarket', 'S', { guild: 'hexers', svc: 'blackmarket', hours: [21, 5] }), B('a_ruinshack', '崩れた研究棟', 'shack', 'S', { lore: 'arcanum_forbidden' })] },
     ],
     events: ['学術大祭（魔法スキルの熟練度+50%）', '湖上オーロラの夜（魔力が満ちSP回復上昇）', '禁呪区画の封印点検'],
     goods: { produce: ['crystal', 'book'], demand: ['silk', 'wheat', 'steel'] }, wealth: { academy: 4, market: 3, student: 2, forbidden: 1 },
@@ -171,7 +171,7 @@ export const CITIES = {
       { id: 'oldtown', name: '川沿い商店街（庶民区）', type: 'common', at: [0.3, 0.6], buildings: [
         B('l_tavern', '大衆酒場「七番目の月」', 'tavern', 'M', { hours: [12, 5] }), B('l_inn', '川沿いの宿', 'inn', 'S', { svc: 'inn' }), B('l_smith', '下町の鍛冶屋', 'smithy', 'S', { svc: 'smith', hours: [8, 20] }),
         B('l_item', '商店街の道具屋', 'shop', 'S', { svc: 'item' }), B('l_armor', '古着と防具の店', 'shop', 'S', { svc: 'armor' }), B('l_dawn', '市民団体「夜明けの灯」集会所', 'shack', 'S', { lore: 'lumina_dawn' })] },
-      { id: 'slum', name: '旧炭鉱スラム', type: 'slum', at: [0.72, 0.8], buildings: [
+      { id: 'slum', name: '旧炭鉱スラム', type: 'slum', at: [0.72, 0.8], buildings: [B('lumina_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'lumina_kowloon' }), 
         B('l_black', '闇市', 'blackmarket', 'L', { svc: 'blackmarket', guild: 'blackmarket' }), B('l_pit', '地下闘技場', 'arena', 'L', { svc: 'arena', guild: 'gladiators', hours: [20, 5] }),
         B('l_rose', '黒薔薇の館', 'mansion', 'M', { guild: 'assassins', hours: [22, 5] }), B('l_clinic', 'もぐりの診療所', 'clinic', 'S', { svc: 'inn' }), B('l_factory', '廃工場', 'warehouse', 'L', { lore: 'lumina_factory' })] },
     ],

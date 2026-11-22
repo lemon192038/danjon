@@ -98,6 +98,7 @@ function pickTarget(zone, m, now) {
   let best = null, bs = -Infinity;
   for (const t of zone.enemiesOf(m)) {
     if (t.buffMods?.stealth && Math.hypot(t.x - m.x, t.y - m.y) > 30) continue;
+    if (m.faction && zone.kind === 'slum' && zone.world.slum.passiveFor(m, t)) continue;
     const d = Math.hypot(t.x - m.x, t.y - m.y); if (d > aggro && !(m.threat?.[t.ownerId || t.id])) continue;
     let s = -d + (m.threat?.[t.ownerId || t.id] || 0) * 0.02;
     if (m.aiLv >= 3) s += (1 - t.hp / t.maxHp) * 150;        // focus weakened targets

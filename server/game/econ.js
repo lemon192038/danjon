@@ -158,8 +158,8 @@ export class Econ {
     const ch = s.ch; const bet = Math.max(10, Math.min(5000, Math.floor(m.bet || 0))); const d = clock().day; ch.casino ||= { day: d, wager: 0 }; if (ch.casino.day !== d) ch.casino = { day: d, wager: 0 };
     if (ch.casino.wager + bet > 200000) return this.err(s, '本日の賭け上限（200,000G）に達しました'); if (ch.gold < bet) return this.err(s, 'ゴールドが足りません');
     ch.gold -= bet; ch.casino.wager += bet; let win = 0, res;
-    const golden = (hash32('gamblers') + d) % 4 === 0 ? 1.2 : 1;
-    if (m.game === 'slot') { const SYM = ['🍒', '🔔', '💎', '7', '🌙']; const W = [40, 28, 16, 6, 10]; const roll = () => { let x = Math.random() * 100; for (let i = 0; i < 5; i++) { x -= W[i]; if (x <= 0) return i; } return 0; }; const r = [roll(), roll(), roll()]; res = r.map(i => SYM[i]); const pay = { 0: 4, 1: 10, 2: 30, 3: 150, 4: 20 }; if (r[0] === r[1] && r[1] === r[2]) win = bet * pay[r[0]]; else if (r[0] === r[1] || r[1] === r[2]) win = Math.round(bet * (r[1] === 0 ? 1.2 : 1.6)); }
+    const golden = (hash32('gamblers') + d) % 4 === 0 ? 1.02 : 1; // small bonus day; expected return stays below 1
+    if (m.game === 'slot') { const SYM = ['🍒', '🔔', '💎', '7', '🌙']; const W = [40, 28, 16, 6, 10]; const roll = () => { let x = Math.random() * 100; for (let i = 0; i < 5; i++) { x -= W[i]; if (x <= 0) return i; } return 0; }; const r = [roll(), roll(), roll()]; res = r.map(i => SYM[i]); const pay = { 0: 3, 1: 8, 2: 25, 3: 100, 4: 15 }; /* EV≈0.88 */ if (r[0] === r[1] && r[1] === r[2]) win = bet * pay[r[0]]; else if (r[0] === r[1] || r[1] === r[2]) win = Math.round(bet * (r[1] === 0 ? 0.8 : 1.2)); }
     else { const n = Math.floor(Math.random() * 37); const red = n !== 0 && [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n); res = [n, n === 0 ? '緑' : red ? '赤' : '黒']; if (m.pick === 'red' && red || m.pick === 'black' && !red && n !== 0) win = bet * 2; else if (+m.pick === n && m.pick !== '' && !isNaN(+m.pick)) win = bet * 36; }
     win = Math.round(win * golden); ch.gold += win; if (win) this.world.guilds.addRep(ch, 'gamblers', 1);
     this.world.sendSelf(s); s.send({ t: 'casinoResult', res, win, bet, gold: ch.gold });
