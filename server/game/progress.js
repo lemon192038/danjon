@@ -54,7 +54,36 @@ export function grantXp(ch, n, notify) {
 export function grantMastery(ch, wt, n, notify) {
   const m = ch.mastery[wt] ||= { lv: 1, xp: 0 }; if (m.lv >= MAX_MASTERY) return;
   m.xp += n;
-  while (m.lv < MAX_MASTERY && m.xp >= masteryXpToNext(m.lv)) { m.xp -= masteryXpToNext(m.lv); m.lv++; const s = DATA.wtSkills.get(wt)[m.lv - 1]; notify?.({ t: 'mastery', wt, lv: m.lv, n: s?.name }); }
+  while (m.lv < MAX_MASTERY && m.xp >= masteryXpToNext(m.lv)) { m.xp -= masteryXpToNext(m.lv); m.lv++; const s = DATA.wtSkills.get(wt)[m.lv - 1]; notify?.({ t: 'mastery', wt, lv: m.lv, n: s?.name });
+    const ms = MASTERY_MILESTONES.find(x => x.lv === m.lv); if (ms) { const title = masteryTitle(wt, m.lv); if (ms.title && !ch.progress.titles.includes(title)) { ch.progress.titles.push(title); notify?.({ t: 'title', v: title }); } if (ms.msg) notify?.({ t: 'msg', v: `${WT_BY_ID[wt].name}熟練度${m.lv}：${ms.msg}` }); } }
+}
+// ── weapon mastery milestones (titles + unlocked techniques; techniques are resolved in actor.heavy)
+export const MASTERY_MILESTONES = [{ lv: 25, title: '使い手' }, { lv: 30, msg: 'コンボ派生「最終段→強攻撃」を習得（溜め不要・威力上昇）' }, { lv: 50, title: '熟達者' }, { lv: 60, msg: '強攻撃に追加の衝撃波が発生するようになった' }, { lv: 75, title: '達人' }, { lv: 100, title: '極致' }];
+export const masteryTitle = (wt, lv) => `${WT_BY_ID[wt].name}の${MASTERY_MILESTONES.find(x => x.lv === lv)?.title}`;
+// ── weapon individual history (名もなき武器): every equipped weapon instance accumulates its own record
+export function weaponHistory(ch, ev, notify) {
+  const it = ch.inventory.find(i => i.uid === ch.equip?.weapon); if (!it) return null;
+  const h = it.hist ||= { k: 0, b: 0, since: Date.now(), fam: {}, floors: 0 };
+  if (ev.kill) { h.k++; if (ev.fam) h.fam[ev.fam] = (h.fam[ev.fam] || 0) + 1; }
+  if (ev.boss) h.b++; if (ev.floor) h.floors = Math.max(h.floors, ev.floor);
+  const e = epithetFor(it); if (e && e.tier > (it.epi?.tier || 0)) { it.epi = e; notify?.({ t: 'msg', v: `${DATA.weapons.get(it.ref)?.name}に二つ名が刻まれた：「${e.name}」` }); return e; }
+  return null;
+}
+export function epithetFor(it) {
+  const h = it.hist; if (!h) return null; const fam = Object.entries(h.fam).sort((a, b) => b[1] - a[1])[0]; const famName = fam && DATA.families.get(fam[0])?.name;
+  if (h.k >= 3000) return { tier: 4, name: '千の戦場を越えし', mods: { atk: 0.06, crit: 0.03 } };
+  if (h.b >= 25) return { tier: 3, name: '王殺し', mods: { atk: 0.05, critDmg: 0.08 } };
+  if (h.k >= 1000) return { tier: 2, name: famName ? `${famName}の天敵` : '歴戦', mods: { atk: 0.04 } };
+  if (h.k >= 300) return { tier: 1, name: famName ? `${famName}狩り` : '使い込まれた', mods: { atk: 0.02 } };
+  return null;
+}
+// ── weapon evolution paths (強化先): +10 weapon → the next stronger weapon of the same type; type-group materials
+const EVO_MAT = { sword: 'gem', polearm: 'gem', blunt: 'gem', fist: 'hide', ranged: 'wood', magic: 'crystal', mech: 'gem', myth: 'abyssShard' };
+export function evolveRecipe(w, catId) {
+  const list = DATA.wtWeapons.get(w.wt); if (!list) return null; const i = list.findIndex(x => x.id === w.id);
+  const to = list.slice(i + 1).find(x => x.rar > w.rar) || null; if (!to) return null;
+  const mats = { ore: 5 + w.rar * 3, [EVO_MAT[catId] || 'gem']: 2 + w.rar * 2 }; if (w.rar >= 4) mats.relic = w.rar - 2;
+  return { to: to.id, toName: to.name, toRar: to.rar, toLvl: to.lvl, plus: 10, gold: Math.round(to.price * 0.5), mats };
 }
 export function grantJobXp(ch, n, notify) {
   const j = ch.jobs[ch.job]; if (!j || j.rank >= 10) return;

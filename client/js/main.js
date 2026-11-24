@@ -143,6 +143,7 @@ function tickInput() {
     if (k === ' ') { const mv = input.move(); stickAim(); const a = state.aimAngle ?? 0; net.send({ t: 'dodge', dx: mv.x || Math.cos(a), dy: mv.y || Math.sin(a) }); ui.tut?.event('dodge'); }
     else if ('1234'.includes(k) && k.length === 1) { const a = skillAim(+k - 1); ui.tut?.event('skill'); net.send({ t: 'skill', i: +k - 1, tx: a.x, ty: a.y }); ui.flashSlot(+k - 1); }
     else if (k === 'q') net.send({ t: 'potion', ref: 'hp' }); else if (k === 'e') net.send({ t: 'potion', ref: 'sp' });
+    else if (k === 'r') { const a = aimPoint(true); net.send({ t: 'heavy', ax: Math.round(a.x), ay: Math.round(a.y) }); }
     else if (k === 'f') { net.send({ t: 'interact' }); ui.tut?.event('interact'); }
     else ui.key(k);
   }

@@ -11,7 +11,7 @@
 
 ## 集計
 
-総数 **71** ／ 未実装 62 ／ 一部実装 1 ／ 実装済み 8
+総数 **71** ／ 未実装 61 ／ 一部実装 1 ／ 実装済み 9
 
 ## 大型イベント（8章）（6）
 
@@ -234,7 +234,7 @@
 | lg_worldtree_dream | 世界樹の夢<br><small>WORLD TREE DREAM</small> | 世界規模 | 世界樹領域ユグドラシル | both | 未実装 | outline |
 | lg_deus_machina | 神機降臨<br><small>DEUS MACHINA</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
 | lg_forgotten_hero | 忘却された英雄<br><small>THE FORGOTTEN HERO</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
-| lg_unnamed_arms | 名もなき武器<br><small>THE UNNAMED ARMAMENT</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
+| lg_unnamed_arms | 名もなき武器<br><small>THE UNNAMED ARMAMENT</small> | 世界規模・称号 | 世界各地 | personal | 実装済み | outline |
 | lg_wandering_merchant | 名もなき商人<br><small>THE WANDERING MERCHANT</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
 | lg_rebuild | 滅びた村の再建<br><small>REBUILD THE LOST</small> | 世界規模 | 中央大陸エルディア | both | 未実装 | outline |
 | lg_civil_war | 王国の内乱<br><small>CIVIL WAR</small> | 世界規模 | 中央大陸エルディア | both | 未実装 | outline |
@@ -249,6 +249,15 @@
 | lg_other_side | 世界の裏側<br><small>THE OTHER SIDE</small> | 世界規模 | 世界の外側アウター・ワールド | both | 未実装 | outline |
 | lg_divine_war | 神々の戦争<br><small>WAR OF THE DIVINES</small> | 世界規模 | 神域ディヴァイン・レルム | both | 未実装 | outline |
 | lg_doomsday | 終末時計<br><small>DOOMSDAY CLOCK</small> | 世界規模 | 時間領域クロノス・レルム | both | 未実装 | outline |
+
+### 名もなき武器（lg_unnamed_arms）
+
+- 発生条件：武器を装備して戦い続ける（武器の個体ごとに記録）
+- 進行段階：1. 武器を使い込む → 2. 二つ名が刻まれる
+- 報酬：二つ名（300撃破〜）と攻撃補正、称号「武器に刻む者」
+- 関連：ct_hundred_arms, sl_blackforge
+- 再挑戦：再挑戦可
+- 備考：長期使用した武器に固有の歴史（撃破数・ボス討伐・最多討伐種・進化歴）が蓄積し、節目で二つ名と小さな補正が刻まれる
 
 ## 禁書庫・大罪（12〜14章）（4）
 
@@ -381,6 +390,7 @@ sl_carriers -> lib_forbidden
 sl_capital_shadow -> sl_false_hero, ct_succession
 sl_blackforge -> ct_hundred_arms, lg_unnamed_arms
 sl_last_resident -> lib_forbidden, lg_other_side
+lg_unnamed_arms -> ct_hundred_arms, sl_blackforge
 lib_sealed_abyss -> lib_forbidden
 lib_forbidden -> lib_sins, ev_thousand_spells, sl_carriers, lg_other_side
 lib_sins -> lib_succession

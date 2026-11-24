@@ -44,6 +44,7 @@ export function computeStats(ch, data, extraMods = null) {
   }
   if (mods.all) for (const s of STATS) st[s] = Math.round(st[s] * (1 + mods.all));
   if (weapon) for (const t of weapon.traits) addMods(mods, t.mods);
+  if (wItem?.epi?.mods) addMods(mods, wItem.epi.mods); // epithet earned through the weapon's own history
   // learned weapon-type passives
   const m = ch.mastery?.[wt.id]?.lv || 0;
   for (const sk of data.wtSkills(wt.id) || []) if (sk.kind === 'passive' && sk.req.mastery <= m) addMods(mods, sk.eff[0].mods);

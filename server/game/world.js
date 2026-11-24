@@ -6,6 +6,8 @@ import { WORLD, T } from './maps.js';
 import { DATA, WT_BY_ID } from '../data.js';
 import { store } from '../store.js';
 import { TICK_MS, DIFFICULTIES, STATS, TILE, SKILL_SLOTS } from '../../shared/constants.js';
+import { weaponHistory, evolveRecipe, MASTERY_MILESTONES, masteryTitle } from './progress.js';
+import { categoryOf } from '../../shared/data/weaponTypes.js';
 import { newCharacter, knownSkills, validateSlots, grantXp, grantMastery, grantJobXp, skillUsed, rollLoot, addItem, enhance, shopStock, ITEM_PRICES, questBoard, jobUnlockMet, uid, checkJobUnlocks } from './progress.js';
 import { armorDef } from '../../shared/formulas.js';
 import { STARTER_WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
@@ -209,6 +211,7 @@ export class World {
       grantMastery(ch, f.wt.id, Math.round((3 + (m.level || 1) * 0.4) * (m.boss ? 10 : m.elite ? 3 : 1) * (1 + (mods.masteryXp || 0))), notify);
       grantJobXp(ch, Math.round((2 + (m.level || 1) * 0.3) * (m.boss ? 10 : 1)), notify);
       if (f.npc) { f.npc.gold += m.gold; if (f.npc.partyWith) f.npc.bond[f.npc.partyWith] = Math.min(100, (f.npc.bond[f.npc.partyWith] || 0) + 0.2); continue; }
+      if (weaponHistory(ch, { kill: true, fam: m.fam }, notify)) this.unnamedArms(s);
       ch.gold += Math.round(m.gold * (1 + (mods.gold || 0))); ch.progress.kills++; s.dirty = true; ch.progress.famKills[m.fam] = (ch.progress.famKills[m.fam] || 0) + 1;
       const floor = z.floor || Math.round((m.level || 1) * 0.8);
       const loot = z.kind === 'slum' ? [] : rollLoot({ floor, diff: z.diff || 'NORMAL', boss: false, luck: mods.drop ? mods.drop * 0.03 : 0, preferWt: f.wt.id });
@@ -222,7 +225,7 @@ export class World {
   onBossKilled(z, b) {
     for (const p of z.players) {
       const s = p.session; const ch = p.ch; const diff = z.diff || 'NORMAL';
-      ch.progress.bossKills[diff] = (ch.progress.bossKills[diff] || 0) + 1;
+      ch.progress.bossKills[diff] = (ch.progress.bossKills[diff] || 0) + 1; if (weaponHistory(ch, { boss: true, floor: z.floor }, n => this.note(s, n))) this.unnamedArms(s);
       const di = DIFFICULTIES.findIndex(d => d.id === diff);
       const myth = diff === 'ABYSS' ? 0.08 + z.floor * 0.003 : diff === 'HELL' && z.floor >= 50 ? 0.03 : 0;
       z.dropLoot(p, b.x, b.y, rollLoot({ floor: z.floor, diff, boss: true, mythChance: myth, preferWt: p.wt.id }));
@@ -268,6 +271,10 @@ export class World {
     if (!p.members.length) this.parties.delete(p.id);
     for (const m of p.members) this.pushParty(m); if (!silent) this.pushParty(cid);
   }
+  // 名もなき武器: the first epithet starts and completes the event; later epithets are logged
+  unnamedArms(s) { const E = this.events; const it = s.ch.inventory.find(i => i.uid === s.ch.equip.weapon); const nm = `${DATA.weapons.get(it.ref)?.name}「${it.epi.name}」`;
+    if (!E.prog(s.ch, 'lg_unnamed_arms')) { E.start(s, 'lg_unnamed_arms', { silent: true }); E.advance(s, 'lg_unnamed_arms', 1, { silent: true }); E.complete(s, 'lg_unnamed_arms', null, { silent: true }); E.grant(s, 'lg_unnamed_arms', 'first', { title: '武器に刻む者' }); }
+    E.record(s, 'lg_unnamed_arms', `二つ名を得た：${nm}`, { clear: true }); }
   // ---------- slum / market / hideout glue
   raidHud(ch, z) { const r = ch.raid; return { t: Math.max(0, Math.round((r.ends - Date.now()) / 1000)), w: weight(r.bag), cap: this.slum.capacity(ch), v: value(r.bag) + value(r.pouch), n: r.bag.length, pn: r.pouch.length, L: z.layer, ex: r.extracting ? Math.max(0, Math.round((r.extracting.until - Date.now()) / 100) / 10) : null }; }
   slumInfo(s, z) {
@@ -366,6 +373,7 @@ export class World {
     switch (m.t) {
       case 'in': a.input = { mx: clampN(m.mx), my: clampN(m.my), atk: !!m.atk, spc: !!m.spc }; a.autoAim = !!m.au; if (Number.isFinite(m.ax) && Number.isFinite(m.ay)) { a.aimX = m.ax; a.aimY = m.ay; } else { a.aimX = a.aimY = null; } break;
       case 'dodge': a.dodge(a.zone, clampN(m.dx), clampN(m.dy)); break;
+      case 'heavy': { if (a.dead) break; if (Number.isFinite(m.ax) && Number.isFinite(m.ay) && a.canAct(a.zone.now) && !a.action) { a.facing = Math.atan2(m.ay - a.y, m.ax - a.x); } const r = a.heavy(a.zone); if (r !== 'ok') s.send({ t: 'skillfail', i: -1, r }); break; }
       case 'skill': { const id = s.ch.skills.slots[m.i | 0]; if (!id || a.dead) break; if (!knownSkills(s.ch).includes(id)) break; const tx = Number.isFinite(m.tx) ? m.tx : undefined, ty = Number.isFinite(m.ty) ? m.ty : undefined; if (tx !== undefined && ty !== undefined && (tx !== a.x || ty !== a.y) && a.canAct(a.zone.now)) { a.facing = Math.atan2(ty - a.y, tx - a.x); a.aimX = tx; a.aimY = ty; } const r = a.useSkill(id, a.zone, { tx, ty }); if (r !== 'ok') s.send({ t: 'skillfail', i: m.i, r }); break; }
       case 'potion': { const it = s.ch.inventory.find(i => i.kind === 'potion' && i.ref === m.ref && i.n > 0); if (!it || a.dead || (a.potCd || 0) > a.zone.now) break; a.potCd = a.zone.now + 3000; it.n--; if (it.n <= 0) s.ch.inventory = s.ch.inventory.filter(i => i !== it); const k = 1 + (a.stats.mods.potion || 0); if (m.ref === 'hp') a.heal(a.maxHp * 0.35 * k, a.zone); else a.sp = Math.min(a.maxSp, a.sp + a.maxSp * 0.4 * k); this.sendSelf(s); break; }
       case 'interact': this.interact(s); break;
@@ -433,6 +441,13 @@ export class World {
         return; }
       case 'sell': { if (!inTown) return; const it = ch.inventory.find(i => i.uid === m.uid); if (!it || Object.values(ch.equip).includes(it.uid)) return err('装備中のアイテムは売却できません'); if (it.kind === 'loot') { const rid = regionOfCity(a.zone.cityId) || 'haven_old'; const p = this.market.sellPrice(rid, it, 'regular') * it.n; if (!p) return err(`${PROV[it.prov]}の品は正規の店では買い取ってもらえない（闇市・故買屋・鑑定屋へ）`); ch.gold += p; ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${p}Gで売却しました`); }
         let price = 10; if (it.kind === 'weapon') price = Math.round(DATA.weapons.get(it.ref).price * 0.3); else if (it.kind === 'armor') price = Math.round(60 * Math.pow(2.2, it.tier)); else price = (ITEM_PRICES[it.ref] || 20) * 0.3 * (it.n || 1); ch.gold += Math.round(price); ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${Math.round(price)}Gで売却しました`); }
+      case 'evoInfo': { const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'weapon'); const w = it ? DATA.weapons.get(it.ref) : DATA.weapons.get(m.ref); if (!w) return; return s.send({ t: 'evoInfo', key: m.uid || m.ref, recipe: evolveRecipe(w, categoryOf(w.wt).id), hist: it?.hist ? { k: it.hist.k, b: it.hist.b, since: it.hist.since, top: Object.entries(it.hist.fam).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([f, n]) => [DATA.families.get(f)?.name || f, n]) } : null, epi: it?.epi || null, mastery: MASTERY_MILESTONES.map(x => ({ ...x, name: x.title ? masteryTitle(w.wt, x.lv) : null })) }); }
+      case 'evolve': { if (!inTown) return err('鍛冶屋（街）で進化できます'); const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'weapon'); if (!it) return; const w = DATA.weapons.get(it.ref); const r = evolveRecipe(w, categoryOf(w.wt).id); if (!r) return err('この武器にはこれ以上の強化先がありません');
+        if ((it.plus || 0) < r.plus) return err(`+${r.plus}以上に強化してから進化できます`); if (r.toLvl > ch.level + 10) return err(`Lv${r.toLvl - 10}以上で進化できます`); if (ch.gold < r.gold) return err('ゴールドが足りません');
+        const cnt = k => ch.inventory.filter(i => i.ref === k && i.kind !== 'loot').reduce((t, i) => t + (i.n || 0), 0); const miss = Object.entries(r.mats).filter(([k, n]) => cnt(k) < n).map(([k, n]) => `${ITEMS[k]?.name || k}×${n}`); if (miss.length) return err('素材不足：' + miss.join('、'));
+        ch.gold -= r.gold; for (const [k, n] of Object.entries(r.mats)) { let left = n; for (const x of ch.inventory.filter(i => i.ref === k && i.kind !== 'loot')) { const t = Math.min(left, x.n); x.n -= t; left -= t; if (!left) break; } ch.inventory = ch.inventory.filter(i => !(i.ref in r.mats && i.kind !== 'loot' && i.n <= 0)); }
+        const from = w.name; it.ref = r.to; it.plus = Math.floor((it.plus || 0) / 2); if (!ch.progress.codex.includes(r.to)) ch.progress.codex.push(r.to); (it.hist ||= { k: 0, b: 0, since: Date.now(), fam: {}, floors: 0 }).evo = [...(it.hist.evo || []), from];
+        a.refreshStats(); return ok(`${from}は${r.toName}へと進化した（来歴は引き継がれる）`); }
       case 'enhance': { if (!inTown) return err('鍛冶屋で強化できます'); const r = enhance(ch, m.uid); if (r.error) return err(r.error); return ok(r.ok ? `強化成功！ +${r.plus}` : '強化失敗…（素材は消費されました）'); }
       case 'quest': { const board = questBoard(a.zone.id, day()); const q = board.find(x => x.id === m.id) || ch.progress.quests[m.id]?.def;
         if (m.act === 'accept') { if (!q || ch.progress.quests[q.id]) return; if (Object.values(ch.progress.quests).filter(x => !x.done).length >= 8) return err('同時受注は8件までです'); ch.progress.quests[q.id] = { def: q, prog: 0 }; return ok(`「${q.name}」を受注しました`); }

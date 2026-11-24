@@ -58,6 +58,28 @@ export class Fighter extends Actor {
     zone.schedule(act.until, () => { if (this.action === act) { this.action = null; this.lastAttackEnd = zone.now; this.comboStep = idx + 1; if (act.buffered && this.attackHeld) this.attack(zone.now, zone); } });
     return true;
   }
+  // ---- heavy attack (common to all 86 types): a charged version of the type's finisher. Mastery 30: instant follow-up
+  // right after a combo finisher (派生). Mastery 60: an extra shockwave hit. Super armor while charging.
+  heavy(zone) {
+    const now = zone.now; if (!this.canAct(now) || this.statuses.fear) return 'busy'; if ((this.heavyCd || 0) > now) return 'cd';
+    const chain = this.action?.type === 'attack' && this.action.step === this.wt.combo.length - 1 && now >= this.action.recAt;
+    if (this.action && !chain) return 'busy'; if (this.sp < 6) return 'sp';
+    const m = this.ch.mastery?.[this.wt.id]?.lv || 1; const fin = this.wt.combo[this.wt.combo.length - 1];
+    const follow = chain && m >= 30; this.sp -= 6; this.heavyCd = now + 1400;
+    if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
+    const sp = this.aspdNow(); const charge = follow ? 120 : (fin.t[0] * 1.6 + 260) / sp; const rec = fin.t[2] * 1.2 / sp;
+    const act = { type: 'heavy', t0: now, hitAt: now + charge, recAt: now + charge + 80 + (fin.h > 1 ? fin.t[1] / sp : 0), until: now + charge + 80 + rec + (fin.h > 1 ? fin.t[1] / sp : 0), moveMul: 0, superArmor: true, lockMove: !follow };
+    this.action = act; zone.fx({ t: 'charge', id: this.id, d: Math.round(charge), f: follow ? 1 : 0 });
+    // whips sweep their full length (no close-range dead zone); multi-hit finishers keep all their hits
+    const base = fin.s === 'whip' ? { ...fin, s: 'arc', r: fin.l, a: Math.max(fin.a, 120) } : fin; const hits = fin.h || 1;
+    const spread = fin.s === 'proj' && (fin.n || 1) > 1; const step = { ...base, m: fin.m * (follow ? 2.4 : 2.0) * (1 + Math.min(100, m) * 0.003), st: (fin.st || 5) + 10 / hits, kb: hits > 1 || spread ? (fin.kb || 0) : (fin.kb || 0) + 80, h: 1 };
+    const iv = Math.max(40, fin.t[1] / sp / hits);
+    zone.schedule(act.hitAt, () => { if (this.action !== act || this.dead) return; zone.fx({ t: 'atk', id: this.id, s: this.wt.combo.length - 1, d: 260, k: this.visKey, sh: step.s, hv: 1 });
+      for (let i = 0; i < hits; i++) zone.schedule(zone.now + i * iv, () => { if (!this.dead) this.doStep(zone, { ...step, kb: i === hits - 1 && !spread ? (fin.kb || 0) + 80 : step.kb }, true, i === 0); });
+      if (m >= 60) zone.schedule(zone.now + 180, () => { if (this.dead) return; this.doStep(zone, { ...step, s: 'circle', r: 46, m: step.m * 0.5, kb: 40 }, true, false); zone.fx({ t: 'boom', x: Math.round(this.x), y: Math.round(this.y), r: 46, e: this.weaponEl || 'phys' }); }); });
+    zone.schedule(act.until, () => { if (this.action === act) { this.action = null; this.lastAttackEnd = zone.now; this.comboStep = 0; } });
+    return 'ok';
+  }
   lockTarget(zone, refresh) {
     let t = this.lockId ? zone.actors.get(this.lockId) : null;
     if (!t || t.dead || Math.hypot(t.x - this.x, t.y - this.y) > 300 || refresh && !this.action) { t = zone.nearestEnemy(this, 280); this.lockId = t?.id || null; }

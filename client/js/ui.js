@@ -44,6 +44,7 @@ export class UI {
     net.on('invite', m => { if (confirm(`${m.from} からパーティーに招待されました。参加しますか？`)) net.menu('accept', { pid: m.pid }); });
     net.on('npcList', m => { this.npcList = m.list; if (this.panel === 'party' || this.panel === 'npcs') this.render(); });
     net.on('players', m => { this.players = m.list; if (this.panel === 'party') this.render(); });
+    net.on('evoInfo', m => { (this.evo ||= {})[m.key] = m; if (this._evoReq) delete this._evoReq[m.key]; if (this.panel === 'inventory' || this.panel === 'smith') this.render(); });
     net.on('skillfail', m => { const r = { cd: 'クールダウン中', sp: 'SPが足りない', busy: '行動中', ng: '使用できない' }[m.r]; if (r) this.toast(r, 'err', 900); });
     this.slotSel = null; this.skillTab = 'wtype'; this.codexType = 1; this.codexTab = 'profile';
     this.tut = new Tutorial(net, () => !!ctx.input.touchOn); this.initSlum();
@@ -130,13 +131,13 @@ export class UI {
     switch (a) {
       case 'close': return this.closeModal();
       case 'tab': this.sel[t.dataset.k] = v; return this.render();
-      case 'equip': return m('equip', { uid: v }); case 'sell': if (confirm('売却しますか？')) m('sell', { uid: v }); return; case 'enhance': return m('enhance', { uid: v });
+      case 'equip': return m('equip', { uid: v }); case 'sell': if (confirm('売却しますか？')) m('sell', { uid: v }); return; case 'enhance': if (this.evo) delete this.evo[v]; return m('enhance', { uid: v }); case 'evolve': if (!confirm('進化させますか？（強化値は半分になります。来歴は引き継がれます）')) return; if (this.evo) delete this.evo[v]; return m('evolve', { uid: v });
       case 'alloc': return m('alloc', { stat: v, n: +t.dataset.n || 1 }); case 'resetStats': if (confirm('ゴールドを支払いステータスを再分配しますか？')) m('resetStats'); return;
       case 'pickSkill': this.slotSel = v; return this.render(); case 'slot': if (this.slotSel !== null) m('slot', { i: +v, id: this.slotSel === '' ? null : this.slotSel }); this.slotSel = null; return;
       case 'skillTab': this.skillTab = v; return this.render();
       case 'job': this.sel.job = v; return this.render(); case 'changeJob': return m('job', { id: v });
       case 'codexType': this.codexType = +v; loadType(+v).then(() => this.render()); return this.render(); case 'codexTab': this.codexTab = v; loadType(this.codexType).then(() => this.render()); return this.render();
-      case 'item': this.sel.item = v; return this.render();
+      case 'item': this.sel.item = v; if (this.evo) delete this.evo[v]; return this.render();
       case 'buyW': return m('buy', { kind: 'weapon', ref: v }); case 'buyA': return m('buy', { kind: 'armor', tier: +v, slot: t.dataset.slot }); case 'buyI': return m('buy', { kind: 'item', ref: v, n: +(t.dataset.n || 1) });
       case 'shopWt': this.shopWt = +v; loadType(+v).then(() => this.render()); return;
       case 'qAccept': return m('quest', { act: 'accept', id: v }); case 'qTurn': return m('quest', { act: 'turnin', id: v }); case 'qAbandon': return m('quest', { act: 'abandon', id: v });
@@ -154,19 +155,35 @@ export class UI {
   // ---------- panels
   p_inventory() {
     const ch = this.self.ch; const eq = new Set(Object.values(ch.equip)); const inTown = this.state.zone.kind === 'town';
-    const items = ch.inventory.slice().sort((a, b) => (eq.has(b.uid) - eq.has(a.uid)) || (a.kind > b.kind ? 1 : -1));
+    const q = (this.sel.search || '').trim(), kf = this.sel.ikind || 'all', srt = this.sel.isort || 'kind';
+    const nmOf = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name || '' : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : it.kind === 'loot' ? LOOT[it.ref]?.name || '' : ITEMS[it.ref]?.name || it.ref;
+    const wOf = it => it.kind === 'weapon' ? D.weapons.get(it.ref) : null;
+    const items = ch.inventory.filter(it => (kf === 'all' || (kf === 'mat' ? !['weapon', 'armor', 'loot'].includes(it.kind) : it.kind === kf)) && (!q || nmOf(it).includes(q) || (wOf(it) && WT_BY_ID[wOf(it).wt].name.includes(q))))
+      .sort((a, b) => (eq.has(b.uid) - eq.has(a.uid)) || (srt === 'rar' ? (wOf(b)?.rar || 0) - (wOf(a)?.rar || 0) : srt === 'lvl' ? (wOf(b)?.lvl || 0) - (wOf(a)?.lvl || 0) : srt === 'name' ? nmOf(a).localeCompare(nmOf(b), 'ja') : (a.kind > b.kind ? 1 : -1)));
+    const ibar = `<div class="jbar"><input data-search placeholder="名前・武器種で検索" value="${esc(q)}"><select data-set="ikind">${[['all', 'すべて'], ['weapon', '武器'], ['armor', '防具'], ['loot', '戦利品'], ['mat', '消耗品・素材']].map(([k, n]) => `<option value="${k}" ${kf === k ? 'selected' : ''}>${n}</option>`).join('')}</select><select data-set="isort">${[['kind', '種類順'], ['rar', 'レア度順'], ['lvl', 'Lv順'], ['name', '名前順']].map(([k, n]) => `<option value="${k}" ${srt === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
     const name = it => it.kind === 'weapon' ? D.weapons.get(it.ref)?.name : it.kind === 'armor' ? armorDef(it.slot, it.tier).name : it.kind === 'loot' ? `${LOOT[it.ref]?.name}${it.prov === 'laundered' ? '' : '〔' + PROV[it.prov] + '〕'}` : ITEMS[it.ref]?.name || it.ref;
     const list = items.map(it => { const w = it.kind === 'weapon' ? D.weapons.get(it.ref) : null; const col = w ? rar(w.rar).color : it.kind === 'armor' ? '#a0c0ff' : '#ccc'; return `<div class="irow ${this.sel.item === it.uid ? 'sel' : ''}" data-act="item" data-v="${it.uid}"><span style="color:${col}">${eq.has(it.uid) ? '[E] ' : ''}${esc(name(it))}${it.plus ? ' +' + it.plus : ''}${it.n ? ' ×' + it.n : ''}</span><small>${w ? `${rar(w.rar).key} ${WT_BY_ID[w.wt].name} Lv${w.lvl}` : it.kind === 'armor' ? (it.slot === 'armor' ? '鎧' : '装飾') : '消耗/素材'}</small></div>`; }).join('');
     const it = ch.inventory.find(i => i.uid === this.sel.item); let det = '<p class="dim">アイテムを選択してください</p>';
     if (it) {
-      if (it.kind === 'weapon') det = this.weaponDetail(D.weapons.get(it.ref), it);
+      if (it.kind === 'weapon') det = this.weaponDetail(D.weapons.get(it.ref), it) + this.weaponExtra(it, inTown);
       else if (it.kind === 'armor') { const a = armorDef(it.slot, it.tier); det = `<h3>${a.name}${it.plus ? ' +' + it.plus : ''}</h3><p>防御 ${a.def} / HP+${a.hp}${a.sp ? ` / SP+${a.sp}` : ''}${a.crit ? ` / 会心+${pct(a.crit)}` : ''} ・ 必要Lv${Math.max(1, a.lvl - 10)}</p>`; }
       else if (it.kind === 'loot') { const L = LOOT[it.ref]; det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${['', '一般', '良品', '希少', '貴重', '伝説'][L.r]}・${L.w}kg・基準価値${L.v}G・品質${it.q}</p><p>出所：${PROV[it.prov]}（${it.prov === 'legal' || it.prov === 'laundered' ? '正規店で売却可' : '闇市・故買屋・鑑定屋で扱える'}）</p>`; }
       else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${esc(ITEMS[it.ref]?.desc || '')}${it.ref === 'hp' ? ' [Q]' : it.ref === 'sp' ? ' [E]' : ''}</p>${ITEMS[it.ref]?.use ? `<button class="primary" data-act="useItem" data-v="${it.ref}">使う</button>` : ''}`;
       det += `<div class="btns">${(it.kind === 'weapon' || it.kind === 'armor') && !eq.has(it.uid) ? `<button class="primary" data-act="equip" data-v="${it.uid}">装備</button>` : ''}${inTown && (it.kind === 'weapon' || it.kind === 'armor') ? `<button data-act="enhance" data-v="${it.uid}">強化 (${(() => { const c = enhanceCost(it.kind === 'weapon' ? D.weapons.get(it.ref) : { lvl: it.tier * 15 + 1 }, it.plus || 0); return `${c.gold}G 鉱石${c.ore} 成功率${pct(c.rate)}`; })()})</button>` : ''}${inTown && !eq.has(it.uid) ? `<button data-act="sell" data-v="${it.uid}">売却</button>` : ''}</div>`;
     }
     const cargo = Object.entries(ch.cargo || {}).filter(([, n]) => n > 0).map(([g, n]) => `${({ wheat: '小麦', fish: '干物', spice: '香辛料', silk: '絹織物', ore: '星鉄鉱石', steel: '鋼材', crystal: '魔晶石', book: '魔導写本', wine: '葡萄酒' })[g]}×${n}`).join('、');
-    return this.wrap(`所持品・装備 <small>${ch.inventory.length}/200 ・ ${ch.gold.toLocaleString()}G${ch.bank?.bal ? ` ・ 預金${ch.bank.bal.toLocaleString()}G` : ''}</small>`, `${cargo ? `<p class="dim">積荷：${cargo}</p>` : ''}<div class="split"><div class="list">${list}</div><div class="det">${det}</div></div>`);
+    return this.wrap(`所持品・装備 <small>${ch.inventory.length}/200 ・ ${ch.gold.toLocaleString()}G${ch.bank?.bal ? ` ・ 預金${ch.bank.bal.toLocaleString()}G` : ''}</small>`, `${cargo ? `<p class="dim">積荷：${cargo}</p>` : ''}${ibar}<div class="split"><div class="list">${list || '<p class="dim">該当なし</p>'}</div><div class="det">${det}</div></div>`);
+  }
+  // weapon history (来歴・二つ名), evolution path (強化先) with materials, mastery milestones — data from the server
+  weaponExtra(it, inTown) {
+    const k = it.uid; const info = this.evo?.[k]; if (!info) { if (!this._evoReq?.[k]) { (this._evoReq ||= {})[k] = 1; this.net.menu('evoInfo', { uid: k }); } return '<p class="dim">来歴を読み込み中…</p>'; }
+    const r = info.recipe, h = info.hist; const ch = this.self.ch; const have = ref => ch.inventory.find(i => i.ref === ref && i.kind !== 'loot')?.n || 0;
+    const m = ch.mastery[D.weapons.get(it.ref)?.wt]?.lv || 1;
+    return `<h4>来歴</h4>${h ? `<p>撃破 ${h.k} ・ ボス ${h.b} ・ 使用開始 ${new Date(h.since).toLocaleDateString()}${h.top.length ? `<br><small class="dim">よく倒した相手：${h.top.map(([n, c]) => `${esc(n)}×${c}`).join('、')}</small>` : ''}</p>` : '<p class="dim">まだ戦いの記録がない（装備して戦うと刻まれていく）</p>'}
+      ${info.epi ? `<p>二つ名：<b class="good">「${esc(info.epi.name)}」</b> <small>${esc(modsText(info.epi.mods))}</small></p>` : '<p class="dim">二つ名：撃破300で刻まれる</p>'}
+      <h4>強化先（進化）</h4>${r ? `<p>→ <b style="color:${rar(r.toRar).color}">${esc(r.toName)}</b>（${rar(r.toRar).key}・Lv${r.toLvl}）</p><p><small>条件：+${r.plus}以上 ・ ${r.gold.toLocaleString()}G ・ ${Object.entries(r.mats).map(([x, n]) => `<span class="${have(x) >= n ? '' : 'warn'}">${esc(ITEMS[x]?.name || x)}×${n}（所持${have(x)}）</span>`).join('、')}</small></p>${inTown ? `<button data-act="evolve" data-v="${it.uid}">進化させる</button>` : '<p class="dim">街の鍛冶屋で進化できる</p>'}` : '<p class="dim">この武器は最終段階</p>'}
+      <h4>武器種の熟練度 ${m}/100</h4><p><small>${info.mastery.map(x => `<span class="${m >= x.lv ? 'good' : 'dim'}">Lv${x.lv} ${esc(x.name || x.msg)}</span>`).join(' ／ ')}</small></p>
+      <p class="dim"><small>強攻撃：[R]キー／⚡ボタン（最終段の溜め版。SP6）</small></p>`;
   }
   weaponDetail(w, it) {
     if (!w || w.stub) { loadType(w?.wt || 1).then(() => this.render()); return '<p>読み込み中…</p>'; }

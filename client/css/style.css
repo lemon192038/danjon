@@ -90,3 +90,4 @@ svg.spark{vertical-align:middle}ul.rules{padding-left:18px;margin:4px 0}ul.rules
 @media (max-width:900px),(pointer:coarse){#raidhud{top:4px;font-size:11px;max-width:300px;padding:4px 6px}#raidhud .rt{font-size:15px}}
 .jbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}.jbar input{flex:1;min-width:160px}
 ol.stages{padding-left:20px}ol.stages li.cur{color:#ffd070;font-weight:bold}.tag{display:inline-block;background:#2a2440;border:1px solid #4a3a70;border-radius:10px;padding:1px 8px;margin:2px;font-size:12px}
+.tsk.thv { right: 14px; bottom: 282px; width: 76px; height: 76px; border-color: rgba(255,120,80,.9); background: rgba(110,40,30,.8); }

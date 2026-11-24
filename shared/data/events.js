@@ -3,6 +3,8 @@
 // trigger (human-readable discovery/start condition), prereq [event ids], stages [], outcomes [], rewards [], unlocks [],
 // links [event ids], repeat ('none'|'daily'|'cycle'|'rechallenge'), detail ('spec' = fully specified by the directive,
 // 'outline' = registered as extendable shell; do not invent heavy lore until specified), status ('planned'|'partial'|'live').
+// overrides for registry entries that are already playable
+const LIVE = { lg_unnamed_arms: { status: 'live', kinds: ['world', 'title'], scope: 'personal', trigger: '武器を装備して戦い続ける（武器の個体ごとに記録）', stages: ['武器を使い込む', '二つ名が刻まれる'], rewards: ['二つ名（300撃破〜）と攻撃補正', '称号「武器に刻む者」'], repeat: 'rechallenge', links: ['ct_hundred_arms', 'sl_blackforge'] } };
 const E = (id, name, en, group, o) => ({ id, name, en, group, kinds: [], loc: [], scope: 'both', trigger: '', prereq: [], stages: [], outcomes: [], rewards: [], unlocks: [], links: [], repeat: 'none', detail: 'spec', status: 'planned', ...o });
 export const EVENT_KINDS = { permanent: '常設', conditional: '条件発生型', timed: '時間限定', world: '世界規模', regional: '地域', city: '都市', slum: 'スラム', hidden: '隠し', title: '称号', job: '職業解放', npc: 'NPC遭遇', dungeon: 'ダンジョン' };
 export const EVENT_GROUPS = { major: '大型イベント（8章）', slum: 'スラム起点（9章）', city: '都市起点（10章）', large: 'その他の大型イベント候補（11章）', library: '禁書庫・大罪（12〜14章）', existing: '既存実装（統合対象）' };
@@ -67,13 +69,13 @@ export const EVENTS = [
   ...[['lg_god_remains', '神骸発掘', 'REMNANTS OF GOD', ['divine_realm'], 'ディヴァイン・レルムへの導線'], ['lg_kingdom_below', '地底王国', 'KINGDOM BELOW', ['underrealm'], 'アンダーレルムへの導線'],
     ['lg_fall_heavens', '天空の落日', 'FALL OF THE HEAVENS', ['astralheim'], 'アストラルヘイムへの導線'], ['lg_worldtree_dream', '世界樹の夢', 'WORLD TREE DREAM', ['yggdrasil'], 'ユグドラシルへの導線'],
     ['lg_deus_machina', '神機降臨', 'DEUS MACHINA', ['world'], '神機関連職業・デウス・エクス・マギアの解放'], ['lg_forgotten_hero', '忘却された英雄', 'THE FORGOTTEN HERO', ['world'], ''],
-    ['lg_unnamed_arms', '名もなき武器', 'THE UNNAMED ARMAMENT', ['world'], '長期使用した武器に固有の歴史が蓄積'], ['lg_wandering_merchant', '名もなき商人', 'THE WANDERING MERCHANT', ['world'], ''],
+    ['lg_unnamed_arms', '名もなき武器', 'THE UNNAMED ARMAMENT', ['world'], '長期使用した武器に固有の歴史（撃破数・ボス討伐・最多討伐種・進化歴）が蓄積し、節目で二つ名と小さな補正が刻まれる'], ['lg_wandering_merchant', '名もなき商人', 'THE WANDERING MERCHANT', ['world'], ''],
     ['lg_rebuild', '滅びた村の再建', 'REBUILD THE LOST', ['eldia'], ''], ['lg_civil_war', '王国の内乱', 'CIVIL WAR', ['eldia'], ''],
     ['lg_territory', '古龍の縄張り争い', 'TERRITORIAL DOMINION', ['valgran'], '大型モンスターの生態系・縄張り'], ['lg_vanished_city', '消えた都市', 'THE VANISHED CITY', ['world'], ''],
     ['lg_undefeated', '無敗の挑戦者', '', ['world'], '称号イベント'], ['lg_abyss_walker', '深淵の踏破者', '', ['world'], '称号イベント（ダンジョン踏破）'], ['lg_veteran', '百戦錬磨', '', ['world'], '称号イベント'],
     ['lg_collector', '万物の収集家', '', ['world'], '称号イベント（収集）'], ['lg_nameless_savior', '無名の救世主', '', ['world'], '称号イベント'], ['lg_last_observer', '最後の観測者', '', ['outer_world'], '予言書『七つの災厄と最後の観測者』と関連'],
     ['lg_other_side', '世界の裏側', 'THE OTHER SIDE', ['outer_world'], 'アウター・ワールドへの導線'], ['lg_divine_war', '神々の戦争', 'WAR OF THE DIVINES', ['divine_realm'], ''], ['lg_doomsday', '終末時計', 'DOOMSDAY CLOCK', ['chronos_realm'], 'クロノス・レルムへの導線']]
-    .map(([id, n, en, loc, notes]) => E(id, n, en, 'large', { loc, kinds: ['world'], notes, detail: 'outline' })),
+    .map(([id, n, en, loc, notes]) => E(id, n, en, 'large', { loc, kinds: ['world'], notes, detail: 'outline', ...(LIVE[id] || {}) })),
   // ── 12-14 library & sins
   E('lib_sealed_abyss', '封印されし深淵', 'SEALED ABYSS', 'library', { kinds: ['dungeon', 'permanent'], loc: ['arcelia'], scope: 'personal', trigger: 'アルセリア地下。HARD以上限定', stages: ['1-10 忘却の地下墓地（墓守の巨人）', '11-20 腐蝕の菌窟（腐蝕母樹）', '21-30 灼熱の地底炉（熔鉄の処刑者）', '31-40 沈黙の水没神殿（深海の祭司）', '41-50 失われた機械都市（機械王オルディウス）', '51-100（環境・ボス未定義）'],
     rewards: ['禁書庫の鍵（10F毎ボス：P% = 階層/10、個別抽選、取引・売却不可、入場時1本消費）'], links: ['lib_forbidden'], repeat: 'rechallenge' }),

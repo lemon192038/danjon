@@ -27,7 +27,7 @@ export class Input {
       <div id="tright"><button data-t="dodge" class="tsk dodge"><b>≋</b><small>回避</small></button>
         <button data-t="spc" class="tsk tspcb"><b>◆</b><small id="tspc">特殊</small></button><button data-t="q" class="tsk tpotb"><b>⚗</b><small id="tpot">回復</small></button>
         ${[0, 1, 2, 3].map(i => `<button data-t="s${i}" class="tsk s${i}"><small class="tsn" id="tsn${i}">${i + 1}</small><i class="tcd" id="tcd${i}"></i></button>`).join('')}
-        <button data-t="atk" class="tatk">攻撃</button></div>`;
+        <button data-t="hv" class="tsk thv"><b>⚡</b><small>強攻撃</small></button><button data-t="atk" class="tatk">攻撃</button></div>`;
     document.body.appendChild(root); this.touchRoot = root;
     const zone = root.querySelector('#joyzone'), joy = root.querySelector('#joy'), knob = root.querySelector('#knob'); let jid = null, cx = 0, cy = 0; const R = 56;
     zone.addEventListener('touchstart', e => { if (jid !== null) return; const t = e.changedTouches[0]; jid = t.identifier; cx = t.clientX; cy = t.clientY; joy.style.left = cx - 65 + 'px'; joy.style.top = cy - 65 + 'px'; joy.classList.add('on'); this.touch.active = true; this.touch.mx = this.touch.my = 0; e.preventDefault(); }, { passive: false });
@@ -38,7 +38,7 @@ export class Input {
     zone.addEventListener('touchmove', move, { passive: true }); zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
     for (const b of root.querySelectorAll('button')) {
       const t = b.dataset.t;
-      b.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('down'); if (t === 'atk') this.touch.atk = true; else if (t === 'spc') this.touch.spc = true; else this.pressed.push({ dodge: ' ', s0: '1', s1: '2', s2: '3', s3: '4', f: 'f', q: 'q' }[t]); }, { passive: false });
+      b.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('down'); if (t === 'atk') this.touch.atk = true; else if (t === 'spc') this.touch.spc = true; else this.pressed.push({ dodge: ' ', s0: '1', s1: '2', s2: '3', s3: '4', f: 'f', q: 'q', hv: 'r' }[t]); }, { passive: false });
       const up = e => { e.preventDefault(); b.classList.remove('down'); if (t === 'atk') this.touch.atk = false; if (t === 'spc') this.touch.spc = false; };
       b.addEventListener('touchend', up, { passive: false }); b.addEventListener('touchcancel', up, { passive: false });
     }

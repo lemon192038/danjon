@@ -105,7 +105,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   if (!o.dot) {
     const poiseDmg = (o.st || 1) * (1 + (sm.stagger || 0));
     tgt.poise -= poiseDmg;
-    if (tgt.poise <= 0 && !tgt.superArmor) { tgt.poise = tgt.maxPoise; tgt.staggerUntil = now + (tgt.boss ? 600 : 450); tgt.action = null; zone.fx({ t: 'stagger', id: tgt.id }); }
+    if (tgt.poise <= 0 && !tgt.superArmor && !tgt.action?.superArmor) { tgt.poise = tgt.maxPoise; tgt.staggerUntil = now + (tgt.boss ? 600 : 450); tgt.action = null; zone.fx({ t: 'stagger', id: tgt.id }); }
     if (o.kb && !tgt.kbImmune && !(tgt.buffMods?.kbImmune)) { const k = o.kb * (1 + (sm.kb || 0)) * (tgt.boss ? 0.2 : 1) / Math.max(1, tgt.mass || 1); zone.push(tgt, Math.cos(ang) * k, Math.sin(ang) * k); }
     if (o.pull) { const k = -o.pull * (tgt.boss ? 0.2 : 1); zone.push(tgt, Math.cos(ang) * k, Math.sin(ang) * k); }
     if (o.launch && !tgt.boss) { tgt.airUntil = now + 700; tgt.staggerUntil = Math.max(tgt.staggerUntil, now + 700); }
