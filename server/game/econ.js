@@ -176,7 +176,7 @@ export class Econ {
     az.fx({ t: 'phase', id: 0, v: `WAVE ${A.wave}` }); for (const p of az.players) p.session.send({ t: 'toast', v: `第${A.wave}試合 開始！`, cls: 'big' });
   }
   arenaKill(az) { if (!az.arena) return; if ([...az.actors.values()].some(a => a.kind === 'monster' && !a.dead)) return; if (az.arena.wave < 3) return void setTimeout(() => this.nextWave(az), 1500);
-    for (const p of az.players) { const s = p.session, ch = s.ch; const prize = 300 + az.arena.lv * 60; ch.gold += prize; ch.progress.arenaWins = (ch.progress.arenaWins || 0) + 1; this.world.guilds.addRep(ch, 'gladiators', 3); this.world.guilds.event(s, { kind: 'arena' }); this.world.note(s, { t: 'quest', v: `闘技場で勝利！ 賞金${prize}G` }); }
+    for (const p of az.players) { const s = p.session, ch = s.ch; const prize = 300 + az.arena.lv * 60; ch.gold += prize; ch.progress.arenaWins = (ch.progress.arenaWins || 0) + 1; this.world.events?.record(s, "ex_arena", `闘技場で3連戦に勝利（通算${ch.progress.arenaWins}勝）`, { clear: true }); this.world.guilds.addRep(ch, 'gladiators', 3); this.world.guilds.event(s, { kind: 'arena' }); this.world.note(s, { t: 'quest', v: `闘技場で勝利！ 賞金${prize}G` }); }
     az.arena.done = true; for (const p of [...az.players]) setTimeout(() => p.session.actor?.zone === az && this.leaveArena(p.session), 2500);
   }
   leaveArena(s) { const az = s.actor.zone; const back = az.arena?.from; this.world.enterZone(s, back && this.world.zones.has(back.id) ? back : this.world.zones.get(az.returnTo)); }
@@ -239,7 +239,7 @@ export class Econ {
       if (!this.cityState[m.city]) { this.cityState[m.city] = { flag: o.id, by: ch.name, label: o.label, effect: o.effect, at: Date.now() }; this.addNews(`【${CITIES[m.city].name}】${ch.name}の選択により情勢が変わった：${o.effect}`); for (const ss of this.world.sessions.values()) ss.send({ t: 'chat', from: '号外', v: `${CITIES[m.city].name}：${o.effect}` }); }
       ch.progress.titles.push(`${st.name}の${o.id === step.options[0].id ? '英雄' : '影'}`);
     }
-    this.world.sendSelf(s); this.openStory(s, m.city);
+    this.world.events?.onStory(s, m.city, p, st); this.world.sendSelf(s); this.openStory(s, m.city);
   }
   storyEvent(s, ev) { for (const [city, p] of Object.entries(s.ch.stories || {})) { const step = STORIES[city]?.steps[p.step]; if (!step) continue; if (step.kind === 'kill' && ev.kind === 'kill' && ev.fam === step.fam) p.prog = (p.prog || 0) + 1; if (step.kind === 'floor' && ev.kind === 'floor' && ev.dungeon === step.dungeon && ev.floor >= step.floor) p.prog = 1; } }
   lore(s, key, z) { const def = CITIES[z.cityId]; const text = LORE[key] || def?.history[hash32(key + clock().day) % def.history.length]; s.send({ t: 'open', service: 'lore', data: { title: '記録を読む', text } }); }

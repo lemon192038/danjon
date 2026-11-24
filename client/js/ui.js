@@ -9,6 +9,7 @@ import { sfx } from './sfx.js';
 import { Tutorial } from './tutorial.js';
 import { installCity } from './uicity.js';
 import { installSlum } from './uislum.js';
+import { installEvents } from './uievents.js';
 import { LOOT, PROV } from '/shared/data/slum.js';
 import { ITEMS } from '/shared/data/guilds.js';
 
@@ -21,7 +22,7 @@ const DODGE = { roll: 'ローリング', dash: 'ダッシュ', step: 'ステッ�
 const SPECIAL_NAMES = { guard: 'ガード/盾撃', charge: '溜め斬り', iai: '居合', frenzy: '乱舞', parry: 'パリィ', riposte: '受け流し', dashStrike: '突進斬り', execute: '処刑', throwSpin: '回転投擲', backstab: '背面取り', bloodPact: '血の契約', orbit: '周回刃', vault: '棒高跳び', guardCharge: '盾突進', hook: '鉤引き', sweepTrip: '足払い', tide: '激流', spinGuard: '回転防御', leap: '跳躍斬り', brace: '迎撃構え', reap: '刈り取り', rage: '激昂', whirl: '大旋回', spin: '遠心回転', volley: '一斉投擲', armorBreak: '鎧砕き', superArmor: '不動', blessStrike: '祝福打', spikeBurst: '棘爆', tauntRoar: '咆哮', roll: '鉄球転がし', pileLoad: '杭装填', chi: '気功解放', grab: '掴み投げ', pounce: '飛びかかり', tempo: 'テンポ解放', launch: '蹴り上げ', overclock: '過駆動', auraBurst: '闘気解放', aim: '引き絞り', boltSwap: '矢弾切替', barrage: '制圧射撃', manaArrow: '魔力矢', spirit: '精霊召喚', pinThrow: '縫い止め', ricochet: '跳弾', recallStrike: '呼び戻し', heatVent: '排熱爆破', channel: '詠唱', elemShift: '属性切替', quickcast: '高速詠唱', pageSummon: '頁召喚', spellChain: '連鎖詠唱', orbBarrier: '魔力障壁', ringSwap: '指輪切替', rune: 'ルーン刻印', library: '書架展開', modeToggle: '形態切替', transform: '変形', lash: '絡め取り', wireTrap: '鋼線罠', hammerThrow: '鉄球投擲', drill: '穿孔', rev: '回転鋸', umbrellaGuard: '傘防御・反射', rally: '軍旗', song: '旋律', puppet: '人形召喚', divineJudgment: '神の裁き', demonForm: '魔神化', dragonBreath: '竜の吐息', wings: '光翼', soulHarvest: '魂の解放', timeStop: '時間停止', gravityWell: '重力井戸', erase: '消去', meteor: '流星群', unlock: '解錠' };
 
 export class UI {
-  static install() { installCity(UI); installSlum(UI); }
+  static install() { installCity(UI); installSlum(UI); installEvents(UI); }
   constructor(net, state, ctx) {
     this.net = net; this.state = state; this.ctx = ctx; this.modalOpen = false; this.chatOpen = false; this.panel = null; this.service = null; this.sel = {};
     const hud = document.getElementById('hud');
@@ -29,7 +30,7 @@ export class UI {
       <div id="zinfo"><div id="zname"></div><div id="clock"></div><canvas id="mini" width="140" height="110"></canvas><div id="curses"></div></div>
       <div id="bossbar"><div id="bossname"></div><div class="bar boss"><i></i></div></div>
       <div id="skillbar"></div><div id="notes"></div><div id="toasts"></div>
-      <div id="menubtns">${[['u', '都市'], ['i', '所持品'], ['c', 'ステータス'], ['k', 'スキル'], ['j', '職業'], ['b', '図鑑'], ['l', 'クエスト'], ['p', 'パーティー'], ['n', '冒険者'], ['m', 'マップ'], ['o', '設定']].map(([k, n]) => `<button data-key="${k}" title="${n} [${k.toUpperCase()}]">${n}</button>`).join('')}</div>
+      <div id="menubtns">${[['u', '都市'], ['i', '所持品'], ['c', 'ステータス'], ['k', 'スキル'], ['j', '職業'], ['b', '図鑑'], ['l', 'クエスト'], ['h', '記録'], ['p', 'パーティー'], ['n', '冒険者'], ['m', 'マップ'], ['o', '設定']].map(([k, n]) => `<button data-key="${k}" title="${n} [${k.toUpperCase()}]">${n}</button>`).join('')}</div>
       <div id="chat"><div id="chatlog"></div><input id="chatin" maxlength="120" placeholder="Enterでチャット"></div>
       <div id="deadov"><h2>戦闘不能</h2><button id="respawn" class="primary">街へ帰還する</button></div><div id="interact"></div>`;
     this.$ = s => hud.querySelector(s);
@@ -103,12 +104,12 @@ export class UI {
   }
   // ---------- keys & modal
   key(k) {
-    const map = { u: 'city', i: 'inventory', tab: 'inventory', c: 'status', k: 'skills', j: 'jobs', b: 'codex', l: 'quests', p: 'party', n: 'npcs', m: 'map', o: 'settings' };
+    const map = { u: 'city', i: 'inventory', tab: 'inventory', c: 'status', k: 'skills', j: 'jobs', b: 'codex', l: 'quests', h: 'journal', p: 'party', n: 'npcs', m: 'map', o: 'settings' };
     if (k === 'escape') { if (this.modalOpen) this.closeModal(); else this.open('settings'); return; }
     if (k === 'enter') { this.$('#chatin').focus(); return; }
     if (map[k]) { if (this.panel === map[k] && this.modalOpen) this.closeModal(); else this.open(map[k]); }
   }
-  open(p, service = null) { if (p === 'skills') this.tut.event('menu'); if (p === 'city') this.cityInfo = null; this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
+  open(p, service = null) { if (p === 'skills') this.tut.event('menu'); if (p === 'city') this.cityInfo = null; if (p === 'journal') { this.journal = null; } this.panel = p; this.service = service; this.modalOpen = true; this.modal.style.display = 'flex'; sfx.ui(); if (p === 'party' || p === 'npcs') { this.net.menu('npcList'); this.net.menu('players'); } this.render(); }
   closeModal() { this.modalOpen = false; this.modal.style.display = 'none'; this.panel = null; this.service = null; }
   openService(s, data) {
     if (this.cityPanel(s, data)) return;

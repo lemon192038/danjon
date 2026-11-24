@@ -66,8 +66,8 @@ test('city systems', async () => {
     // bank
     goDoor('m_bank'); goNpc('bank'); const g0 = ch.gold; send({ t: 'menu', op: 'bank', act: 'dep', n: 1000 }); assert.equal(ch.bank.bal, 1000); assert.equal(ch.gold, g0 - 1000); exit();
     // casino in lumina: house edge
-    w.enterZone(s, w.zones.get('lumina')); goDoor('l_casino'); goNpc('casino'); let spent = 0, won = 0; for (let i = 0; i < 400; i++) { const before = ch.gold; send({ t: 'menu', op: 'casino', game: i % 2 ? 'slot' : 'roulette', pick: 'red', bet: 100 }); spent += 100; won += ch.gold - before + 100; }
-    assert.ok(won / spent < 1.15, 'casino return ' + (won / spent).toFixed(2)); exit();
+    w.enterZone(s, w.zones.get('lumina')); goDoor('l_casino'); goNpc('casino'); let spent = 0, won = 0; for (let i = 0; i < 3000; i++) { const before = ch.gold; send({ t: 'menu', op: 'casino', game: i % 2 ? 'slot' : 'roulette', pick: 'red', bet: 60 }); spent += 60; won += ch.gold - before + 60; }
+    { const wins = out.filter(m => m.t === 'casinoResult'); const sumWin = wins.reduce((a, m) => a + m.win, 0); assert.ok(won / spent < 1.08, 'casino return ' + (won / spent).toFixed(2) + ' results ' + wins.length + ' sumWin ' + sumWin + ' spent ' + spent + ' won ' + won); } exit();
     // black market & info & craft
     goDoor('l_black'); goNpc('blackmarket'); assert.ok(last('open').data.list.length > 0); send({ t: 'menu', op: 'info' }); assert.equal(last('open').service, 'lore'); exit();
     goDoor('l_smith'); ch.inventory.push({ uid: 'ore9', kind: 'mat', ref: 'ore', n: 30 }); const nW = ch.inventory.filter(i => i.kind === 'weapon').length; send({ t: 'menu', op: 'craft', wt: 3 }); assert.equal(ch.inventory.filter(i => i.kind === 'weapon').length, nW + 1, JSON.stringify(errs())); exit();

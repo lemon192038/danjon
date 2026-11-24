@@ -145,6 +145,7 @@ export class Slum {
     const res = { ok: true, via: EXITS[via]?.name || (via === 'hideout' ? '隠れ家' : '潜入口'), items: got, value: val, kills: r.kills, time: Math.round((Date.now() - r.started) / 1000), rid: r.rid };
     this.world.slumQuest(s, { kind: 'extract', rid: r.rid, via, items: got });
     this.world.hideout.onExtract(ch, r.rid, val);
+    this.world.events?.record(s, 'ex_slum_raid', `${REGIONS[r.rid].name}から脱出（${EXITS[via]?.name || (via === 'hideout' ? '隠れ家' : '潜入口')}・推定${val}G）`, { clear: true });
     I?.players.delete(ch.id); ch.raid = null; s.ch.progress.raids = (s.ch.progress.raids || 0) + 1;
     const dest = via === 'hideout' ? null : this.cityEntrance(REGIONS[res.rid].city);
     if (via === 'hideout') this.world.hideout.enter(s); else this.world.enterZone(s, dest.z, dest.p);
@@ -160,6 +161,7 @@ export class Slum {
     if (cause === 'death' && R.tier >= 4 && r.insured !== ch.equip.weapon) { const w = ch.inventory.find(i => i.uid === ch.equip.weapon); const others = ch.inventory.filter(i => i.kind === 'weapon' && i !== w); if (w && others.length) { ch.inventory = ch.inventory.filter(i => i !== w); ch.equip.weapon = others[0].uid; lostWeapon = DATA.weapons.get(w.ref)?.name; lost.push({ ref: 'weapon', name: lostWeapon, wref: w.ref }); } }
     // the dead raider's bag becomes a lootable corpse for others in the instance (PvPvE)
     if (z && cause === 'death' && r.bag.length) { const tx = Math.floor(a.x / 16), ty = Math.floor(a.y / 16); const id = `dead_${ch.id}_${Date.now()}`; z.map.objects.push({ k: 'cont', ck: 'corpse', id, x: tx, y: ty + 1, danger: R.tier, items: r.bag.map(x => ({ ...x })) }); z.map.props.push({ k: 'cont', ck: 'corpse', x: tx, y: ty, w: 1, h: 1 }); z.fx({ t: 'objUpdate', x: tx, y: ty, add: 'corpse' }); }
+    this.world.events?.record(s, 'ex_slum_raid', `${R.name}で探索失敗（${{ death: '戦闘不能', mia: '行方不明', dc: '切断' }[cause] || cause}）`);
     ch.progress.extractions ||= []; ch.progress.extractions.push({ rid: r.rid, at: Date.now(), ok: false, cause, value: value(lost.filter(x => LOOT[x.ref])) }); I?.players.delete(ch.id); ch.raid = null;
     s.send({ t: 'raidResult', ok: false, cause, lost: lost.map(x => ({ name: x.name || LOOT[x.ref]?.name, n: x.n || 1 })), kept: kept.map(x => ({ name: LOOT[x.ref].name, n: x.n || 1 })), lostWeapon, insured: !!r.insured, rid: r.rid, tip: cause === 'death' ? (R.tier >= 4 ? '高危険度区域では装備を失う。武器に保険をかけるか、保険ポーチに貴重品を入れよう。' : '倒れると探索バッグの中身を失う。貴重品は保険ポーチ（2枠）へ。') : cause === 'mia' ? '制限時間内に脱出地点へ。残り5分で警告が出る。' : '接続が切れたまま探索が終了した。装備は失っていない。' });
     if (cause === 'mia' && a) { const dest = this.cityEntrance(R.city); this.world.enterZone(s, dest.z, dest.p); }

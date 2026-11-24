@@ -18,6 +18,7 @@ import { CITIES, ROUTES, TRANSPORT, WEATHER } from '../../shared/data/cities.js'
 import { Slum, regionOfCity, weight, value } from './slum.js';
 import { Hideout } from './hideout.js';
 import { Market } from './market.js';
+import { EventEngine } from './events.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
 export const isTown = z => z.kind === 'town' || z.kind === 'interior';
@@ -29,7 +30,7 @@ export class World {
     this.life = new Life(this); this.life.rollWeather(); this.guilds = new Guilds(this); this.guildEvent = (s, ev) => this.guilds.event(s, ev);
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
-    this.market = new Market(store.worldState()?.market); this.slum = new Slum(this); this.hideout = new Hideout(this);
+    this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
@@ -53,6 +54,7 @@ export class World {
     if (this.tick % 20 === 0) this.life.step();
     if (this.tick % 40 === 0) this.econ.hourly();
     if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
+    if (this.tick % 200 === 0) this.events.simulate();
     if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); ss.send({ t: 'env', h: c.hour, m: c.minute, wx: cid ? this.life.weatherOf(cid) : 'clear', city: cid || null }); } }
     if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
   }
@@ -89,6 +91,7 @@ export class World {
     else if (z) { if (z.kind === 'dungeon' || z.kind === 'arena') s.ch.pos = { zone: z.returnTo || 'haven', x: null, y: null }; else if (z.kind === 'interior') { const p = z.door ? this.zones.get(z.cityId).tileCenter([z.door.x, z.door.y + 1]) : null; s.ch.pos = { zone: z.cityId, x: p?.x ?? null, y: p?.y ?? null }; } else s.ch.pos = { zone: z.id, x: Math.round(s.actor.x), y: Math.round(s.actor.y) }; }
     store.saveChar(s.ch);
   }
+  clockHour() { return clock().hour; }
   cityNear(z) { if (!z) return null; if (z.cityId) return z.cityId; if (z.returnTo) return z.returnTo; const l = WORLD[z.id]?.links; if (l) for (const v of Object.values(l)) if (WORLD[v]?.kind === 'town') return v; return null; }
   // ---------- buildings
   enterBuilding(s, door) {
@@ -124,7 +127,7 @@ export class World {
     return false;
   }
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
-  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save() }); }
+  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save(), events: this.events.save() }); }
   enterZone(s, z, pos) {
     const old = s.actor;
     let hp = 1, sp = 1; if (old) { hp = old.hp / old.maxHp; sp = old.sp / old.maxSp; old.zone.remove(old); if (old.dead) hp = 1; }
@@ -223,6 +226,7 @@ export class World {
       const di = DIFFICULTIES.findIndex(d => d.id === diff);
       const myth = diff === 'ABYSS' ? 0.08 + z.floor * 0.003 : diff === 'HELL' && z.floor >= 50 ? 0.03 : 0;
       z.dropLoot(p, b.x, b.y, rollLoot({ floor: z.floor, diff, boss: true, mythChance: myth, preferWt: p.wt.id }));
+      if (z.floor % 10 === 0) this.events.record(s, 'ex_dungeons', `${z.dungeon.name} ${z.floor}階 [${diff}] のボスを討伐`, { clear: true });
       if (z.floor === 100 && !ch.progress.titles.includes(z.dungeon.name + '踏破者')) { ch.progress.titles.push(z.dungeon.name + '踏破者'); this.note(s, { t: 'title', v: z.dungeon.name + '踏破者' }); }
       this.questCheck(s, { kind: 'boss', dungeon: z.dungeon.id, floor: z.floor, diff }); this.guilds.event(s, { kind: 'boss', dungeon: z.dungeon.id, floor: z.floor });
       const c = ch.progress.clears[z.dungeon.id] ||= {}; if (z.floor > (c[diff] || 0)) c[diff] = z.floor; c.max = Math.max(c.max || 0, z.floor);
@@ -472,6 +476,7 @@ export class World {
         if (m.npc) { const n = z.map.npcs.find(x => x.service === m.npc); if (n) { const p = z.tileCenter([n.x, n.y + 2]); a.x = p.x; a.y = p.y; } }
         if (m.obj) { const o = z.map.objects.find(x => x.k === m.obj && !x.looted && (!m.type || x.type === m.type)); if (o) { const p = z.tileCenter([o.x, o.y]); a.x = p.x; a.y = p.y; } }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
+      case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
       case 'slum': return this.slumMenu(s, m);
       case 'market': return this.marketMenu(s, m);
       case 'hideout': return this.hideoutMenu(s, m);
