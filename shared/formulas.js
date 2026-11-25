@@ -43,7 +43,7 @@ export function computeStats(ch, data, extraMods = null) {
     addMods(mods, job.passive.mods, 1 + jp.rank * 0.1);
   }
   if (mods.all) for (const s of STATS) st[s] = Math.round(st[s] * (1 + mods.all));
-  if (weapon) for (const t of weapon.traits) addMods(mods, t.mods);
+  if (weapon) for (const t of wItem?.traits || weapon.traits) addMods(mods, t.mods); // per-instance traits after a reroll
   if (wItem?.epi?.mods) addMods(mods, wItem.epi.mods); // epithet earned through the weapon's own history
   // learned weapon-type passives
   const m = ch.mastery?.[wt.id]?.lv || 0;

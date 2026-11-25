@@ -6,7 +6,8 @@ import { WORLD, T } from './maps.js';
 import { DATA, WT_BY_ID } from '../data.js';
 import { store } from '../store.js';
 import { TICK_MS, DIFFICULTIES, STATS, TILE, SKILL_SLOTS } from '../../shared/constants.js';
-import { weaponHistory, evolveRecipe, MASTERY_MILESTONES, masteryTitle } from './progress.js';
+import { weaponHistory, evolveRecipe, MASTERY_MILESTONES, masteryTitle, rerollTrait } from './progress.js';
+import { rollArtifactMat, craftArtifact, artTrigger, ART_SLOTS, matName } from './artifacts.js';
 import { categoryOf } from '../../shared/data/weaponTypes.js';
 import { newCharacter, knownSkills, validateSlots, grantXp, grantMastery, grantJobXp, skillUsed, rollLoot, addItem, enhance, shopStock, ITEM_PRICES, questBoard, jobUnlockMet, uid, checkJobUnlocks } from './progress.js';
 import { armorDef } from '../../shared/formulas.js';
@@ -58,7 +59,7 @@ export class World {
     if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
     if (this.tick % 200 === 0) this.events.simulate();
     if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); const wx = cid ? this.life.weatherOf(cid) : 'clear'; ss.send({ t: 'env', h: c.hour, m: c.minute, wx, city: cid || null, se: season(c.day).name, temp: cid ? temperature(cid, wx, c) : null }); } }
-    if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
+    if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (!s.actor.dead && s.actor.hp < s.actor.maxHp * 0.3) artTrigger(s.actor, 'lowhp'); if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
   }
   broadcast(z) {
     const fx = z.fxq;
@@ -112,7 +113,8 @@ export class World {
     switch (o.k) {
       case 'node': return this.econ.gather(s, z, o);
       case 'board': return b?.guild ? this.guilds.open(s, b.guild) : this.openService(s, 'quest');
-      case 'bookcase': case 'lectern': case 'statue': case 'display': case 'telescope': case 'globe': case 'altar': return z.home ? false : this.econ.lore(s, b?.lore || `${z.id}:${o.k}`, z);
+      case 'altar': if (z.home) return false; return this.openAltar(s, b);
+      case 'bookcase': case 'lectern': case 'statue': case 'display': case 'telescope': case 'globe': return z.home ? false : this.econ.lore(s, b?.lore || `${z.id}:${o.k}`, z);
       case 'vault': return this.econ.openBank(s);
       case 'slot': case 'roulette': return this.econ.services.casino(s);
       case 'forge': return s.send({ t: 'open', service: 'craft', data: { cost: 200 + s.ch.level * 15, rank: s.ch.guilds?.smiths?.rank || 0 } });
@@ -233,6 +235,8 @@ export class World {
       if (z.floor === 100 && !ch.progress.titles.includes(z.dungeon.name + '踏破者')) { ch.progress.titles.push(z.dungeon.name + '踏破者'); this.note(s, { t: 'title', v: z.dungeon.name + '踏破者' }); }
       this.questCheck(s, { kind: 'boss', dungeon: z.dungeon.id, floor: z.floor, diff }); this.guilds.event(s, { kind: 'boss', dungeon: z.dungeon.id, floor: z.floor });
       const c = ch.progress.clears[z.dungeon.id] ||= {}; if (z.floor > (c[diff] || 0)) c[diff] = z.floor; c.max = Math.max(c.max || 0, z.floor);
+      if (['HARD', 'HELL', 'ABYSS'].includes(diff) && z.floor >= 50) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 2 }); this.note(s, { t: 'msg', v: '特性変更チケット×2を手に入れた' }); }
+      const am = rollArtifactMat(z, ch); if (am) this.note(s, { t: 'msg', v: `アーティファクト素材：${matName(am)}（${z.dungeon.name} ${z.floor}F ${diff}）を手に入れた` });
       checkJobUnlocks(ch, n => this.note(s, n));
       this.sendSelf(s);
       void di;
@@ -271,6 +275,7 @@ export class World {
     if (!p.members.length) this.parties.delete(p.id);
     for (const m of p.members) this.pushParty(m); if (!silent) this.pushParty(cid);
   }
+  openAltar(s, b) { const ch = s.ch; s.send({ t: 'open', service: 'altar', data: { tickets: ch.inventory.filter(i => i.ref === 'traitTicket').reduce((t, i) => t + i.n, 0), lore: b?.lore ? true : false, weapons: ch.inventory.filter(i => i.kind === 'weapon').map(i => { const w = DATA.weapons.get(i.ref); return { uid: i.uid, name: w.name, rar: w.rar, plus: i.plus || 0, fav: !!i.fav, eq: ch.equip.weapon === i.uid, traits: i.traits || w.traits }; }).filter(x => x.traits.length) } }); }
   // 名もなき武器: the first epithet starts and completes the event; later epithets are logged
   unnamedArms(s) { const E = this.events; const it = s.ch.inventory.find(i => i.uid === s.ch.equip.weapon); const nm = `${DATA.weapons.get(it.ref)?.name}「${it.epi.name}」`;
     if (!E.prog(s.ch, 'lg_unnamed_arms')) { E.start(s, 'lg_unnamed_arms', { silent: true }); E.advance(s, 'lg_unnamed_arms', 1, { silent: true }); E.complete(s, 'lg_unnamed_arms', null, { silent: true }); E.grant(s, 'lg_unnamed_arms', 'first', { title: '武器に刻む者' }); }
@@ -394,6 +399,7 @@ export class World {
   interact(s) {
     const a = s.actor, z = a.zone;
     if (a.dead) return;
+    for (const o of z.map.objects || []) if (o.k === 'altar') { const p = z.tileCenter([o.x, o.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 20 && this.useObject(s, z, o) !== false) return; } // standing at the altar beats the priest
     for (const n of z.map.npcs || []) { const p = z.tileCenter([n.x, n.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < (z.kind === 'interior' ? 44 : 30)) return this.openService(s, n.service, n); }
     for (const d of z.map.doors || []) { const p = z.tileCenter([d.x, d.y]); if (Math.hypot(p.x - a.x, p.y - (a.y - 6)) < 22) return this.enterBuilding(s, d); }
     for (const st of z.map.stops || []) { const p = z.tileCenter([st.x, st.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 26) return s.send({ t: 'open', service: 'stops', data: { here: st.district, stops: z.map.stops.map(x => ({ district: x.district, name: x.name })), fee: 10 } }); }
@@ -429,6 +435,8 @@ export class World {
       case 'equip': { const it = ch.inventory.find(i => i.uid === m.uid); if (!it) return; if (a.action && a.action.until > a.zone.now) return err('行動中は変更できません');
         if (it.kind === 'weapon') { const w = DATA.weapons.get(it.ref); if (w.lvl > ch.level + 10 && !WT_BY_ID[w.wt].myth) return err(`Lv${w.lvl - 10}以上で装備できます`); ch.equip.weapon = it.uid; ch.mastery[w.wt] ||= { lv: 1, xp: 0 }; }
         else if (it.kind === 'armor') { if (armorDef(it.slot, it.tier).lvl > ch.level + 10) return err('レベルが足りません'); ch.equip[it.slot] = it.uid; }
+        else if (it.kind === 'artifact') { const slot = ART_SLOTS.includes(m.slot) ? m.slot : ART_SLOTS.find(k => !ch.equip[k]) || 'art1'; for (const k of ART_SLOTS) if (ch.equip[k] === it.uid) ch.equip[k] = null; ch.equip[slot] = it.uid; }
+        else return;
         a.comboStep = 0; a.altMode = false; a.gauge = null; return ok('装備を変更しました'); }
       case 'alloc': { const st = m.stat; const n = Math.max(1, Math.min(ch.statPoints, m.n | 0 || 1)); if (!STATS.includes(st) || ch.statPoints < n) return; ch.stats[st] += n; ch.statPoints -= n; return ok(); }
       case 'resetStats': { if (!inTown) return err('街でのみ可能です'); const cost = ch.level * 100; if (ch.gold < cost) return err(`${cost}G必要です`); ch.gold -= cost; let sum = 0; for (const k of STATS) { sum += ch.stats[k]; ch.stats[k] = 0; } ch.statPoints += sum; return ok('ステータスを再分配できます'); }
@@ -439,8 +447,16 @@ export class World {
         if (kind === 'armor') { const tier = m.tier | 0; if (!shopStock(town, 'armor').includes(tier)) return; const slot = m.slot === 'accessory' ? 'accessory' : 'armor'; const price = Math.round(200 * Math.pow(2.2, tier)); if (ch.gold < price) return err('ゴールドが足りません'); ch.gold -= price; addItem(ch, { kind: 'armor', slot, tier, plus: 0 }); return ok(`${armorDef(slot, tier).name}を購入しました`); }
         if (kind === 'item') { const n = Math.max(1, Math.min(99, m.n | 0 || 1)); const price = ITEM_PRICES[m.ref]; if (!price) return; if (ch.gold < price * n) return err('ゴールドが足りません'); ch.gold -= price * n; addItem(ch, { kind: m.ref === 'ore' ? 'mat' : 'potion', ref: m.ref, n }); return ok('購入しました'); }
         return; }
-      case 'sell': { if (!inTown) return; const it = ch.inventory.find(i => i.uid === m.uid); if (!it || Object.values(ch.equip).includes(it.uid)) return err('装備中のアイテムは売却できません'); if (it.kind === 'loot') { const rid = regionOfCity(a.zone.cityId) || 'haven_old'; const p = this.market.sellPrice(rid, it, 'regular') * it.n; if (!p) return err(`${PROV[it.prov]}の品は正規の店では買い取ってもらえない（闇市・故買屋・鑑定屋へ）`); ch.gold += p; ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${p}Gで売却しました`); }
+      case 'sell': { if (!inTown) return; const it = ch.inventory.find(i => i.uid === m.uid); if (!it || Object.values(ch.equip).includes(it.uid)) return err('装備中のアイテムは売却できません'); if (it.fav) return err('お気に入りの品は売却できません（お気に入りを外してください）'); if (ITEMS[it.ref]?.nosell || it.kind === 'amat') return err('この品は売却できません'); if (it.kind === 'loot') { const rid = regionOfCity(a.zone.cityId) || 'haven_old'; const p = this.market.sellPrice(rid, it, 'regular') * it.n; if (!p) return err(`${PROV[it.prov]}の品は正規の店では買い取ってもらえない（闇市・故買屋・鑑定屋へ）`); ch.gold += p; ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${p}Gで売却しました`); }
         let price = 10; if (it.kind === 'weapon') price = Math.round(DATA.weapons.get(it.ref).price * 0.3); else if (it.kind === 'armor') price = Math.round(60 * Math.pow(2.2, it.tier)); else price = (ITEM_PRICES[it.ref] || 20) * 0.3 * (it.n || 1); ch.gold += Math.round(price); ch.inventory = ch.inventory.filter(i => i !== it); return ok(`${Math.round(price)}Gで売却しました`); }
+      case 'unequip': { for (const k of ART_SLOTS) if (ch.equip[k] === m.uid) ch.equip[k] = null; return ok(); }
+      case 'fav': { const it = ch.inventory.find(i => i.uid === m.uid); if (!it) return; it.fav = !it.fav; return ok(it.fav ? 'お気に入りに登録しました' : 'お気に入りを解除しました'); }
+      case 'sellBulk': { if (!inTown) return err('街の中で売却できます'); const rars = new Set((Array.isArray(m.rars) ? m.rars : []).map(Number)); if (!rars.size) return err('レア度を選んでください');
+        const eqs = new Set(Object.values(ch.equip)); const list = ch.inventory.filter(i => i.kind === 'weapon' && !i.fav && !eqs.has(i.uid) && rars.has(DATA.weapons.get(i.ref)?.rar)); if (!list.length) return err('売却対象がありません（装備中・お気に入りは除外）');
+        let total = 0; for (const it of list) total += Math.round(DATA.weapons.get(it.ref).price * 0.3); const set = new Set(list); ch.inventory = ch.inventory.filter(i => !set.has(i)); ch.gold += total; return ok(`${list.length}本を${total.toLocaleString()}Gで一括売却しました`); }
+      case 'pray': { const z = a.zone; const b = z.bldgId ? findBuilding(z.cityId, z.bldgId) : null; return this.econ.lore(s, b?.lore || `${z.id}:altar`, z); }
+      case 'trait': { if (!a.zone.map.objects?.some(o => o.k === 'altar') || a.zone.home) return err('街の祭壇で変更できます'); const r = rerollTrait(ch, m.uid, m.slot | 0); if (r.error) return err(r.error); this.sendSelf(s); s.send({ t: 'traitResult', uid: m.uid, old: r.old, next: r.next }); return this.openAltar(s); }
+      case 'artifact': { if (!a.zone.map.npcs?.some(n => n.service === 'smith')) return err('鍛冶屋でアーティファクトを作成できます'); const r = craftArtifact(ch, m.cond, m.eff); if (r.error) return err(r.error); this.events.record(s, 'ex_dungeons', `アーティファクト「${r.art.name}」を作成`); return ok(`アーティファクト「${r.art.name}」を作成しました（${r.cost.toLocaleString()}G）`); }
       case 'evoInfo': { const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'weapon'); const w = it ? DATA.weapons.get(it.ref) : DATA.weapons.get(m.ref); if (!w) return; return s.send({ t: 'evoInfo', key: m.uid || m.ref, recipe: evolveRecipe(w, categoryOf(w.wt).id), hist: it?.hist ? { k: it.hist.k, b: it.hist.b, since: it.hist.since, top: Object.entries(it.hist.fam).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([f, n]) => [DATA.families.get(f)?.name || f, n]) } : null, epi: it?.epi || null, mastery: MASTERY_MILESTONES.map(x => ({ ...x, name: x.title ? masteryTitle(w.wt, x.lv) : null })) }); }
       case 'evolve': { if (!inTown) return err('鍛冶屋（街）で進化できます'); const it = ch.inventory.find(i => i.uid === m.uid && i.kind === 'weapon'); if (!it) return; const w = DATA.weapons.get(it.ref); const r = evolveRecipe(w, categoryOf(w.wt).id); if (!r) return err('この武器にはこれ以上の強化先がありません');
         if ((it.plus || 0) < r.plus) return err(`+${r.plus}以上に強化してから進化できます`); if (r.toLvl > ch.level + 10) return err(`Lv${r.toLvl - 10}以上で進化できます`); if (ch.gold < r.gold) return err('ゴールドが足りません');
@@ -492,7 +508,7 @@ export class World {
         if (m.obj) { const o = z.map.objects.find(x => x.k === m.obj && !x.looted && (!m.type || x.type === m.type)); if (o) { const p = z.tileCenter([o.x, o.y]); a.x = p.x; a.y = p.y; } }
         if (m.hour != null) setClockHour(m.hour | 0);
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
-        if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
+        if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
       case 'slum': return this.slumMenu(s, m);
       case 'market': return this.marketMenu(s, m);

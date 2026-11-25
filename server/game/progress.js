@@ -78,6 +78,19 @@ export function epithetFor(it) {
   if (h.k >= 300) return { tier: 1, name: famName ? `${famName}狩り` : '使い込まれた', mods: { atk: 0.02 } };
   return null;
 }
+// ── trait reroll (特性変更): random trait of the same rarity tier, different from the weapon's current traits
+let TRAIT_POOL = null;
+export function rerollTrait(ch, itemUid, slot) {
+  const it = ch.inventory.find(i => i.uid === itemUid && i.kind === 'weapon'); if (!it) return { error: '武器を選んでください' };
+  const w = DATA.weapons.get(it.ref); const cur = (it.traits || w.traits).map(t => ({ ...t })); if (!cur.length) return { error: 'この武器には特性がありません' };
+  if (!Number.isInteger(slot) || slot < 0 || slot >= cur.length) return { error: '変更する特性を選んでください' };
+  const tk = ch.inventory.find(i => i.ref === 'traitTicket' && i.n > 0); if (!tk) return { error: '特性変更チケットがありません' };
+  if (!TRAIT_POOL) { TRAIT_POOL = new Map(); for (const x of DATA.weapons.values()) for (const t of x.traits) { const m = TRAIT_POOL.get(x.rar) || new Map(); if (!m.has(t.key)) m.set(t.key, t); TRAIT_POOL.set(x.rar, m); } }
+  const pool = [...(TRAIT_POOL.get(w.rar) || TRAIT_POOL.get(1)).values()].filter(t => !cur.some(c => c.key === t.key)); if (!pool.length) return { error: '変更先の特性がありません' };
+  const next = { ...pool[Math.floor(Math.random() * pool.length)] }; const old = cur[slot]; cur[slot] = next; it.traits = cur;
+  tk.n--; if (tk.n <= 0) ch.inventory = ch.inventory.filter(i => i !== tk);
+  return { ok: true, old, next };
+}
 // ── weapon evolution paths (強化先): +10 weapon → the next stronger weapon of the same type; type-group materials
 const EVO_MAT = { sword: 'gem', polearm: 'gem', blunt: 'gem', fist: 'hide', ranged: 'wood', magic: 'crystal', mech: 'gem', myth: 'abyssShard' };
 export function evolveRecipe(w, catId) {

@@ -12,6 +12,7 @@ import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
 import { rollLoot } from './progress.js';
 import { LOOT } from '../../shared/data/slum.js';
+import { artTrigger } from './artifacts.js';
 
 class Heap { constructor() { this.a = []; } push(x) { const a = this.a; a.push(x); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p].at <= a[i].at) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
   pop() { const a = this.a; const top = a[0]; const last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l].at < a[m].at) m = l; if (r < a.length && a[r].at < a[m].at) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
@@ -160,11 +161,12 @@ export class Zone {
       if (killer.wt) onKillHook(this, killer);
       if (killer.stats?.mods.killHeal) killer.heal(killer.maxHp * killer.stats.mods.killHeal, this);
       if (killer.stats?.mods.raiseOnKill && Math.random() < killer.stats.mods.raiseOnKill) this.spawnSummon(killer, 'skeleton', 12000, 0.3);
+      if (killer.ch) artTrigger(killer, 'kill');
       this.world.onMonsterKilled(this, t, killer);
       if (t.boss) this.onBossKilled(t);
       if (t.spawnCell) this.respawns.push({ at: now + 20000, cell: t.spawnCell });
       this.schedule(now + 1200, () => this.remove(t));
-    } else if (t.kind === 'summon') this.schedule(now + 400, () => this.remove(t));
+    } else if (t.kind === 'summon') { const ow = this.actors.get(t.ownerId); if (ow?.ch) artTrigger(ow, 'summon'); this.schedule(now + 400, () => this.remove(t)); }
     else this.world.onFighterDied(this, t);
   }
   onBossKilled(b) {

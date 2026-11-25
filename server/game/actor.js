@@ -1,3 +1,4 @@
+import { artTrigger } from './artifacts.js';
 // Actor: shared runtime entity for players, NPC adventurers, monsters and summons.
 import { STATUS } from '../../shared/constants.js';
 import { computeStats } from '../../shared/formulas.js';
@@ -130,6 +131,7 @@ export class Fighter extends Actor {
     if (sk.cast) { this.action = { type: 'cast', until: now + sk.cast, lockMove: true }; zone.schedule(now + sk.cast, fire); }
     else { if (!this.action || this.action.type === 'attack') this.action = { type: 'skillAnim', until: now + 220, moveMul: 0.5 }; fire(); }
     this.onSkillUsed?.(sk);
+    if (this.ch) artTrigger(this, 'skill');
     return 'ok';
   }
   special(phase, zone) {

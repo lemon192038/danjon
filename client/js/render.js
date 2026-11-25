@@ -61,6 +61,7 @@ export class Renderer {
       case 'charge': case 'stance': { const e = E(f.id); if (e) e.stanceAt = now; break; }
       case 'steam': { const e = E(f.id); if (e) for (let i = 0; i < 16; i++) this.part(e.x, e.y, '#ddd', 30, 700, true); break; }
       case 'markpop': this.ring(f.x, f.y, 20, 'dark'); break;
+      case 'artfx': { const e = E(f.id); if (e) { this.texts.push({ x: e.x, y: e.y - 30, v: `${f.v}${f.n > 1 ? ' ×' + f.n : ''}`, skill: 1, e: 'holy', col: '#ffd070', t0: now }); this.ring(e.x, e.y, 16, 'holy'); } break; }
       case 'revive': { const e = E(f.id); if (e) { e.dieAt = 0; this.ring(e.x, e.y, 30, 'holy'); } break; }
       case 'miss': this.texts.push({ x: f.x, y: f.y - 12, v: 'MISS', skill: 1, e: 'phys', t0: now }); break;
     }

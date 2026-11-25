@@ -92,3 +92,4 @@ svg.spark{vertical-align:middle}ul.rules{padding-left:18px;margin:4px 0}ul.rules
 ol.stages{padding-left:20px}ol.stages li.cur{color:#ffd070;font-weight:bold}.tag{display:inline-block;background:#2a2440;border:1px solid #4a3a70;border-radius:10px;padding:1px 8px;margin:2px;font-size:12px}
 .tsk.thv { right: 14px; bottom: 282px; width: 76px; height: 76px; border-color: rgba(255,120,80,.9); background: rgba(110,40,30,.8); }
 .wcities span{display:inline-block;margin:1px 6px 1px 0;font-size:12px} details summary{cursor:pointer;padding:3px 0}
+.bulk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;padding:6px;background:rgba(255,255,255,.04);border-radius:6px}.chk{display:inline-flex;align-items:center;gap:2px;font-size:12px}.artcraft{grid-column:1/-1;margin-top:10px;border-top:1px solid #3a2f5a;padding-top:6px}

@@ -1,3 +1,4 @@
+import { artTrigger } from './artifacts.js';
 // Hit-shape tests and the single damage pipeline used by every attacker (players, NPCs, monsters, summons).
 import { ELEMENT_CHART, STATUS } from '../../shared/constants.js';
 import { angDiff } from '../../shared/util.js';
@@ -49,7 +50,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   const act = tgt.action;
   if (act && !o.noCounter) {
     if ((act.counter && now <= act.counter.until) && Math.abs(angDiff(tgt.facing, ang + Math.PI)) < 2.2) {
-      act.counter.triggered = { src, ang }; zone.fx({ t: 'parry', x: tgt.x, y: tgt.y }); return 0;
+      act.counter.triggered = { src, ang }; zone.fx({ t: 'parry', x: tgt.x, y: tgt.y }); if (tgt.ch) artTrigger(tgt, 'parry'); return 0;
     }
     if (act.guard && Math.abs(angDiff(tgt.facing, ang + Math.PI)) < 1.6 && !o.unblockable) {
       o = { ...o, guarded: act.guard.dr };
@@ -65,7 +66,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   if (o.fixed) atk = o.fixed;
   let m = o.m || 1;
   if (el && src.enchant?.until > now && src.enchant.el === el) m *= 1 + src.enchant.m;
-  if (el) m *= 1 + (sm.elemDmg?.[el] || 0) + (sm.elemAll || 0);
+  if (el) m *= 1 + (sm.elemDmg?.[el] || 0) + (sm.elemAll || 0) + (bm['el_' + el] || 0);
   if (o.isSkill && el) m *= 1 + (sm.spellDmg || 0) * 0.5;
   if (bm.nextHit && !o.dot) { m *= 1 + bm.nextHit; src.consumeNextHit = true; }
   if (sm.lowHpAtk && src.hp < src.maxHp * 0.35) m *= 1 + sm.lowHpAtk;
@@ -75,13 +76,13 @@ export function dealDamage(zone, src, tgt, o, now) {
   if (sm.backstab && Math.abs(angDiff(tgt.facing, ang)) < 1.0) m *= 1 + sm.backstab;
   if (o.exec && tgt.hp / tgt.maxHp <= o.exec.th) m *= o.exec.m * (1 + (sm.execDmg || 0));
   if (o.vs && tgt.statuses[o.vs.status]) { m *= o.vs.m; if (o.vs.consume) delete tgt.statuses[o.vs.status]; }
-  if (o.consumeMark && tgt.marked > now) { m *= 1 + o.consumeMark; tgt.marked = 0; zone.fx({ t: 'markpop', x: tgt.x, y: tgt.y }); }
+  if (o.consumeMark && tgt.marked > now) { m *= 1 + o.consumeMark; tgt.marked = 0; zone.fx({ t: 'markpop', x: tgt.x, y: tgt.y }); if (src.ch) artTrigger(src, 'mark'); }
   if (o.tip) m *= 1.35;
   if (o.counterHit) m *= 1 + (sm.counterDmg || 0);
   if (tgt.statuses.curse) m *= 1 + 0.2 * (1 + (src.stats.mods.curseAmp || 0));
   let critC = src.stats.crit + (o.critAdd || 0) + (bm.crit || 0);
   const crit = !o.dot && Math.random() < critC;
-  if (crit) m *= src.stats.critDmg + (bm.critDmg || 0);
+  if (crit) { m *= src.stats.critDmg + (bm.critDmg || 0); if (src.ch) artTrigger(src, 'crit'); }
   m *= elemMul(el, tgt);
   let def = tgt.stats.def * (tgt.statuses.armorbreak ? 0.65 : 1) * (1 + (tgt.buffMods?.def || 0));
   let dmg = dmgFormula(atk, m, def, (o.pen || 0) + (sm.pen || 0));

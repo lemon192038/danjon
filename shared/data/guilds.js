@@ -89,5 +89,6 @@ export const ITEMS = {
   luckCharm: { name: '幸運の護符', price: 1200, desc: '30分間 ドロップ率上昇', use: { buff: { drop: 0.3 }, dur: 1800000 } }, returnWing: { name: '帰還の翼', price: 300, desc: 'ダンジョンから即座に帰還', use: { ret: 1 } },
   meal: { name: '街の定食', price: 80, desc: '20分間 HP自然回復+', use: { buff: { regen: 0.004 }, dur: 1200000 } },
   herb: { name: '薬草', price: 25, desc: '採集素材', mat: 1 }, hide: { name: '魔獣の皮', price: 45, desc: '狩猟素材', mat: 1 }, gem: { name: '原石', price: 150, desc: '採掘素材', mat: 1 }, crystal: { name: '魔晶片', price: 180, desc: '魔力素材', mat: 1 },
+  traitTicket: { name: '特性変更チケット', price: 0, desc: '街の祭壇で武器の特性を1つ選び、ランダムな別の特性に変更する（HARD以上の50階以降のボスから2枚確定）', mat: 1, nosell: 1 },
   wood: { name: '霊木材', price: 40, desc: '木工素材', mat: 1 }, relic: { name: '遺物の欠片', price: 400, desc: '古代遺物', mat: 1 }, abyssShard: { name: '深淵の欠片', price: 2000, desc: '深淵の力', mat: 1 },
 };
