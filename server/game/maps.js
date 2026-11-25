@@ -83,6 +83,14 @@ function arena(r, w, h) {
 function floorCells(g) { const c = []; for (let y = 1; y < g.h - 1; y++) for (let x = 1; x < g.w - 1; x++) { const v = g.get(x, y); if (v === T.FLOOR || v === T.GRASS || v === T.PATH) c.push([x, y]); } return c; }
 const GIMMICK_TILE = { lava: T.LAVA, water: T.SHALLOW, ice: T.ICE, spikes: T.SPIKE, traps: T.SPIKE, poisonFog: T.POISON, curseZone: T.CURSE, current: T.CURRENT };
 
+// BFS walking distance from a cell over passable tiles (4-neighbour, same rule as actor movement)
+export function walkDist(g, from) {
+  const W = g.w, H = g.h, d = new Int32Array(W * H).fill(-1); const q = [from[1] * W + from[0]]; d[q[0]] = 0;
+  for (let h = 0; h < q.length; h++) { const i = q[h], x = i % W, y = (i / W) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (d[j] >= 0 || BLOCKING.has(g.get(nx, ny))) continue; d[j] = d[i] + 1; q.push(j); } }
+  return d;
+}
+// open ground: the cell and all 8 neighbours are walkable (no monster wedged between trees/walls)
+const openAt = (g, x, y) => { for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (BLOCKING.has(g.get(x + i, y + j))) return false; return true; };
 export function genDungeonFloor(dungeon, floor, diff) {
   const band = dungeon.bands[Math.min(9, Math.floor((floor - 1) / 10))];
   const seed = hash32(`${dungeon.id}:${floor}:${diff}`); const r = rng(seed);
@@ -109,20 +117,24 @@ export function genDungeonFloor(dungeon, floor, diff) {
   }
   // start & stairs: farthest apart
   let start = g.start || cells[Math.floor(r() * cells.length)];
-  let far = start, fd = -1;
-  for (let k = 0; k < 300; k++) { const c = cells[Math.floor(r() * cells.length)]; const d = (c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2; if (d > fd) { fd = d; far = c; } }
-  for (const [x, y] of [start, far]) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (g.get(x + i, y + j) !== T.WALL && !BLOCKING.has(g.get(x + i, y + j))) g.set(x + i, y + j, T.FLOOR);
-  const stairs = boss ? [g.bossAt[0], g.bossAt[1] - 3] : far; const stairsPos = stairs;
+  // everything the player needs (stairs, exit, monsters, chests) must be reachable on foot from the arrival point
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (!BLOCKING.has(g.get(start[0] + i, start[1] + j))) g.set(start[0] + i, start[1] + j, T.FLOOR);
+  let dist = walkDist(g, start); const reach = c => dist[c[1] * g.w + c[0]] >= 0;
+  if (cells.filter(reach).length < 40) { let best = start, bn = 0; for (let k = 0; k < 12; k++) { const c = cells[Math.floor(r() * cells.length)]; const d = walkDist(g, c); let n = 0; for (const v of d) if (v >= 0) n++; if (n > bn) { bn = n; best = c; } } start = best; dist = walkDist(g, start); }
+  let far = start, fd = -1; for (const c of cells) { const d = dist[c[1] * g.w + c[0]]; if (d > fd) { fd = d; far = c; } } // farthest by walking distance
+  let stairs = boss ? [g.bossAt[0], g.bossAt[1] - 3] : far;
+  if (!reach(stairs)) { let b = null, bd = 1e9; for (const c of cells) if (reach(c)) { const d = Math.hypot(c[0] - stairs[0], c[1] - stairs[1]); if (d < bd) { bd = d; b = c; } } stairs = b || start; }
+  const stairsPos = stairs;
   g.set(stairs[0], stairs[1], boss ? T.FLOOR : T.STAIRS);
   // exit portal placed next to (not on) the spawn point
   // exit portal: placed 5-9 tiles away from the arrival point so it can't be stepped on by accident
-  let ex = null; const cand = floorCells(g).filter(([x, y]) => { const d = Math.hypot(x - start[0], y - start[1]); return d >= 5 && d <= 9 && (x !== stairsPos[0] || y !== stairsPos[1]); });
+  let ex = null; const cand = floorCells(g).filter(([x, y]) => { const d = Math.hypot(x - start[0], y - start[1]); return d >= 5 && d <= 9 && dist[y * g.w + x] >= 0 && (x !== stairsPos[0] || y !== stairsPos[1]); });
   if (cand.length) ex = cand[Math.floor(r() * cand.length)];
-  else { const any = floorCells(g).filter(([x, y]) => Math.hypot(x - start[0], y - start[1]) >= 4); if (any.length) ex = any[0]; }
+  else { const any = floorCells(g).filter(([x, y]) => Math.hypot(x - start[0], y - start[1]) >= 4 && dist[y * g.w + x] >= 0); if (any.length) ex = any[0]; }
   if (ex) g.set(ex[0], ex[1], T.EXIT);
-  cells = floorCells(g);
+  dist = walkDist(g, start); cells = floorCells(g).filter(c => dist[c[1] * g.w + c[0]] >= 0);
   const spawns = []; const nMon = boss ? 0 : (floor <= 3 && dungeon.minLv < 10 ? 6 : 10) + Math.floor(floor / 8) + Math.floor(r() * 6);
-  for (let k = 0; k < nMon * 3 && spawns.length < nMon; k++) { const c = cells[Math.floor(r() * cells.length)]; if ((c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2 > 100) spawns.push(c); }
+  for (let k = 0; k < nMon * 3 && spawns.length < nMon; k++) { const c = cells[Math.floor(r() * cells.length)]; if ((c[0] - start[0]) ** 2 + (c[1] - start[1]) ** 2 > 100 && (k > nMon * 2 || openAt(g, c[0], c[1]))) spawns.push(c); }
   const chests = []; if (!boss) for (let k = 0; k < 1 + Math.floor(r() * 3); k++) chests.push(cells[Math.floor(r() * cells.length)]);
   const lights = []; for (let k = 0; k < 10; k++) lights.push(cells[Math.floor(r() * cells.length)]);
   return { w: g.w, h: g.h, tiles: g.t, pal: band.pal, band, start, stairs, exit: ex, stairsOpen: !boss, spawns, chests, lights, boss, bossAt: g.bossAt, seed, grid: g };
@@ -177,10 +189,10 @@ export function genOverworld(id) {
   const edge = { east: [W - 2, cy], west: [1, cy], north: [cx, 1], south: [cx, H - 2] };
   for (const [dir, to] of Object.entries(def.links)) { const [x, y] = edge[dir]; g.rect(dir === 'east' ? W - 3 : dir === 'west' ? 0 : cx - 2, dir === 'north' ? 0 : dir === 'south' ? H - 3 : cy - 2, dir === 'east' || dir === 'west' ? 3 : 5, dir === 'east' || dir === 'west' ? 5 : 3, T.PATH); for (let k = -2; k <= 2; k++) g.set(dir === 'east' || dir === 'west' ? x : x + k, dir === 'east' || dir === 'west' ? y + k : y, T.EXIT); exits.push({ dir, to, x, y }); }
   for (const gt of gates) g.set(gt.x, gt.y, T.PORTAL);
-  const cells = floorCells(g); const spawns = []; const objects = [], props = [];
-  if (def.kind === 'field') for (let k = 0; k < 26; k++) { const c = cells[Math.floor(r() * cells.length)]; if (Math.abs(c[0] - cx) + Math.abs(c[1] - cy) > 8) spawns.push(c); }
+  const fd = walkDist(g, [cx, cy + 2]); const cells = floorCells(g).filter(c => fd[c[1] * W + c[0]] >= 0); const open = cells.filter(c => openAt(g, c[0], c[1])); const spawns = []; const objects = [], props = [];
   if (def.kind === 'field') { const mats = def.mats || { field_green: ['herb', 'herb', 'wood'], field_highland: ['herb', 'gem', 'crystal'], field_mine: ['gem', 'gem', 'wood'], field_lake: ['crystal', 'herb', 'wood'], field_coast: ['herb', 'wood', 'gem'] }[id] || ['herb'];
-    for (let k = 0; k < 14; k++) { const c = cells[Math.floor(r() * cells.length)]; const mat = mats[k % mats.length]; g.set(c[0], c[1], T.BLOCK); objects.push({ k: 'node', mat, x: c[0], y: c[1] + 1 }); props.push({ k: 'node', mat, x: c[0], y: c[1], w: 1, h: 1 }); } }
+    for (let k = 0; k < 14; k++) { const c = open[Math.floor(r() * open.length)]; const mat = mats[k % mats.length]; g.set(c[0], c[1], T.BLOCK); objects.push({ k: 'node', mat, x: c[0], y: c[1] + 1 }); props.push({ k: 'node', mat, x: c[0], y: c[1], w: 1, h: 1 }); } }
+  if (def.kind === 'field') { const open2 = cells.filter(c => openAt(g, c[0], c[1])); for (let k = 0; k < 26; k++) { const c = open2[Math.floor(r() * open2.length)]; if (Math.abs(c[0] - cx) + Math.abs(c[1] - cy) > 8) spawns.push(c); } }
   return { w: W, h: H, tiles: g.t, pal: def.pal, start: [cx, cy + 2], spawns, npcs, gates, exits, lights, grid: g, kind: def.kind, name: def.name, lv: def.lv, objects, props };
 }
 export const tileAt = (map, px, py) => { const x = Math.floor(px / TILE), y = Math.floor(py / TILE); return x < 0 || y < 0 || x >= map.w || y >= map.h ? T.VOID : map.tiles[y * map.w + x]; };
