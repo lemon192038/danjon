@@ -76,6 +76,7 @@ export const GUILDS = [
   G('shopkeepers', '商店主組合', 'culture', 'haven', ['lumina', 'celestia'], '組合長フローラ', '街角の店が街を支える', '小売店の互助', { size: '加盟店九百', join: { level: 1 }, ranks: 'member', quests: ['deliver', 'fund'], shop: ['hp', 'sp'], rel: { ally: ['merchants'], rival: [], enemy: ['blackmarket'] }, facility: '組合事務所', event: '商店街の大売り出し' }),
   // ── 独自組織
   G('dawn', '市民団体「夜明けの灯」', 'culture', 'lumina', [], '元坑夫の娘アニタ', 'スラムに灯りを', '貧困者支援と腐敗の告発', { size: '会員百名', join: { level: 10 }, ranks: 'member', quests: ['fund', 'gather:herb', 'kill'], shop: ['hp'], rel: { ally: ['physicians', 'carpenters'], rival: [], enemy: ['assassins', 'blackmarket'] }, facility: '炊き出し所', event: '夜明けの灯の集会' }),
+  G('fishers', '釣り師ギルド', 'culture', 'marinelia', ['marina', 'nereia'], '釣り名人トーマ', '待つことは、海と話すこと', '釣り・漁場の管理・水産素材の採集', { size: '会員九百', join: { level: 1 }, ranks: 'member', quests: ['gather:herb', 'killFam:lizard', 'deliver'], shop: ['fishGood', 'hp'], rel: { ally: ['sailors', 'cooks'], rival: ['shipping'], enemy: [] }, facility: '釣り堀と魚拓の壁', event: '大物釣り大会' }),
   G('wardens', '灯台守の会', 'culture', 'marina', [], '灯台守エルマー', '一つの灯が百の船を救う', '灯台と航路の保守', { size: '二十名', join: { level: 5 }, ranks: 'member', quests: ['killFam:harpy', 'fund'], shop: ['sp'], rel: { ally: ['sailors'], rival: [], enemy: ['smugglers'] }, facility: '灯室', event: '灯台祭' }),
 ];
 export const GUILD_BY_ID = Object.fromEntries(GUILDS.map(g => [g.id, g]));

@@ -9,6 +9,12 @@ export const GAME_MIN_MS = 2000; // 1 game minute = 2 real seconds -> 1 day = 48
 let OFFSET = 0; // ms; test hook to pin the game hour
 export function setClockHour(h) { const t = Math.floor(Date.now() / GAME_MIN_MS); const cur = Math.floor(t / 60) % 24; OFFSET = ((h - cur + 24) % 24) * 60 * GAME_MIN_MS; }
 export function clock(now = Date.now()) { const total = Math.floor((now + OFFSET) / GAME_MIN_MS); return { total, day: Math.floor(total / 1440), hour: Math.floor(total / 60) % 24, minute: total % 60 }; }
+// seasons: 4 seasons x 7 game days. Climate of each continent sets the base temperature; weather and night adjust it.
+export const SEASONS = [{ id: 'spring', name: '春', t: 0, wx: { rain: 1.5, clear: 1.1 } }, { id: 'summer', name: '夏', t: 9, wx: { storm: 1.8, clear: 1.3, snow: 0 } }, { id: 'autumn', name: '秋', t: -1, wx: { fog: 1.8, wind: 1.5, cloud: 1.2 } }, { id: 'winter', name: '冬', t: -11, wx: { snow: 3, clear: 0.8, storm: 0.6 } }];
+export const season = (day = clock().day) => SEASONS[Math.floor(((day % 28) + 28) % 28 / 7)];
+const BASE_T = { eldia: 16, nordia: -6, shengar: 18, saharia: 31, valgran: 27, asteria: 23 };
+const WX_T = { clear: 2, cloud: 0, rain: -3, snow: -6, fog: -1, wind: -2, storm: -4, smog: 1, aurora: -3 };
+export function temperature(cityId, wx, c = clock()) { const cont = CITIES[cityId]?.continent || 'eldia'; const se = season(c.day); const night = c.hour < 6 || c.hour >= 20 ? (cont === 'saharia' ? -14 : -5) : 0; return Math.round(BASE_T[cont] + se.t * (cont === 'saharia' ? 0.4 : 1) + (WX_T[wx] || 0) + night); }
 export const isOpen = (hours, h) => !hours ? true : hours[0] < hours[1] ? h >= hours[0] && h < hours[1] : h >= hours[0] || h < hours[1] % 24 || (hours[1] === 24 && h >= hours[0]);
 
 const ROLE = { receptionist: '受付係', adventurer: '冒険者', clerk: '事務員', smith: '鍛冶職人', apprentice: '見習い', shopkeeper: '店主', customer: '客', barkeep: '酒場の主人', patron: '常連客', bard: '吟遊詩人', innkeeper: '宿の主人', traveler: '旅人', banker: '銀行員', guard: '衛兵', priest: '司祭', worshipper: '参拝者', librarian: '司書', scholar: '学者', dealer: 'ディーラー', gambler: '賭博客', performer: '役者', audience: '観客', usher: '案内係', concierge: 'コンシェルジュ', guest: '宿泊客', bellboy: 'ベルボーイ', butler: '執事', noble: '貴族', researcher: '研究員', assistant: '助手', professor: '教授', student: '学生', craftsman: '職人', foreman: '現場監督', porter: '荷運び', arenamaster: '闘技場主', gladiator: '闘士', spectator: '観戦客', doctor: '医師', patient: '患者', attendant: '番台', bather: '入浴客', stationmaster: '駅長', curator: '学芸員', visitor: '見学者', astronomer: '天文学者', fence: '故買屋', thug: 'ごろつき', shady: '怪しい男', resident: '住民', king: '摂政', citizen: '市民' };
@@ -23,7 +29,7 @@ export class Life {
   get time() { return clock(); }
   weatherOf(cityId) { return this.weather[cityId] || 'clear'; }
   rollWeather(now) {
-    for (const [id, c] of Object.entries(CITIES)) { const tbl = Object.entries(c.weather); const tot = tbl.reduce((a, [, w]) => a + w, 0); let x = Math.random() * tot; for (const [k, w] of tbl) { x -= w; if (x <= 0) { this.weather[id] = k; break; } } }
+    const se = season(); for (const [id, c] of Object.entries(CITIES)) { const warm = ['saharia', 'valgran'].includes(c.continent); const tbl = Object.entries(c.weather).map(([k, w]) => [k, w * (k === 'snow' && warm ? 0 : se.wx[k] ?? 1)]).concat(se.id === 'winter' && !warm && !c.weather.snow ? [['snow', 1.5]] : []); const tot = tbl.reduce((a, [, w]) => a + w, 0); let x = Math.random() * tot; for (const [k, w] of tbl) { x -= w; if (x <= 0) { this.weather[id] = k; break; } } }
   }
   // Build citizens from a generated city map (staff for each building role + families for homes)
   populate(cityId, map, interiorRoles) {

@@ -1,6 +1,7 @@
 // Procedural map generation: towns, fields and 1,200 dungeon floors (seeded, layout varies per biome band).
 import { rng, hash32 } from '../../shared/util.js';
 import { TILE } from '../../shared/constants.js';
+import { NEW_FIELDS, CHAINS, NEW_CITIES } from '../../shared/data/worldcities.js';
 export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21, BLOCK: 22, MARBLE: 23, COBBLE: 24, RUBBLE: 25, PLANK: 26, CARPET: 27, STONEF: 28, IWALL: 29, STEPS: 30, MAT: 31 };
 export const BLOCKING = new Set([T.VOID, T.WALL, T.WATER, T.TREE, T.HOUSE, T.PILLAR, T.ROOF, T.BLOCK, T.IWALL]);
 export { Grid, floorCells };
@@ -141,6 +142,16 @@ export const WORLD = {
   field_coast: { name: '灰の海岸道', kind: 'field', pal: 'grass', links: { west: 'marina', east: 'lumina' }, gates: ['d06', 'd04'], lv: [15, 45], fams: [['lizard', 'harpy', 'zombie', 'shade', 'cultist']] },
   lumina: { name: '歓楽都市ルクスガルド', kind: 'town', links: { west: 'field_coast' }, gates: [] },
 };
+// PHASE 2: six-continent overworld. Towns and fields are linked along each continent's chains (city - field - city).
+// Each map has four edges; links are assigned to a free edge on both sides (opposite directions), deterministically.
+{
+  const OPP = { east: 'west', west: 'east', north: 'south', south: 'north' }; const ORDER = ['east', 'north', 'west', 'south'];
+  for (const [cont, fields] of Object.entries(NEW_FIELDS)) for (const [id, name, pal, lv, fams, gates, mats] of fields) WORLD[id] = { name, kind: 'field', pal, links: {}, gates, lv, fams: [fams], mats, continent: cont };
+  for (const id of Object.keys(NEW_CITIES)) WORLD[id] = { name: NEW_CITIES[id].name, kind: 'town', links: {}, gates: [], continent: NEW_CITIES[id].continent };
+  const link = (a, b) => { const A = WORLD[a], Bn = WORLD[b]; if (!A || !Bn || Object.values(A.links).includes(b)) return; const d = ORDER.find(x => !A.links[x] && !Bn.links[OPP[x]]); if (!d) return; A.links[d] = b; Bn.links[OPP[d]] = a; };
+  for (const chains of Object.values(CHAINS)) for (const ch of chains) for (let i = 0; i + 1 < ch.length; i++) if (WORLD[ch[i]].kind !== WORLD[ch[i + 1]].kind || WORLD[ch[i]].kind === 'field') link(ch[i], ch[i + 1]);
+  link('haven', 'field_capital'); // the original western frontier joins the new heartland of Eldia on foot
+}
 export function genOverworld(id) {
   const def = WORLD[id]; const r = rng(hash32('world:' + id));
   const W = def.kind === 'town' ? 60 : 90, H = def.kind === 'town' ? 46 : 70;
@@ -168,7 +179,7 @@ export function genOverworld(id) {
   for (const gt of gates) g.set(gt.x, gt.y, T.PORTAL);
   const cells = floorCells(g); const spawns = []; const objects = [], props = [];
   if (def.kind === 'field') for (let k = 0; k < 26; k++) { const c = cells[Math.floor(r() * cells.length)]; if (Math.abs(c[0] - cx) + Math.abs(c[1] - cy) > 8) spawns.push(c); }
-  if (def.kind === 'field') { const mats = { field_green: ['herb', 'herb', 'wood'], field_highland: ['herb', 'gem', 'crystal'], field_mine: ['gem', 'gem', 'wood'], field_lake: ['crystal', 'herb', 'wood'], field_coast: ['herb', 'wood', 'gem'] }[id] || ['herb'];
+  if (def.kind === 'field') { const mats = def.mats || { field_green: ['herb', 'herb', 'wood'], field_highland: ['herb', 'gem', 'crystal'], field_mine: ['gem', 'gem', 'wood'], field_lake: ['crystal', 'herb', 'wood'], field_coast: ['herb', 'wood', 'gem'] }[id] || ['herb'];
     for (let k = 0; k < 14; k++) { const c = cells[Math.floor(r() * cells.length)]; const mat = mats[k % mats.length]; g.set(c[0], c[1], T.BLOCK); objects.push({ k: 'node', mat, x: c[0], y: c[1] + 1 }); props.push({ k: 'node', mat, x: c[0], y: c[1], w: 1, h: 1 }); } }
   return { w: W, h: H, tiles: g.t, pal: def.pal, start: [cx, cy + 2], spawns, npcs, gates, exits, lights, grid: g, kind: def.kind, name: def.name, lv: def.lv, objects, props };
 }

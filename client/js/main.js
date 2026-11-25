@@ -72,11 +72,11 @@ function createScreen() {
 // ---------- game
 net.on('zone', m => {
   const tiles = Uint8Array.from(atob(m.tiles), c => c.charCodeAt(0));
-  state.zone = { ...m, tiles }; state.ents.clear(); state.me = null; state.meEnt = null; state.env = { h: m.clock?.h ?? 12, m: m.clock?.m ?? 0, wx: m.wx, city: m.cityId };
+  state.zone = { ...m, tiles }; state.ents.clear(); state.me = null; state.meEnt = null; state.env = { h: m.clock?.h ?? 12, m: m.clock?.m ?? 0, wx: m.wx, city: m.cityId, se: state.env?.se, temp: m.cityId && m.cityId === state.env?.city ? state.env?.temp : null };
   if (!renderer) startGame();
   renderer.setZone(state.zone); ui.onZone(state.zone); screen('');
 });
-net.on('env', m => { state.env = { h: m.h, m: m.m, wx: m.wx, city: m.city }; ui?.onEnv?.(state.env); });
+net.on('env', m => { state.env = { h: m.h, m: m.m, wx: m.wx, city: m.city, se: m.se, temp: m.temp }; ui?.onEnv?.(state.env); });
 net.on('loading', m => { ui?.loading(m.v, m.ms || 600, m.mode); });
 net.on('homeRefresh', m => { if (!state.zone) return; state.zone.props = m.props; state.zone.tiles = Uint8Array.from(atob(m.tiles), c => c.charCodeAt(0)); renderer.rerender(); });
 net.on('self', m => { state.self = m; const w = m.ch.inventory.find(i => i.uid === m.ch.equip.weapon); const wts = new Set(m.ch.inventory.filter(i => i.kind === 'weapon').map(i => +i.ref.split('_')[0])); wts.add(m.d.wt); Promise.all([...wts].map(loadType)).then(() => ui.onSelf(m)); ui.onSelf(m); });

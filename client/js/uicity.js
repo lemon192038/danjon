@@ -12,7 +12,7 @@ export const OBJ_HINT = { bookcase: '本を読む', lectern: '記録を読む', 
 export function installCity(UI) {
   const P = UI.prototype;
   P.cityPanel = function (service, data) { if (!PANELS[service]) return false; this.svc = data; this.open(PANELS[service], service); return true; };
-  P.onEnv = function (env) { const el = this.$('#clock'); if (el) el.textContent = `🕐 ${String(env.h).padStart(2, '0')}:${String(env.m).padStart(2, '0')}  ${WX[env.wx] || ''}`; };
+  P.onEnv = function (env) { const el = this.$('#clock'); if (el) el.textContent = `🕐 ${String(env.h).padStart(2, '0')}:${String(env.m).padStart(2, '0')}  ${WX[env.wx] || ''}${env.se ? ` ${env.se}` : ''}${env.temp != null ? ` ${env.temp}℃` : ''}`; };
   P.loading = function (text, ms, mode) { const el = document.getElementById('loadingov'); el.innerHTML = `<div><div class="lmode">${{ carriage: '🐎', ship: '⛵', rail: '🚂', airship: '🛩' }[mode] || '🚪'}</div><div>${esc(text)}</div><div class="lbar"><i style="animation-duration:${ms}ms"></i></div></div>`; el.classList.add('on'); clearTimeout(this._lt); this._lt = setTimeout(() => el.classList.remove('on'), ms + 300); };
   P.cityHint = function (z, p) {
     const h = this.state.env?.h ?? 12; let hint = '';
@@ -98,7 +98,7 @@ export function installCity(UI) {
     return this.wrap(`${esc(d.cityName)}：${esc(d.name)} <small>${Math.min(d.step + 1, d.total)}/${d.total}</small>`, `${d.outcome ? `<p class="warn">この街の運命は既に決した：${esc(d.outcome.by)}が「${esc(d.outcome.choice)}」を選んだ。${esc(d.outcome.effect)}</p>` : ''}
     ${d.done ? `<p class="good">この物語を最後まで見届けた（あなたの選択：${esc(d.mine)}）</p>` : `<p class="lore">${esc(s.text)}</p>${s.kind === 'choice' ? s.options.map(o => `<button class="primary" data-act="storyDo" data-choice="${o.id}">${esc(o.label)}</button>`).join(' ') : `<p class="dim">${s.kind === 'kill' || s.kind === 'floor' ? `進行 ${Math.min(d.prog, s.n || 1)}/${s.n || 1}` : ''}</p><button class="primary" data-act="storyDo">${s.kind === 'talk' ? '話を聞く' : s.kind === 'fund' ? `支払う（${G(s.gold)}）` : s.kind === 'deliver' ? '届ける' : '報告する'}</button>`}`}`); };
   P.p_city = function () { const c = this.cityInfo; if (!c) { this.net.menu('cityInfo'); return this.wrap('都市', '<p>読み込み中…</p>'); } const C = c.city;
-    return this.wrap(`${esc(C.name)} <small>${esc(C.title)}</small>`, `<div class="split"><div><p>${esc(c.weather)} ・ ${String(c.time.hour).padStart(2, '0')}:${String(c.time.minute).padStart(2, '0')} ・ 治安 ${'★'.repeat(C.security)}${'☆'.repeat(5 - C.security)}</p>
+    return this.wrap(`${esc(C.name)} <small>${esc(C.title)}</small>`, `<div class="split"><div><p>${c.season ? `${esc(c.season)}・${c.temp}℃ ・ ` : ''}${esc(c.weather)} ・ ${String(c.time.hour).padStart(2, '0')}:${String(c.time.minute).padStart(2, '0')} ・ 治安 ${'★'.repeat(C.security)}${'☆'.repeat(5 - C.security)}</p>
       ${c.state ? `<p class="warn">現在の情勢：${esc(c.state.effect)}（${esc(c.state.by)}の選択）</p>` : ''}
       <h4>歴史</h4><ol>${C.history.map(h => `<li>${esc(h)}</li>`).join('')}</ol><p>成立：${esc(C.origin)}（${esc(C.founded)}）</p>
       <h4>街の姿</h4><p>地理：${esc(C.geography)}<br>気候：${esc(C.climate)}<br>建築：${esc(C.architecture)}<br>ランドマーク：${esc(C.landmark)}</p>

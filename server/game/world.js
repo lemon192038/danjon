@@ -11,7 +11,7 @@ import { categoryOf } from '../../shared/data/weaponTypes.js';
 import { newCharacter, knownSkills, validateSlots, grantXp, grantMastery, grantJobXp, skillUsed, rollLoot, addItem, enhance, shopStock, ITEM_PRICES, questBoard, jobUnlockMet, uid, checkJobUnlocks } from './progress.js';
 import { armorDef } from '../../shared/formulas.js';
 import { STARTER_WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
-import { Life, clock, isOpen } from './life.js';
+import { Life, clock, isOpen, season, temperature, setClockHour } from './life.js';
 import { interiorRoles, findBuilding, HOME_TPL } from './city.js';
 import { Guilds } from './guildsys.js';
 import { Econ } from './econ.js';
@@ -57,7 +57,7 @@ export class World {
     if (this.tick % 40 === 0) this.econ.hourly();
     if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
     if (this.tick % 200 === 0) this.events.simulate();
-    if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); ss.send({ t: 'env', h: c.hour, m: c.minute, wx: cid ? this.life.weatherOf(cid) : 'clear', city: cid || null }); } }
+    if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); const wx = cid ? this.life.weatherOf(cid) : 'clear'; ss.send({ t: 'env', h: c.hour, m: c.minute, wx, city: cid || null, se: season(c.day).name, temp: cid ? temperature(cid, wx, c) : null }); } }
     if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
   }
   broadcast(z) {
@@ -485,11 +485,13 @@ export class World {
       case 'req': return this.econ.request(s, m);
       case 'story': return this.econ.story(s, m);
       case 'use': { const it = s.ch.inventory.find(i => i.ref === m.ref && i.n > 0 && ITEMS[i.ref]?.use); if (!it) return; const u = ITEMS[it.ref].use; if (u.ret && a.zone.kind !== 'dungeon') return err('ダンジョン内で使えます'); it.n--; if (it.n <= 0) s.ch.inventory = s.ch.inventory.filter(x => x !== it); if (u.heal) a.hp = a.maxHp; if (u.sp) a.sp = a.maxSp; if (u.buff) a.addBuff(u.buff, u.dur, 'item_' + it.ref); if (u.ret) { this.sendSelf(s); return this.leaveDungeon(s); } return ok(`${ITEMS[it.ref].name}を使った`); }
-      case 'cityInfo': { const cid = this.cityNear(a.zone); if (!cid) return; const c = CITIES[cid]; const t = clock(); return s.send({ t: 'cityInfo', id: cid, city: { name: c.name, title: c.title, founded: c.founded, history: c.history, origin: c.origin, geography: c.geography, climate: c.climate, architecture: c.architecture, industry: c.industry, economy: c.economy, politics: c.politics, ruler: c.ruler, security: c.security, classes: c.classes, culture: c.culture, lifestyle: c.lifestyle, landmark: c.landmark.name, monsters: c.monsters, events: c.events, districts: c.districts.map(d => ({ name: d.name, type: d.type, buildings: d.buildings.map(b => ({ name: b.name, hours: b.hours || null, guild: b.guild || null })) })) }, weather: WEATHER[this.life.weatherOf(cid)], time: t, state: this.econ.cityState[cid] || null, news: this.econ.news.slice(0, 8).map(n => n.v), prices: Object.keys(c.goods ? {} : {}), guildsHere: [] }); }
+      case 'cityInfo': { const cid = this.cityNear(a.zone); if (!cid) return; const c = CITIES[cid]; const t = clock(); return s.send({ t: 'cityInfo', id: cid, city: { name: c.name, title: c.title, founded: c.founded, history: c.history, origin: c.origin, geography: c.geography, climate: c.climate, architecture: c.architecture, industry: c.industry, economy: c.economy, politics: c.politics, ruler: c.ruler, security: c.security, classes: c.classes, culture: c.culture, lifestyle: c.lifestyle, landmark: c.landmark.name, monsters: c.monsters, events: c.events, districts: c.districts.map(d => ({ name: d.name, type: d.type, buildings: d.buildings.map(b => ({ name: b.name, hours: b.hours || null, guild: b.guild || null })) })) }, weather: WEATHER[this.life.weatherOf(cid)], time: t, season: season(t.day).name, temp: temperature(cid, this.life.weatherOf(cid), t), continent: c.continent, state: this.econ.cityState[cid] || null, news: this.econ.news.slice(0, 8).map(n => n.v), prices: Object.keys(c.goods ? {} : {}), guildsHere: [] }); }
       case 'dev': { if (process.env.DEV_TOOLS !== '1') return; const z = a.zone; // e2e helper only (never enabled in production)
         if (m.door) { const d = z.map.doors.find(x => x.svc === m.door || x.id === m.door); if (d) { const p = z.tileCenter([d.x, d.y + 1]); a.x = p.x; a.y = p.y; } }
         if (m.npc) { const n = z.map.npcs.find(x => x.service === m.npc); if (n) { const p = z.tileCenter([n.x, n.y + 2]); a.x = p.x; a.y = p.y; } }
         if (m.obj) { const o = z.map.objects.find(x => x.k === m.obj && !x.looted && (!m.type || x.type === m.type)); if (o) { const p = z.tileCenter([o.x, o.y]); a.x = p.x; a.y = p.y; } }
+        if (m.hour != null) setClockHour(m.hour | 0);
+        if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
       case 'slum': return this.slumMenu(s, m);

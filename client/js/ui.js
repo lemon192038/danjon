@@ -10,6 +10,8 @@ import { Tutorial } from './tutorial.js';
 import { installCity } from './uicity.js';
 import { installSlum } from './uislum.js';
 import { installEvents } from './uievents.js';
+import { CONTINENTS, REALMS, LEGACY_CITIES } from '/shared/data/world.js';
+import { CITIES } from '/shared/data/cities.js';
 import { LOOT, PROV } from '/shared/data/slum.js';
 import { ITEMS } from '/shared/data/guilds.js';
 
@@ -301,9 +303,16 @@ export class UI {
       <p>到達記録: ${Object.entries(n.best || {}).map(([k, v]) => `${esc(D.dungeons[k]?.name)} ${v}F`).join(' / ') || 'なし'}</p><h4>冒険履歴</h4><ul class="log">${n.log.map(l => `<li>${esc(l.m)}</li>`).join('') || '<li class="dim">まだ記録がない</li>'}</ul>
       ${!n.inParty && !n.remote && n.state !== 'party' ? `<button class="primary" data-act="npcInvite" data-v="${n.id}">パーティーに勧誘</button>` : ''}${n.inParty ? `<button data-act="kick" data-v="${n.id}">パーティーから外す</button>` : ''}`);
   }
+  // world overview: continents → cities (visited ✓, current ◉) and hidden realms only once discovered
+  worldList() {
+    const ch = this.self.ch; const vis = new Set(ch.progress.visited || []); const cur = this.state.zone.cityId; const seen = ch.events?.seen || {};
+    const conts = CONTINENTS.map(c => { const extra = c.id === 'eldia' ? LEGACY_CITIES : []; const ids = [...extra, ...c.cities.map(x => x.id)].filter(id => CITIES[id]);
+      return `<details ${ids.includes(cur) ? 'open' : ''}><summary><b>${esc(c.name)}</b> <small>${ids.filter(i => vis.has(i)).length}/${ids.length}</small></summary><p class="wcities">${ids.map(id => `<span class="${id === cur ? 'good' : vis.has(id) ? '' : 'dim'}">${id === cur ? '◉' : vis.has(id) ? '✓' : '・'}${esc(CITIES[id].name)}</span>`).join(' ')}</p></details>`; }).join('');
+    const realms = REALMS.filter(r => seen[r.id]); return conts + `<h4>特殊領域</h4>${realms.length ? realms.map(r => `<p>✦ ${esc(r.name)}</p>`).join('') : '<p class="dim">まだ見ぬ領域が世界のどこかにある…</p>'}<p class="dim"><small>大陸間は港（船）と飛空艇発着場から移動できる</small></p>`;
+  }
   p_map() {
     const z = this.state.zone; setTimeout(() => { const cv = this.modal.querySelector('#bigmap'); if (!cv) return; const g = cv.getContext('2d'); const s = Math.min(cv.width / z.w, cv.height / z.h); g.imageSmoothingEnabled = false; g.drawImage(this.ctx.renderer.mini, 0, 0, z.w * s, z.h * s); g.fillStyle = '#fff'; const me = this.state.me; g.fillRect(me.x / 16 * s - 2, me.y / 16 * s - 2, 5, 5); g.font = '11px sans-serif'; g.fillStyle = '#ffd070'; for (const n of z.npcs) g.fillText(n.name, n.x * s, n.y * s); g.fillStyle = '#c0a0ff'; for (const gt of z.gates) g.fillText(D.dungeons[gt.dungeon]?.name, gt.x * s - 20, gt.y * s - 4); g.fillStyle = '#80c0ff'; for (const e of z.exits) g.fillText('→' + e.to, e.x * s - 30, e.y * s); }, 0);
-    return this.wrap(`マップ ― ${esc(z.name)}`, `<div class="split"><canvas id="bigmap" width="520" height="420"></canvas><div><h3>世界</h3><ul class="world"><li>始まりの街ヘイヴン ⇄ 翠風の平原（翠緑の古洞・紅蓮の火山窟・黄昏の死都）</li><li>翠風の平原 ⇄ 港町マリナ（深海神殿・凍てつく氷獄）</li><li>翠風の平原 ⇄ 霧の高原（天空の浮遊遺跡・機巧の大迷宮・魔神の封印窟・星霜の時計塔）</li><li>霧の高原 ⇄ 天空都市セレスティア（神々の試練場・虚無の境界・終焉の深淵）</li></ul><p class="dim">各街のダンジョン門番からは全ダンジョンに入場できます。</p>${z.kind === 'dungeon' ? `<p>${z.floor}F / ${z.diff}</p><button data-act="leave">帰還する</button>` : ''}</div></div>`);
+    return this.wrap(`マップ ― ${esc(z.name)}`, `<div class="split"><canvas id="bigmap" width="520" height="420"></canvas><div><h3>世界</h3>${this.worldList()}<p class="dim">各街のダンジョン門番からは全ダンジョンに入場できます。</p>${z.kind === 'dungeon' ? `<p>${z.floor}F / ${z.diff}</p><button data-act="leave">帰還する</button>` : ''}</div></div>`);
   }
   p_exitConfirm() { const d = this.svc || {}; return `<div class="panel small"><div class="ph"><h2>ダンジョンから帰還</h2><button data-act="close" class="x">✕</button></div><div class="pb"><p>${esc(d.name || '')} ${d.floor || ''}階から街へ帰還しますか？</p><p class="dim">到達した階層は記録され、次回は10階ごとの区切りから再開できます。</p><div class="btns"><button class="primary" data-act="leave">帰還する</button> <button data-act="close">キャンセル</button></div></div></div>`; }
   p_settings() {

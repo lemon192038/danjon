@@ -27,6 +27,16 @@ export { shade };
 // ---------- tile map prerender (static layer)
 import { drawFloor, drawIWall, drawBuilding, drawLandmark, drawDecor, windows, FLOORS } from './citysprites.js';
 export { windows };
+const GROUND = {
+  snow: { grass: ['#e8eef4', '#dfe6ee', '#c4d0dc'], path: ['#b8c0c8', '#aeb6c0', '#8a94a0'], tint: { 24: '#9aa4b0', 23: '#d8e0ea', 25: '#7a7c84' }, flake: 1 },
+  ice: { grass: ['#d8e8f4', '#cfe0ee', '#a8c8e0'], path: ['#a8bccc', '#9eb2c4', '#7a90a8'], tint: { 24: '#8aa0b8', 23: '#d0e4f4', 25: '#6a7a8a' }, flake: 1 },
+  sand: { grass: ['#e2c890', '#d8be86', '#b89a64'], path: ['#d0b07a', '#c6a670', '#a8885a'], tint: { 24: '#c8a878', 23: '#f0e4c8', 25: '#a08a64' } },
+  ash: { grass: ['#4a4440', '#443e3a', '#6a3a2a'], path: ['#5a504a', '#524842', '#3a302c'], tint: { 24: '#4a4246', 23: '#6a5a58', 25: '#3a3230' } },
+  obsidian: { grass: ['#3a3440', '#34303a', '#5a4a6a'], path: ['#4a4450', '#423c48', '#2a2630'], tint: { 24: '#3e3a46', 23: '#5a5468', 25: '#2e2a32' } },
+  coral: { grass: ['#e8e0c8', '#e0d8bc', '#c8bc98'], path: ['#dcd2ba', '#d2c8ae', '#b0a488'], tint: { 24: '#d8d0c0', 23: '#f4f0e8', 25: '#a8a090' } },
+  lava: { grass: ['#4a3a34', '#44342e', '#a03a20'], path: ['#5a4a42', '#52423a', '#3a2a24'], tint: {} },
+  marble: { tint: { 24: '#d0ccc4' }, grass: ['#5a9a4a', '#549244', '#7aba5a'], path: ['#c8c0b0', '#c0b8a8', '#a09888'] },
+};
 export function renderTileMap(map, palKey) {
   const pal = PALETTES[palKey] || PALETTES.moss; const S = 16;
   const c = document.createElement('canvas'); c.width = map.w * S; c.height = map.h * S; const g = c.getContext('2d');
@@ -39,7 +49,9 @@ export function renderTileMap(map, palKey) {
   for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
     let v = at(x, y); const px = x * S, py = y * S, r = rnd(x, y);
     if (v === T.BLOCK) { v = map.floorTile || [at(x - 1, y), at(x + 1, y), at(x, y + 1), at(x, y - 1)].find(n => n !== T.BLOCK && n !== T.WALL && n !== T.IWALL && n !== T.VOID) || T.COBBLE; if (v === T.BLOCK) v = T.COBBLE; }
-    if (FLOORS[v]) { drawFloor(g, v, px, py, x, y, v === map.floorTile && map.kind === 'interior' ? null : null); continue; }
+    const GT = map.kind === 'town' || map.kind === 'field' ? GROUND[palKey] : null; // regional ground (snow towns, desert sandstone, volcanic basalt, coral sand)
+    if (FLOORS[v]) { drawFloor(g, v, px, py, x, y, GT?.tint?.[v] || null); if (GT?.flake && r > 0.8) { g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(px + (r * 13 | 0), py + 3, 2, 1); } continue; }
+    if (GT && (v === T.GRASS || v === T.PATH)) { const [c1, c2, dc] = v === T.GRASS ? GT.grass : GT.path; g.fillStyle = r < 0.5 ? c1 : c2; g.fillRect(px, py, S, S); if (r > 0.55) { g.fillStyle = dc; g.fillRect(px + Math.floor(r * 12), py + 4 + Math.floor(r * 7), 2, 1); g.fillRect(px + Math.floor(r * 5) + 3, py + 11, 1, 1); } continue; }
     if (v === T.IWALL) { drawIWall(g, px, py, map.wallCol || '#6a4a3a', at(x, y + 1) !== T.IWALL); continue; }
     const floorBase = (col1, col2) => { g.fillStyle = r < 0.5 ? col1 : col2; g.fillRect(px, py, S, S); for (let k = 0; k < 5; k++) { const a = rnd(x, y, k + 1); g.fillStyle = shade(col1, 0.82 + rnd(x, y, k + 9) * 0.3); g.fillRect(px + Math.floor(a * 15), py + Math.floor(rnd(x, y, k + 20) * 15), 1 + (a > 0.8 ? 1 : 0), 1); } if (r > 0.9) { g.fillStyle = shade(col1, 0.7); g.fillRect(px + 3, py + 8, 4, 1); g.fillRect(px + 9, py + 4, 1, 3); } };
     switch (v) {
@@ -59,7 +71,9 @@ export function renderTileMap(map, palKey) {
         if (!isWallish(at(x, y - 1)) && at(x, y - 1) !== T.VOID) { g.fillStyle = shade(pal.wallTop, 1.35); g.fillRect(px, py, S, 1); }
         if (face) { g.fillStyle = pal.wallFace; g.fillRect(px, py + 7, S, 9); g.fillStyle = shade(pal.wallFace, 0.75); for (let k = 9; k < S; k += 3) g.fillRect(px + ((k / 3) % 2 ? 0 : 4), py + k, S, 1); g.fillStyle = shade(pal.wallFace, 1.25); g.fillRect(px, py + 7, S, 1); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(px, py + S, S, 0); }
         break; }
-      case T.TREE: floorBase(palKey === 'town' ? '#4f8a3a' : pal.floor, palKey === 'town' ? '#4a8236' : pal.floor2); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px + 2, py + 12, 12, 3); g.fillStyle = '#5a3a20'; g.fillRect(px + 7, py + 9, 3, 6); g.fillStyle = '#2a5a24'; g.fillRect(px + 2, py + 2, 12, 9); g.fillStyle = '#3a7a30'; g.fillRect(px + 3, py + 1, 10, 7); g.fillStyle = '#5aa040'; g.fillRect(px + 5, py + 2, 4, 2); break;
+      case T.TREE: floorBase(palKey === 'town' ? '#4f8a3a' : pal.floor, palKey === 'town' ? '#4a8236' : pal.floor2); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px + 2, py + 12, 12, 3); g.fillStyle = '#5a3a20'; g.fillRect(px + 7, py + 9, 3, 6); const LEAF = { snow: ['#2a4a3a', '#e8eef4', '#ffffff'], ice: ['#2a4a4a', '#d8ecf8', '#ffffff'], sand: ['#4a7a2a', '#6a9a3a', '#8aba4a'], ash: ['#2a2220', '#3a2e28', '#5a3a2a'], lava: ['#2a2220', '#3a2e28', '#6a2a1a'], obsidian: ['#2a2232', '#3a3042', '#5a4a6a'] }[palKey] || ['#2a5a24', '#3a7a30', '#5aa040']; if (GT && v === T.TREE) { g.fillStyle = r < 0.5 ? GT.grass[0] : GT.grass[1]; g.fillRect(px, py + 11, S, 5); }
+        if (palKey === 'snow' || palKey === 'ice') { for (let k = 0; k < 3; k++) { const w = 12 - k * 3, ty = py + 9 - k * 3; g.fillStyle = '#2a4a3a'; g.fillRect(px + 8 - w / 2, ty, w, 3); g.fillStyle = '#f4f8fc'; g.fillRect(px + 8 - w / 2 + 1, ty, w - 3, 1); } g.fillStyle = '#ffffff'; g.fillRect(px + 7, py, 2, 2); break; }
+        g.fillStyle = LEAF[0]; g.fillRect(px + 2, py + 2, 12, 9); g.fillStyle = LEAF[1]; g.fillRect(px + 3, py + 1, 10, 7); g.fillStyle = LEAF[2]; g.fillRect(px + 5, py + 2, 4, 2); break;
       case T.HOUSE: g.fillStyle = '#d8c4a0'; g.fillRect(px, py, S, S); g.fillStyle = '#b8a07c'; for (let k = 3; k < S; k += 5) g.fillRect(px, py + k, S, 1); g.fillStyle = '#6a4a2a'; if (at(x - 1, y) !== T.HOUSE) g.fillRect(px, py, 2, S); if (at(x + 1, y) !== T.HOUSE) g.fillRect(px + S - 2, py, 2, S); if (x % 2 === 0 && at(x - 1, y) === T.HOUSE && at(x + 1, y) === T.HOUSE && at(x, y + 1) !== T.HOUSE) { g.fillStyle = '#3a2a1a'; g.fillRect(px + 4, py + 3, 8, 7); g.fillStyle = '#ffe8a0'; g.fillRect(px + 5, py + 4, 6, 5); g.fillStyle = '#6a4a2a'; g.fillRect(px + 7, py + 4, 1, 5); g.fillRect(px + 5, py + 6, 6, 1); } g.fillStyle = 'rgba(0,0,0,.25)'; if (at(x, y + 1) !== T.HOUSE) g.fillRect(px, py + S - 1, S, 1); break;
       case T.ROOF: { const base = ROOFS[roofCol.get(y * map.w + x) % ROOFS.length]; g.fillStyle = base; g.fillRect(px, py, S, S); g.fillStyle = shade(base, 0.8); for (let k = 2; k < S; k += 4) for (let j = (k / 4 | 0) % 2 * 3; j < S; j += 6) g.fillRect(px + j, py + k, 4, 1); if (at(x, y - 1) !== T.ROOF) { g.fillStyle = shade(base, 1.3); g.fillRect(px, py, S, 2); } if (at(x, y + 1) !== T.ROOF) { g.fillStyle = shade(base, 0.6); g.fillRect(px, py + S - 2, S, 2); } if (at(x - 1, y) !== T.ROOF) { g.fillStyle = shade(base, 0.7); g.fillRect(px, py, 1, S); } if (at(x + 1, y) !== T.ROOF) { g.fillStyle = shade(base, 0.7); g.fillRect(px + S - 1, py, 1, S); } break; }
     }

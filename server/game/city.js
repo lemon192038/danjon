@@ -6,7 +6,7 @@ import { T, BLOCKING, Grid } from './maps.js';
 
 export const SIZES = { S: [5, 4], M: [7, 5], L: [9, 6], XL: [13, 7] };
 const DFLOOR = { rich: T.MARBLE, commerce: T.COBBLE, common: T.PATH, slum: T.RUBBLE, special: T.COBBLE };
-const LANDMARK_SIZE = { windmill: [6, 7], lighthouse: [5, 9], castle: [22, 11], forge: [14, 9], magetower: [8, 13], clocktower: [9, 11] };
+const LANDMARK_SIZE = { windmill: [6, 7], lighthouse: [5, 9], castle: [22, 11], forge: [14, 9], magetower: [8, 13], clocktower: [9, 11], temple: [14, 11], icepalace: [18, 11], pagoda: [8, 13], worldtree: [12, 13], pyramid: [14, 10], volcano: [16, 11] };
 // palettes per city & district for building walls/roofs
 const STYLE = {
   haven: { rich: ['#d8c4a0', ['#a03a2a', '#2a5aa0']], commerce: ['#d8c4a0', ['#a03a2a', '#2a5aa0', '#3a7a3a']], common: ['#c8b090', ['#8a4a2a', '#5a6a3a']], slum: ['#9a8a70', ['#5a4a3a']] },
@@ -16,6 +16,15 @@ const STYLE = {
   arcanum: { rich: ['#c8d4f0', ['#3a4ab0', '#6a3ab0']], commerce: ['#b8c4e0', ['#2a6a9a', '#5a3a9a']], common: ['#a8a0c0', ['#4a3a7a', '#2a4a6a']], slum: ['#6a6478', ['#3a3048']] },
   lumina: { rich: ['#2a2438', ['#c0902a', '#a02a6a']], commerce: ['#e0d8c8', ['#8a2a3a', '#2a2a40']], common: ['#a07858', ['#5a3a2a', '#3a4a5a']], slum: ['#5a4a40', ['#2a2420', '#3a3028']] },
 };
+// regional architecture for the six-continent cities (walls, roof palettes per district type)
+const CONT_STYLE = {
+  eldia: STYLE.celestia, nordia: { rich: ['#c8ccd4', ['#2a3a6a', '#e8eef4']], commerce: ['#9aa0a8', ['#3a4a6a', '#5a3a2a']], common: ['#7a6a5a', ['#2a2a3a', '#4a3a30']], slum: ['#5a524a', ['#2a2420']], special: ['#a8b0bc', ['#2a3a6a']] },
+  shengar: { rich: ['#f0e8dc', ['#b02a20', '#2a2a2a']], commerce: ['#e8dcc8', ['#2a2a2a', '#8a2a20']], common: ['#c8b89a', ['#3a3a3a', '#5a4a3a']], slum: ['#8a7a64', ['#3a3028']], special: ['#f0e8dc', ['#b02a20']] },
+  saharia: { rich: ['#f0e4c8', ['#2a6ad0', '#e8e0d0']], commerce: ['#e0c89a', ['#c87a3a', '#2a8a9a']], common: ['#d0b080', ['#a86a3a', '#8a6a4a']], slum: ['#a8906a', ['#6a5a40']], special: ['#f0e4c8', ['#2a6ad0']] },
+  valgran: { rich: ['#5a4a48', ['#a02a20', '#2a2a30']], commerce: ['#3a3234', ['#6a2a20', '#2a2a30']], common: ['#4a3e38', ['#3a2a24', '#5a3a2a']], slum: ['#3a3430', ['#2a2420']], special: ['#5a4a48', ['#a02a20']] },
+  asteria: { rich: ['#f8f8f4', ['#2a8ac0', '#3ab0b0']], commerce: ['#f0f0e8', ['#2a6ab0', '#e0a03a']], common: ['#e8e4d8', ['#3a7aa0', '#4a6a8a']], slum: ['#b0a898', ['#4a5a6a']], special: ['#f8f8f4', ['#2a8ac0']] },
+};
+const CONT_DECOR = { nordia: ['well', 'banner', 'barrel'], shengar: ['lamp', 'flowerbed', 'tree', 'statue'], saharia: ['stall', 'stall', 'barrel', 'well'], valgran: ['steamvent', 'pipe', 'fire', 'pipe'], asteria: ['net', 'crate', 'barrel', 'flowerbed'], eldia: ['banner', 'flowerbed'] };
 const DECOR = { rich: ['lamp', 'lamp', 'statue', 'flowerbed', 'tree', 'bench'], commerce: ['lamp', 'stall', 'stall', 'barrel', 'bench', 'signpost'], common: ['lamp', 'barrel', 'crate', 'tree', 'bench', 'well'], slum: ['trash', 'crate', 'barrel', 'brokenlamp', 'fire'], special: ['lamp'] };
 const CITY_DECOR = { vulcan: ['pipe', 'pipe', 'steamvent'], arcanum: ['crystal', 'floatlight'], lumina: ['neon', 'neon'], marina: ['crate', 'net'], celestia: ['banner', 'statue'], haven: ['hay'] };
 
@@ -61,7 +70,7 @@ export function genCity(id, links) {
   const free = (x, y, w, h, di) => { if (x < 3 || y < 3 || x + w > W - 3 || y + h + 2 > H - 3) return false; for (let j = y; j < y + h + 1; j++) for (let i = x; i < x + w; i++) { const v = g.get(i, j); if (occ[j * W + i] || v === T.WATER || v === T.BRIDGE || v === T.COBBLE || v === T.STEPS || v === T.EXIT || v === T.WALL || v === T.SHALLOW || (di != null && dmap[j * W + i] !== di)) return false; } return true; };
   const place = (w, h, d, di, tries = 500) => { for (let k = 0; k < tries; k++) { const rad = 3 + k / 8; const a = r() * Math.PI * 2; const x = Math.round(d.cx + Math.cos(a) * rad - w / 2), y = Math.round(d.cy + Math.sin(a) * rad * 0.8 - h / 2); if (free(x, y, w, h, k < 350 ? di : null)) return [x, y]; } return null; };
   for (let i = 0; i < plazas.length; i++) mark(plazas[i].x - 4, plazas[i].y - 4, 9, 9);
-  const st = STYLE[id] || STYLE.haven;
+  const st = STYLE[id] || CONT_STYLE[def.continent] || STYLE.haven;
   const building = (b, d, di, x, y, w, h, extra = {}) => {
     g.rect(x, y, w, h, T.BLOCK); const dx = x + (w >> 1), dy = y + h; // door tile under the facade
     g.set(dx, dy - 1, T.DOOR); g.set(dx, dy, d.type === 'rich' ? T.MARBLE : d.type === 'slum' ? T.RUBBLE : T.PATH);
@@ -89,7 +98,7 @@ export function genCity(id, links) {
     for (let k = 0; k < n; k++) { const w = d.type === 'rich' ? 7 : d.type === 'slum' ? 4 : 5, h = d.type === 'rich' ? 5 : 4; const pos = place(w, h, d, di, 400); if (!pos) continue; const hid = `${id}_home_${d.id}_${k}`; const nm = d.type === 'rich' ? '邸宅' : d.type === 'slum' ? 'バラック' : d.type === 'commerce' ? '集合住宅' : '民家'; const p = building({ id: hid, name: nm, t: d.type === 'rich' ? 'mansion' : d.type === 'slum' ? 'shack' : 'house', size: 'S' }, d, di, pos[0], pos[1], w, h, { home: true }); homes.push({ id: hid, district: d.id, dtype: d.type }); p.home = true; }
   });
   // decorations
-  const dec = [...(CITY_DECOR[id] || [])];
+  const dec = [...(CITY_DECOR[id] || (STYLE[id] ? [] : CONT_DECOR[def.continent]) || [])];
   for (let k = 0; k < W * H / 45; k++) {
     const x = 3 + Math.floor(r() * (W - 6)), y = 3 + Math.floor(r() * (H - 6)); if (occ[y * W + x]) continue; const v = g.get(x, y); if (BLOCKING.has(v) || v === T.WATER || v === T.BRIDGE || v === T.EXIT || v === T.DOOR || v === T.COBBLE && r() < 0.7) continue;
     const d = dAt(x, y); const pool = DECOR[d.type].concat(r() < 0.35 ? dec : []); const kd = pool[Math.floor(r() * pool.length)];

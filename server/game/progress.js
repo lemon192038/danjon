@@ -4,6 +4,7 @@ import { xpToNext, masteryXpToNext, jobXpToNext, STAT_POINTS_PER_LEVEL, enhanceC
 import { MAX_LEVEL, MAX_MASTERY, DIFFICULTIES, STATS } from '../../shared/constants.js';
 import { STARTER_WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
 import { hash32, rng } from '../../shared/util.js';
+import { CITIES } from '../../shared/data/cities.js';
 
 let uidc = Date.now() % 100000;
 export const uid = () => 'i' + (uidc++).toString(36) + Math.floor(Math.random() * 1e4).toString(36);
@@ -163,7 +164,7 @@ export function enhance(ch, itemUid) {
 
 // ---- shops (data-driven from weapon acquisition table)
 export function shopStock(town, kind) {
-  const tier = { haven: 0, marina: 1, celestia: 2, vulcan: 2, arcanum: 2, lumina: 1 }[town] ?? 0;
+  const tier = { haven: 0, marina: 1, celestia: 2, vulcan: 2, arcanum: 2, lumina: 1 }[town] ?? (CITIES[town] ? (CITIES[town].continent === 'eldia' ? 1 : 2) : 0);
   if (kind === 'weapon') { const out = []; for (const list of DATA.wtWeapons.values()) for (const w of list) if (w.acq.src === 'shop' && w.acq.minFloor <= [15, 40, 100][tier] && w.acq.minFloor >= [0, 5, 20][tier]) out.push(w.id); return out; }
   if (kind === 'armor') return Array.from({ length: 4 }, (_, i) => Math.min(9, tier * 3 + i));
   return ['hp', 'sp', 'ore'];

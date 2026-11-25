@@ -1,3 +1,4 @@
+import { NEW_CITIES } from './worldcities.js';
 // ABYSS : ETERNAL FRONTIER — City definitions (data-driven). Every city: lore, districts, buildings, landmark, climate, economy.
 // District types: rich / commerce / common / slum / special. Building `t` = interior template key (server/game/interiors.js).
 // Building `svc` = service opened by the NPC at the counter. `hours` = [open, close] in game hours (omit = 24h).
@@ -179,6 +180,9 @@ export const CITIES = {
     goods: { produce: ['wine'], demand: ['silk', 'crystal', 'spice', 'fish', 'steel'] }, wealth: { grand: 5, civic: 3, oldtown: 2, slum: 1 },
   },
 };
+// PHASE 2: the six-continent world (archetype + per-city identity), merged after the original six cities (unchanged)
+Object.assign(CITIES, NEW_CITIES);
+for (const id of ['haven', 'marina', 'celestia', 'vulcan', 'arcanum', 'lumina']) CITIES[id].continent ||= 'eldia';
 export const CITY_IDS = Object.keys(CITIES);
 
 // Trade goods (regional production & demand drive prices; logistics refill supply)
@@ -191,5 +195,17 @@ export const ROUTES = [
   ['haven', 'marina', 'carriage', 90, 60], ['haven', 'celestia', 'carriage', 180, 150], ['marina', 'lumina', 'ship', 120, 200], ['marina', 'celestia', 'ship', 200, 260],
   ['celestia', 'vulcan', 'rail', 120, 180], ['celestia', 'arcanum', 'airship', 60, 400], ['vulcan', 'arcanum', 'rail', 150, 160], ['lumina', 'celestia', 'airship', 80, 450], ['vulcan', 'lumina', 'rail', 180, 220], ['haven', 'vulcan', 'carriage', 240, 180],
 ];
+// overland routes inside each new continent (carriage / rail / airship by city), and sea & sky lanes between continents
+for (const [a, b, mode, min, fee] of [
+  ['haven', 'arcelia', 'carriage', 150, 120], ['celestia', 'arcelia', 'carriage', 160, 140], ['arcelia', 'vermion', 'carriage', 80, 70], ['arcelia', 'elmgard', 'carriage', 110, 90], ['vermion', 'luminas', 'carriage', 90, 80], ['vermion', 'drakford', 'rail', 70, 90],
+  ['arcelia', 'marinelia', 'carriage', 100, 90], ['arcelia', 'celestia_holy', 'carriage', 120, 100], ['marina', 'marinelia', 'ship', 60, 80], ['drakford', 'vulcan', 'rail', 140, 150], ['luminas', 'arcanum', 'airship', 70, 300],
+  ['frostheim', 'granberg', 'carriage', 90, 90], ['granberg', 'whiteridge', 'carriage', 80, 80], ['frostheim', 'ignis_zero', 'airship', 50, 260], ['ignis_zero', 'valhart', 'carriage', 100, 90],
+  ['ryuga', 'kazane', 'carriage', 80, 70], ['ryuga', 'elfilia', 'carriage', 100, 80], ['kazane', 'tenrai', 'carriage', 90, 80], ['tenrai', 'shuraga', 'carriage', 90, 80], ['ryuga', 'tenrai', 'airship', 40, 250],
+  ['azradia', 'bazaruk', 'carriage', 100, 90], ['bazaruk', 'mirage', 'carriage', 120, 110], ['azradia', 'nefer', 'carriage', 90, 80], ['mirage', 'zal_qadim', 'carriage', 110, 100],
+  ['valcanos', 'dragnia', 'carriage', 90, 90], ['valcanos', 'greymoll', 'carriage', 100, 90], ['greymoll', 'baldran', 'carriage', 90, 80], ['baldran', 'ashbell', 'carriage', 100, 90],
+  ['nereia', 'bluecoast', 'ship', 60, 70], ['nereia', 'atlantia', 'ship', 70, 80], ['atlantia', 'aquaria', 'ship', 60, 70], ['bluecoast', 'seirune', 'ship', 80, 90],
+  // between continents: ocean lanes from Eldia's port and sky lanes from the capital
+  ['marinelia', 'nereia', 'ship', 240, 600], ['marinelia', 'frostheim', 'ship', 300, 700], ['marinelia', 'ryuga', 'ship', 320, 750], ['marinelia', 'valcanos', 'ship', 300, 700],
+  ['arcelia', 'azradia', 'airship', 200, 900], ['arcelia', 'ryuga', 'airship', 220, 950], ['nereia', 'ryuga', 'ship', 260, 650], ['valcanos', 'azradia', 'carriage', 280, 400]]) ROUTES.push([a, b, mode, min, fee]);
 export const TRANSPORT = { carriage: { name: '乗合馬車', stormBlocked: false }, ship: { name: '定期船', stormBlocked: true }, rail: { name: '魔導鉄道', stormBlocked: false }, airship: { name: '飛空艇', stormBlocked: true } };
 export const WEATHER = { clear: '晴れ', cloud: '曇り', rain: '雨', snow: '雪', fog: '霧', wind: '強風', storm: '嵐', smog: '煤煙', aurora: '魔力オーロラ' };
