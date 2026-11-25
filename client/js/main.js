@@ -36,7 +36,8 @@ function loginScreen(msg = '') {
 }
 function connect(token) { net.stop = false; net.connect(token); }
 net.on('authfail', () => { net.stop = true; net.token = null; try { localStorage.removeItem('aef_token'); } catch {} loginScreen('セッションが切れました。再ログインしてください'); });
-net.on('authok', () => net.send({ t: 'chars' }));
+net.on('kicked', m => { net.stop = true; state.playingId = null; loginScreen(m.v + '（この画面では再接続しません）'); });
+net.on('authok', () => { if (state.playingId) { net.send({ t: 'play', id: state.playingId }); ui?.toast('再接続しました'); } else net.send({ t: 'chars' }); }); // reconnect resumes the same character
 net.on('chars', m => charSelect(m.list));
 net.on('err', m => ui ? ui.toast(m.v, 'err') : alert(m.v));
 
@@ -45,7 +46,7 @@ function charSelect(list) {
     <div class="clist">${list.map(c => `<button class="cslot" data-id="${c.id}"><canvas width="32" height="48" data-look='${JSON.stringify(c.look)}'></canvas><b>${c.name}</b><span>Lv${c.level} ${D.jobMap.get(c.job)?.name || ''}</span></button>`).join('')}
     ${list.length < 4 ? '<button class="cslot new" id="newc">＋ 新規作成</button>' : ''}</div><button id="logout" class="ghost">ログアウト</button></div></div>`);
   for (const cv of document.querySelectorAll('.cslot canvas')) { const g = cv.getContext('2d'); g.imageSmoothingEnabled = false; g.scale(2, 2); g.drawImage(charSprite(JSON.parse(cv.dataset.look)), 0, 0); }
-  for (const b of document.querySelectorAll('.cslot[data-id]')) b.onclick = () => { net.send({ t: 'play', id: b.dataset.id }); screen(''); };
+  for (const b of document.querySelectorAll('.cslot[data-id]')) b.onclick = () => { state.playingId = b.dataset.id; net.send({ t: 'play', id: b.dataset.id }); screen(''); };
   if ($('#newc')) $('#newc').onclick = () => createScreen();
   $('#logout').onclick = () => { try { localStorage.removeItem('aef_token'); } catch {} net.stop = true; net.ws?.close(); loginScreen(); };
 }

@@ -67,6 +67,7 @@ export class World {
     const fx = z.fxq;
     for (const p of z.players) {
       const s = p.session; if (!s || s.ws.readyState !== 1) continue;
+      if (s.ws.bufferedAmount > 512 * 1024) continue; // slow link: skip this snapshot instead of piling up data (the next one supersedes it)
       const snap = z.snapshot(p);
       const now = z.now; const cds = {}; for (const id of p.ch.skills.slots) if (id && p.cds[id] > now) cds[id] = Math.round(p.cds[id] - now);
       s.send({ t: 's', me: { id: p.id, x: Math.round(p.x), y: Math.round(p.y), hp: Math.round(p.hp), mhp: p.maxHp, sp: Math.round(p.sp), msp: p.maxSp, cds, g: p.gauge || null, alt: p.altMode ? 1 : 0, sh: p.shield ? Math.round(p.shield.amt) : 0, dead: p.dead ? 1 : 0, bm: Object.keys(p.buffMods).length ? p.buffMods : null, raid: p.ch.raid && z.kind === 'slum' ? this.raidHud(p.ch, z) : null }, ...snap, fx });
@@ -75,9 +76,10 @@ export class World {
   // ---------- sessions
   attach(ws, account) { const s = { ws, account, send: o => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); } }; return s; }
   play(s, cid) {
-    const ch = store.loadChar(cid); const acc = store.account(s.account);
-    if (!ch || !acc.chars.includes(cid)) return s.send({ t: 'err', v: 'キャラクターが見つかりません' });
-    for (const o of this.sessions.values()) if (o.ch?.id === cid) { o.send({ t: 'err', v: '別の接続でログインしました' }); this.detach(o); o.ws.close(); }
+    const acc = store.account(s.account); if (!acc.chars.includes(cid)) return s.send({ t: 'err', v: 'キャラクターが見つかりません' });
+    // close & save the previous connection FIRST, so the character we load includes everything up to this moment
+    for (const o of [...this.sessions.values()]) if (o !== s && o.ch?.id === cid) { o.send({ t: 'kicked', v: '別の接続でログインしました' }); this.detach(o); o.ws.close(); }
+    const ch = store.loadChar(cid); if (!ch) return s.send({ t: 'err', v: 'キャラクターが見つかりません' });
     migrate(ch); s.ch = ch; this.sessions.set(cid, s); this.econ.catchUp(ch);
     const zid = this.zones.has(ch.pos.zone) && WORLD[ch.pos.zone] ? ch.pos.zone : 'haven';
     if (!(ch.raid && this.slum.rejoin(s))) { this.enterZone(s, this.zones.get(zid), ch.pos.zone === zid ? ch.pos : null); if (ch.raid) this.slum.fail(s, 'dc'); }
@@ -173,7 +175,8 @@ export class World {
     } else if (tile === T.STAIRS && z.kind === 'dungeon' && z.map.stairsOpen) this.nextFloor(s, z);
     else if (tile === T.MAT && (z.kind === 'interior' || z.kind === 'arena')) { if (z.kind === 'arena') this.econ?.leaveArena(s); else this.exitBuilding(s); }
     // auto pickup drops
-    for (const d of z.drops) if (!d.chest && d.owner === a.id && Math.hypot(d.x - a.x, d.y - a.y) < 18) { if (d.it.kind === 'sloot') { if (!s.ch.raid) continue; d.until = 0; const { kind, ...it } = d.it; void kind; this.slum.toBag(s, it, z); continue; } d.until = 0; addItem(s.ch, d.it, n => this.note(s, n)); }
+    // iterate over a snapshot: picking up can drop items again (overweight), which must never be re-picked in the same pass
+    for (const d of [...z.drops]) if (!d.chest && d.owner === a.id && d.until > z.now && Math.hypot(d.x - a.x, d.y - a.y) < 18) { if (d.it.kind === 'sloot') { if (!s.ch.raid) continue; const { kind, ...it } = d.it; void kind; if (!this.slum.hasRoom(s.ch, it)) { if (!d.warned) { d.warned = 1; s.send({ t: 'toast', v: `重量オーバーで${this.slum.lootName(it)}を拾えない（バッグ [G] で捨てるか保険ポーチへ）` }); } continue; } d.until = 0; this.slum.toBag(s, it, z); continue; } d.until = 0; addItem(s.ch, d.it, n => this.note(s, n)); }
   }
   // ---------- dungeon flow
   enterDungeon(s, dId, diff, floor) {

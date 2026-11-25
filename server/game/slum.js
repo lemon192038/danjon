@@ -113,9 +113,11 @@ export class Slum {
     if (Math.random() < 0.06 && o.ck !== 'trash') out.push({ ref: 'fuse', n: 1, q: 1, prov: 'slum' });
     return out;
   }
+  hasRoom(ch, it) { const r = ch.raid; return !!r && weight(r.bag) + (LOOT[it.ref]?.w || 0) * (it.n || 1) <= this.capacity(ch); }
+  lootName(it) { return LOOT[it.ref]?.name || it.ref; }
   toBag(s, it, z) { const r = s.ch.raid; if (!r) return; if (weight(r.bag) + (LOOT[it.ref].w || 0) > this.capacity(s.ch)) { z.dropLoot(s.actor, s.actor.x, s.actor.y, [{ kind: 'sloot', ...it }]); return s.send({ t: 'toast', v: `重量オーバー！ ${LOOT[it.ref].name}を足元に置いた` }); } r.bag.push(it); s.send({ t: 'toast', v: `入手：${LOOT[it.ref].name}${it.q >= 1.2 ? '（高品質）' : ''}` }); }
   pouch(s, i, toPouch) { const r = s.ch.raid; if (!r) return; if (toPouch) { const it = r.bag[i]; if (!it || r.pouch.length >= 2 || (LOOT[it.ref].w || 0) > 1) return this.err(s, '保険ポーチは2枠・1kg以下の品のみ'); r.bag.splice(i, 1); r.pouch.push(it); } else { const it = r.pouch.splice(i, 1)[0]; if (it) r.bag.push(it); } this.bagView(s); }
-  drop(s, i) { const r = s.ch.raid; const it = r?.bag.splice(i, 1)[0]; if (it) s.actor.zone.dropLoot(s.actor, s.actor.x, s.actor.y, [{ kind: 'sloot', ...it }]); this.bagView(s); }
+  drop(s, i) { const r = s.ch.raid; const it = r?.bag.splice(i, 1)[0]; if (it) s.actor.zone.dropLoot({ id: -1 }, s.actor.x, s.actor.y, [{ kind: 'sloot', ...it }]); this.bagView(s); } // discarded on purpose: nobody auto-picks it up
   bagView(s) { const r = s.ch.raid; if (!r) return; s.send({ t: 'open', service: 'raidbag', data: { bag: r.bag, pouch: r.pouch, w: weight(r.bag), cap: this.capacity(s.ch), v: value(r.bag) + value(r.pouch) } }); }
   // ── extraction
   exitCheck(s, z, o) {

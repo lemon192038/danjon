@@ -24,7 +24,10 @@ await store.init();
 const server = http.createServer(app);
 const world = new World();
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8192 });
+// heartbeat: keeps proxies from closing quiet sockets and drops dead clients (their character is saved on close)
+setInterval(() => { for (const ws of wss.clients) { if (ws.alive === false) { ws.terminate(); continue; } ws.alive = false; try { ws.ping(); } catch {} } }, 25000);
 wss.on('connection', ws => {
+  ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   let s = null; let count = 0, windowStart = Date.now();
   ws.on('message', raw => {
     const now = Date.now(); if (now - windowStart > 1000) { count = 0; windowStart = now; } if (++count > 80) return; // flood guard
