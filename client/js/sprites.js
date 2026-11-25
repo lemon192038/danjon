@@ -2,6 +2,7 @@
 export const T = { VOID: 0, FLOOR: 1, WALL: 2, WATER: 3, SHALLOW: 4, LAVA: 5, ICE: 6, SPIKE: 7, STAIRS: 8, EXIT: 9, GRASS: 10, PATH: 11, TREE: 12, HOUSE: 13, DOOR: 14, BRIDGE: 15, POISON: 16, PORTAL: 17, PILLAR: 18, ROOF: 19, CURSE: 20, CURRENT: 21, BLOCK: 22, MARBLE: 23, COBBLE: 24, RUBBLE: 25, PLANK: 26, CARPET: 27, STONEF: 28, IWALL: 29, STEPS: 30, MAT: 31 };
 const P = (floor, floor2, wallTop, wallFace, water, accent, dark, fog) => ({ floor, floor2, wallTop, wallFace, water, accent, dark, fog });
 export const PALETTES = {
+  slumtown: P('#5a5048', '#524840', '#4a3e36', '#2e2620', '#3a4a50', '#ff9040', 0.3, '#3a3028'),
   sewer: P('#3a4440', '#343e3a', '#2a3230', '#1a201e', '#3a5a4a', '#90ffb0', 0.6, '#203028'), slumground: P('#5a5048', '#524840', '#4a3e36', '#2e2620', '#3a5060', '#ffb060', 0.25, '#3a3028'),
   slummid: P('#5a4a40', '#50423a', '#46383a', '#2a2026', '#3a4a6a', '#ff60b0', 0.35, '#2a2030'), slumroof: P('#6a6468', '#5e585c', '#4a4448', '#302c30', '#4a6a8a', '#80d0ff', 0.1, '#5a5a6a'),
   town: P('#7a6a52', '#6e5e48', '#5b4d3c', '#3f342a', '#3a78c8', '#e8c070', 0.0, null), grass: P('#4f8a3a', '#467d33', '#2f5a2a', '#24461f', '#3a78c8', '#f0e070', 0.0, null), highland: P('#6b8a5a', '#5f7d50', '#4a5a4a', '#353f35', '#4a80b8', '#d0e0ff', 0.1, '#c8d0e0'),
@@ -35,6 +36,7 @@ const GROUND = {
   obsidian: { grass: ['#3a3440', '#34303a', '#5a4a6a'], path: ['#4a4450', '#423c48', '#2a2630'], tint: { 24: '#3e3a46', 23: '#5a5468', 25: '#2e2a32' } },
   coral: { grass: ['#e8e0c8', '#e0d8bc', '#c8bc98'], path: ['#dcd2ba', '#d2c8ae', '#b0a488'], tint: { 24: '#d8d0c0', 23: '#f4f0e8', 25: '#a8a090' } },
   lava: { grass: ['#4a3a34', '#44342e', '#a03a20'], path: ['#5a4a42', '#52423a', '#3a2a24'], tint: {} },
+  slumtown: { grass: ['#5a5244', '#544c3e', '#3a4a2a'], path: ['#6a5e4e', '#625646', '#4a4036'], tint: { 24: '#6a6258', 23: '#7a7266', 25: '#5a5048' } },
   marble: { tint: { 24: '#d0ccc4' }, grass: ['#5a9a4a', '#549244', '#7aba5a'], path: ['#c8c0b0', '#c0b8a8', '#a09888'] },
 };
 export function renderTileMap(map, palKey) {

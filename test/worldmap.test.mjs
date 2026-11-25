@@ -18,7 +18,7 @@ test('six-continent world', async () => {
   const w = new World();
   try {
     // every continent city from the directive exists (names unchanged) and is a town zone with all buildings placed
-    for (const c of CONTINENTS) for (const city of c.cities) { if (city.id === 'gravel') continue; assert.equal(CITIES[city.id]?.name, city.name, city.id); const z = w.zones.get(city.id); assert.equal(z.kind, 'town', city.id);
+    for (const c of CONTINENTS) for (const city of c.cities) { assert.equal(CITIES[city.id]?.name, city.name, city.id); const z = w.zones.get(city.id); assert.equal(z.kind, 'town', city.id);
       assert.equal(z.map.doors.filter(d => !d.home).length, CITIES[city.id].districts.flatMap(d => d.buildings).length, city.id); assert.ok(!z.map.unreachable?.length, city.id + ' reachable'); }
     for (const c of CONTINENTS) for (const f of c.fields) if (WORLD[f.id]) assert.equal(w.zones.get(f.id).kind, 'field', f.id);
     // route graph connects all cities; overland links are symmetric

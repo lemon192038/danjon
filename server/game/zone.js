@@ -47,7 +47,7 @@ export class Zone {
       this.genArgs = [id, opts.bldg, opts.city, opts.homeTier ?? null]; this.map = genInterior(...this.genArgs); this.kind = 'interior'; this.name = opts.home ? `${opts.home.ownerName}の家（${this.map.name}）` : opts.bldg.name; this.gim = [];
       this.map.npcs = [];
       const spots = this.map.spots; const s0 = spots.find(x => x.fixed) || spots[0];
-      if (opts.bldg.svc && s0) this.map.npcs.push({ service: opts.bldg.svc, name: opts.bldg.name, x: s0.x, y: s0.y });
+      if (opts.bldg.svc && s0) this.map.npcs.push({ service: opts.bldg.svc, name: opts.bldg.name, x: s0.x, y: s0.y, ...(opts.bldg.org ? { org: opts.bldg.org } : {}), ...(opts.bldg.region ? { region: opts.bldg.region } : {}) });
       if (opts.bldg.guild) { const s1 = opts.bldg.svc ? spots.find(x => !x.fixed) || s0 : s0; if (s1) this.map.npcs.push({ service: 'guildhq', guild: opts.bldg.guild, name: 'ギルド窓口', x: s1.x, y: s1.y }); }
       if (opts.bldg.story && s0) this.map.npcs.push({ service: 'story', story: opts.bldg.story, name: opts.bldg.name, x: s0.x, y: s0.y });
     } else if (WORLD[id]?.kind === 'town') {

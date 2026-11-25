@@ -73,8 +73,9 @@ export class Slum {
     z.add(a); return a;
   }
   // faction NPC behaviour hook (called from monster target selection)
-  passiveFor(m, t) { if (!m.faction || m.provoked) return false; if (!t.ch) return true; const g = FACTIONS[m.faction].guild; const rep = g ? this.world.guilds.rep(t.ch, g) : 0; return rep >= m.hostileBelow; }
-  provoked(z, m, src) { if (!m.faction || m.provoked) return; m.provoked = true; for (const o of z.actors.values()) if (o.faction === m.faction && o.kind === 'monster' && Math.hypot(o.x - m.x, o.y - m.y) < 160) o.provoked = true; const g = FACTIONS[m.faction].guild; const ch = src?.ch || src?.owner?.ch; if (g && ch) this.world.guilds.addRep(ch, g, -3); }
+  passiveFor(m, t) { if (!m.faction || m.provoked) return false; if (!t.ch) return true; return this.repOf(t.ch, m.faction) >= m.hostileBelow; }
+  repOf(ch, f) { const F = FACTIONS[f]; return F?.org ? this.world.orgs.rep(ch, f) : F?.guild ? this.world.guilds.rep(ch, F.guild) : 0; }
+  provoked(z, m, src) { if (!m.faction || m.provoked) return; m.provoked = true; for (const o of z.actors.values()) if (o.faction === m.faction && o.kind === 'monster' && Math.hypot(o.x - m.x, o.y - m.y) < 160) o.provoked = true; const g = FACTIONS[m.faction].guild; const ch = src?.ch || src?.owner?.ch; if (g && ch) this.world.guilds.addRep(ch, g, -3); if (FACTIONS[m.faction].org && ch) this.world.orgs.addRep(ch, m.faction, -3); }
   // ── raid lifecycle
   start(s, opts = {}) {
     const ch = s.ch; const z = s.actor.zone; if (ch.raid) return this.err(s, '既に探索中です');
@@ -168,7 +169,7 @@ export class Slum {
     this.world.sendSelf(s);
   }
   onDeath(s) { if (s.ch.raid) this.fail(s, 'death'); }
-  onKill(z, m, killer) { const s = killer?.session; if (m.faction) { this.world.market.shift(z.inst.rid, m.faction, -0.6); if (s) this.world.slumQuest(s, { kind: 'faction', faction: m.faction }); } if (s?.ch.raid) s.ch.raid.kills++; const drops = []; if (Math.random() < 0.5) { const pool = Object.entries(LOOT).filter(([, it]) => ['material', 'mech', 'contraband', 'consumable'].includes(it.cat) && it.r <= 2 + (m.elite ? 2 : 0)); const [k, it] = pool[Math.floor(Math.random() * pool.length)]; drops.push({ kind: 'sloot', ref: k, n: 1, q: 1, prov: it.prov }); } if (m.convoy) drops.push({ kind: 'sloot', ref: 'parts', n: 1, q: 1, prov: 'illegal' }, { kind: 'sloot', ref: 'goldbar', n: 1, q: 1, prov: 'unknown' }); if (killer && drops.length) z.dropLoot(killer.session ? killer : killer, m.x, m.y, drops); }
+  onKill(z, m, killer) { const s = killer?.session; if (m.faction) { this.world.market.shift(z.inst.rid, m.faction, -0.6); if (s) { this.world.slumQuest(s, { kind: 'faction', faction: m.faction }); this.world.orgs.onKill(s, m.faction); } } if (s?.ch.raid) s.ch.raid.kills++; const drops = []; if (Math.random() < 0.5) { const pool = Object.entries(LOOT).filter(([, it]) => ['material', 'mech', 'contraband', 'consumable'].includes(it.cat) && it.r <= 2 + (m.elite ? 2 : 0)); const [k, it] = pool[Math.floor(Math.random() * pool.length)]; drops.push({ kind: 'sloot', ref: k, n: 1, q: 1, prov: it.prov }); } if (m.convoy) drops.push({ kind: 'sloot', ref: 'parts', n: 1, q: 1, prov: 'illegal' }, { kind: 'sloot', ref: 'goldbar', n: 1, q: 1, prov: 'unknown' }); if (killer && drops.length) z.dropLoot(killer.session ? killer : killer, m.x, m.y, drops); }
   rejoin(s) { const r = s.ch.raid; const I = r && this.inst.get(r.inst); if (I && Date.now() < r.ends) { const z = this.zone(I, r.layer ?? 1); this.world.enterZone(s, z, r.pos || null); s.send({ t: 'toast', v: '探索に復帰した' }); return true; } if (r) { s.actor = s.actor || null; this.fail(s, 'dc'); } return false; }
   cleanup() { const now = Date.now(); for (const [id, I] of this.inst) { const active = Object.values(I.zones).some(k => this.world.zones.get(k)?.players.size); if (!active && now - I.created > (RAID_MINUTES + 3) * 60000) { for (const k of Object.values(I.zones)) this.world.zones.delete(k); this.inst.delete(id); } if (now - I.created > JOIN_WINDOW) I.closed = true; } }
   // ── slum NPC interaction (talk / trade / client job)

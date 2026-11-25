@@ -91,7 +91,7 @@ export function installSlum(UI) {
       <h3>入手方法</h3>${d.can.map(o => `<div class="srow"><div class="sh"><b>${esc(o.name)}</b><small>${esc(o.cond)}${o.by ? ' ・ ' + esc(o.by) : ''}</small></div>${d.regions.map(r => `<button ${o.ok ? '' : 'disabled'} data-act="ho" data-do="acquire" data-k="${o.k}" data-rid="${r.k}">${esc(r.name)}</button>`).join(' ')}</div>`).join('')}`);
     const facs = d.fac.map(f => `<div class="srow"><div class="sh"><b>${esc(f.name)} ${f.lv ? 'Lv' + f.lv : ''}</b><small>${esc(f.desc)}</small></div><p class="dim">${f.lv >= 3 ? '最大' : cost(f.cost)}</p>${d.inside ? `${f.lv < 3 ? `<button data-act="ho" data-do="install" data-k="${f.k}">${f.lv ? '強化' : '設置'}</button>` : ''} ${f.lv ? `<button class="primary" data-act="ho" data-do="use" data-f="${f.k}">使う</button>` : ''}` : ''}</div>`).join('');
     const st = (list, from) => list.map((it, i) => `<div class="irow"><span>${esc(lootName(it.ref))} ×${it.n}</span>${d.inside ? `<button data-act="ho" data-do="take" data-i="${i}" data-from="${from}">取り出す</button>` : ''}</div>`).join('') || '<p class="dim">空</p>';
-    return this.wrap(`隠れ家「${esc(d.name)}」 <small>${esc(d.region)} ・ 段階${d.lv + 1}</small>`, `<div class="split"><div><p>発覚リスク <b class="${d.exposure >= 45 ? 'warn' : ''}">${esc(d.risk)}</b>（${d.exposure}） ・ 公開設定 ${['private', 'party', 'public'].map(v => `<button class="${d.vis === v ? 'sel' : ''}" data-act="ho" data-do="vis" data-v="${v}">${{ private: '非公開', party: 'パーティー', public: '公開' }[v]}</button>`).join('')}</p>
+    return this.wrap(`隠れ家「${esc(d.name)}」 <small>${esc(d.region)} ・ 段階${d.lv + 1}</small>`, `<div class="split"><div><p>発覚リスク <b class="${d.exposure >= 45 ? 'warn' : ''}">${esc(d.risk)}</b>（${d.exposure}） ・ 状況 <b class="${d.stage !== '平穏' ? 'warn' : ''}">${esc(d.stage || '平穏')}</b> ・ 公開設定 ${['private', 'party', 'public'].map(v => `<button class="${d.vis === v ? 'sel' : ''}" data-act="ho" data-do="vis" data-v="${v}">${{ private: '非公開', party: 'パーティー', public: '公開' }[v]}</button>`).join('')}</p>
       <p class="dim">発覚度は探索・洗浄で上がり、時間と警備設備で下がる。荒らされても失うのは保管庫の安価な品の一部（最大10%）だけ。隠し収納・設備・武器・所持金は守られる。</p>
       ${d.inside ? (d.next ? `<p>次の段階「${esc(d.next.name)}」：${cost(d.next.cost)} <button class="primary" data-act="ho" data-do="upgrade">拡張</button></p>` : '<p class="good">最大段階</p>') : `<button class="primary" data-act="ho" data-do="enter">隠れ家に入る</button>`} <button data-act="hoVisit">他の隠れ家を訪ねる</button>
       <h3>設備（${d.fac.filter(f => f.lv).length}/${d.slots}）</h3>${facs}</div>
@@ -109,3 +109,18 @@ export function installSlum(UI) {
       <h3>持ち帰ったもの（保険ポーチ）</h3>${r.kept.map(x => `<p class="good">${esc(x.name)} ×${x.n}</p>`).join('') || '<p class="dim">なし</p>'}<p class="tip">💡 ${esc(r.tip)}</p>`); };
 }
 void FACILITIES; void EVENTS; void LAYERS;
+// Gravel organisation headquarters
+export function installOrgs(UI) {
+  const P = UI.prototype; const prevPanel = P.cityPanel;
+  P.cityPanel = function (s, data) { if (s === 'org') { this.svc = data; if (this.panel !== 'org' || !this.modalOpen) this.open('org', s); else this.render(); return true; } return prevPanel.call(this, s, data); };
+  const prevAct = P.cityAct; P.cityAct = function (a, t) { if (a === 'og') { const d = t.dataset; return this.net.menu('org', { org: this.svc.id, act: d.do, id: d.id }) || true; } return prevAct.call(this, a, t); };
+  P.p_org = function () { const d = this.svc; const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const bar = d.board.map(b => `<span class="orgbar" style="width:${Math.max(4, b.share)}%;background:${b.color}" title="${e(b.name)} ${b.share}%"></span>`).join('');
+    const jobs = d.jobs.map(j => { const act = d.active.find(a => a.id === j.id); return `<div class="srow"><div class="sh"><b>${e(j.desc)}</b><small>評判+${j.rep}${j.gold ? ` ・ ${j.gold.toLocaleString()}G` : ''}${j.cost ? ` ・ 上納${j.cost.toLocaleString()}G` : ''}</small></div>${act ? `<small>${act.kind === 'hit' ? `${act.prog || 0}/${act.n}` : ''}</small> <button class="primary" data-act="og" data-do="turnin" data-id="${j.id}">報告/納める</button> <button data-act="og" data-do="abandon" data-id="${j.id}">破棄</button>` : `<button data-act="og" data-do="accept" data-id="${j.id}">引き受ける</button>`}</div>`; }).join('');
+    return this.wrap(`<span style="color:${d.color === '#2a2a3a' || d.color === '#3a3a4a' ? '#aab' : d.color}">${e(d.name)}</span> <small>縄張り ${d.share}% ・ 構成員${d.members} ・ 勢力${d.power} ・ 資金${d.wealth}</small>`, `<div class="orgbars">${bar}</div><p class="dim"><small>グレイヴェルの縄張り（支配：${e(d.controller)}）</small></p>
+      <div class="split"><div><p class="lore">${e(d.desc)}</p><p>首領：<b>${e(d.leader)}</b><br>幹部：${d.officers.map(e).join('、')}</p><p>収入源：${e(d.income)}<br>目的：${e(d.goal)}</p><p>同盟：${d.allies.map(e).join('、') || 'なし'} ／ <span class="warn">敵対：${d.enemies.map(e).join('、') || 'なし'}</span></p>
+        <p>あなたとの関係：評判 <b>${d.rep}</b> ${d.hostile ? '<span class="warn">（敵視されている：地下街で襲われる）</span>' : '<span class="good">（見逃される）</span>'}</p>
+        ${d.member ? '<p class="good">あなたはこの組織の一員だ</p><button data-act="og" data-do="leave">組織を抜ける</button>' : '<button data-act="og" data-do="join">組織に加わる（評判10以上）</button>'}
+        <h4>歴代の首領</h4>${d.leaders.map(l => `<p class="dim"><small>${e(l.name)}${l.from ? `（${e(l.from)}から継承）` : ''}</small></p>`).join('')}</div>
+      <div><h3>組織の仕事（本日）</h3>${jobs}<h4>スラムの噂</h4>${d.news.map(n => `<p class="dim"><small>・${e(n)}</small></p>`).join('') || '<p class="dim">静かなものだ</p>'}</div></div>`); };
+}

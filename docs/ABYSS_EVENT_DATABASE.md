@@ -11,7 +11,7 @@
 
 ## 集計
 
-総数 **71** ／ 未実装 61 ／ 一部実装 1 ／ 実装済み 9
+総数 **71** ／ 未実装 60 ／ 実装済み 11
 
 ## 大型イベント（8章）（6）
 
@@ -88,9 +88,9 @@
 
 | ID | 名称 | 分類 | 地域 | 共有 | 状態 | 詳細度 |
 |---|---|---|---|---|---|---|
-| sl_graymarket | 灰色市場<br><small>GRAY MARKET</small> | 常設・スラム | スラム・グレイヴェル | world | 一部実装 | spec |
+| sl_graymarket | 灰色市場<br><small>GRAY MARKET</small> | 常設・スラム | スラム・グレイヴェル | world | 実装済み | spec |
 | sl_children | 消えた子供たち<br><small>THE MISSING CHILDREN</small> | スラム・条件発生型 | スラム・グレイヴェル | both | 未実装 | spec |
-| sl_factions | 七つの裏社会<br><small>SEVEN UNDERWORLD FACTIONS</small> | 常設・スラム・世界規模 | スラム・グレイヴェル | world | 未実装 | spec |
+| sl_factions | 七つの裏社会<br><small>SEVEN UNDERWORLD FACTIONS</small> | 常設・スラム・世界規模 | スラム・グレイヴェル | world | 実装済み | spec |
 | sl_facility | 地下に眠る巨大施設<br><small>THE BURIED FACILITY</small> | スラム・ダンジョン・隠し・職業解放 | スラム・グレイヴェル | both | 未実装 | spec |
 | sl_plague | スラムの疫病<br><small>PLAGUE OF THE SLUMS</small> | スラム・条件発生型・世界規模 | スラム・グレイヴェル | world | 未実装 | spec |
 | sl_false_hero | 偽りの英雄<br><small>THE FALSE HERO</small> | スラム・NPC遭遇 | スラム・グレイヴェル | both | 未実装 | spec |
@@ -108,7 +108,7 @@
 - 報酬：希少品の購入機会
 - 関連：sl_auction, sl_factions
 - 再挑戦：日替わり
-- 備考：既存の闇市相場エンジン（server/game/market.js）を流用
+- 備考：地域「グレイヴェル地下街」の闇市相場。供給・需要・在庫・組織の支配率で価格が動き、上下限で暴騰暴落を防ぐ
 
 ### 消えた子供たち（sl_children）
 
@@ -126,6 +126,7 @@
 - 進行段階：1. 勢力図 → 2. 抗争 → 3. 同盟 → 4. リーダー交代
 - 関連：sl_graymarket, sl_false_hero, sl_capital_shadow
 - 再挑戦：世界状態で再発生
+- 備考：七組織の縄張り・資金・構成員・首領は世界共有でログアウト中も進行。拠点で仕事を受け、加入できる
 
 ### 地下に眠る巨大施設（sl_facility）
 

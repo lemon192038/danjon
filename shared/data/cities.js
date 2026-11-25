@@ -197,7 +197,7 @@ export const ROUTES = [
 ];
 // overland routes inside each new continent (carriage / rail / airship by city), and sea & sky lanes between continents
 for (const [a, b, mode, min, fee] of [
-  ['haven', 'arcelia', 'carriage', 150, 120], ['celestia', 'arcelia', 'carriage', 160, 140], ['arcelia', 'vermion', 'carriage', 80, 70], ['arcelia', 'elmgard', 'carriage', 110, 90], ['vermion', 'luminas', 'carriage', 90, 80], ['vermion', 'drakford', 'rail', 70, 90],
+  ['haven', 'arcelia', 'carriage', 150, 120], ['arcelia', 'gravel', 'carriage', 20, 10], ['celestia', 'arcelia', 'carriage', 160, 140], ['arcelia', 'vermion', 'carriage', 80, 70], ['arcelia', 'elmgard', 'carriage', 110, 90], ['vermion', 'luminas', 'carriage', 90, 80], ['vermion', 'drakford', 'rail', 70, 90],
   ['arcelia', 'marinelia', 'carriage', 100, 90], ['arcelia', 'celestia_holy', 'carriage', 120, 100], ['marina', 'marinelia', 'ship', 60, 80], ['drakford', 'vulcan', 'rail', 140, 150], ['luminas', 'arcanum', 'airship', 70, 300],
   ['frostheim', 'granberg', 'carriage', 90, 90], ['granberg', 'whiteridge', 'carriage', 80, 80], ['frostheim', 'ignis_zero', 'airship', 50, 260], ['ignis_zero', 'valhart', 'carriage', 100, 90],
   ['ryuga', 'kazane', 'carriage', 80, 70], ['ryuga', 'elfilia', 'carriage', 100, 80], ['kazane', 'tenrai', 'carriage', 90, 80], ['tenrai', 'shuraga', 'carriage', 90, 80], ['ryuga', 'tenrai', 'airship', 40, 250],

@@ -9,6 +9,7 @@ const DFLOOR = { rich: T.MARBLE, commerce: T.COBBLE, common: T.PATH, slum: T.RUB
 const LANDMARK_SIZE = { windmill: [6, 7], lighthouse: [5, 9], castle: [22, 11], forge: [14, 9], magetower: [8, 13], clocktower: [9, 11], temple: [14, 11], icepalace: [18, 11], pagoda: [8, 13], worldtree: [12, 13], pyramid: [14, 10], volcano: [16, 11] };
 // palettes per city & district for building walls/roofs
 const STYLE = {
+  gravel: { rich: ['#7a6a58', ['#4a3a30', '#5a4a3a']], commerce: ['#8a7a64', ['#4a3a2a', '#6a3a2a', '#3a3a3a']], common: ['#7a6a5a', ['#3a3028', '#4a4038']], slum: ['#6a5a4a', ['#3a3028', '#2a2420', '#4a3a2a']] },
   haven: { rich: ['#d8c4a0', ['#a03a2a', '#2a5aa0']], commerce: ['#d8c4a0', ['#a03a2a', '#2a5aa0', '#3a7a3a']], common: ['#c8b090', ['#8a4a2a', '#5a6a3a']], slum: ['#9a8a70', ['#5a4a3a']] },
   marina: { rich: ['#f0ece4', ['#2a6ab0', '#3a8ac0']], commerce: ['#ece4d4', ['#2a5aa0', '#c07a3a']], common: ['#a8583a', ['#6a3a2a', '#4a4a5a']], slum: ['#8a7a6a', ['#4a3a3a', '#3a4a4a']] },
   celestia: { rich: ['#f4f0f8', ['#c0a040', '#3a4a9a']], commerce: ['#e8e4dc', ['#4a5aa0', '#a0a8c0']], common: ['#d0b894', ['#8a3a2a', '#3a5a3a']], slum: ['#7a6a5a', ['#4a3a30']] },
@@ -26,7 +27,7 @@ const CONT_STYLE = {
 };
 const CONT_DECOR = { nordia: ['well', 'banner', 'barrel'], shengar: ['lamp', 'flowerbed', 'tree', 'statue'], saharia: ['stall', 'stall', 'barrel', 'well'], valgran: ['steamvent', 'pipe', 'fire', 'pipe'], asteria: ['net', 'crate', 'barrel', 'flowerbed'], eldia: ['banner', 'flowerbed'] };
 const DECOR = { rich: ['lamp', 'lamp', 'statue', 'flowerbed', 'tree', 'bench'], commerce: ['lamp', 'stall', 'stall', 'barrel', 'bench', 'signpost'], common: ['lamp', 'barrel', 'crate', 'tree', 'bench', 'well'], slum: ['trash', 'crate', 'barrel', 'brokenlamp', 'fire'], special: ['lamp'] };
-const CITY_DECOR = { vulcan: ['pipe', 'pipe', 'steamvent'], arcanum: ['crystal', 'floatlight'], lumina: ['neon', 'neon'], marina: ['crate', 'net'], celestia: ['banner', 'statue'], haven: ['hay'] };
+const CITY_DECOR = { gravel: ['trash', 'crate', 'brokenlamp', 'fire', 'barrel', 'trash'], vulcan: ['pipe', 'pipe', 'steamvent'], arcanum: ['crystal', 'floatlight'], lumina: ['neon', 'neon'], marina: ['crate', 'net'], celestia: ['banner', 'statue'], haven: ['hay'] };
 
 export function genCity(id, links) {
   const def = CITIES[id]; const r = rng(hash32('city:' + id)); const [W, H] = def.size;
@@ -79,7 +80,7 @@ export function genCity(id, links) {
     mark(x, y, w, h); for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) occ[j * W + i] = 2;
     const sty = st[d.type] || st.common; const hh = hash32(b.id);
     const p = { k: 'bldg', id: b.id, name: b.name, x, y, w, h, door: [dx, dy - 1], t: b.t, dtype: d.type, wall: sty[0], roof: sty[1][hh % sty[1].length], var: hh % 997, city: id, ...extra };
-    props.push(p); doors.push({ id: b.id, name: b.name, x: dx, y: dy - 1, hours: b.hours || null, t: b.t, svc: b.svc || null, guild: b.guild || null, district: d.id, dtype: d.type, home: extra.home || false });
+    props.push(p); doors.push({ id: b.id, name: b.name, x: dx, y: dy - 1, hours: b.hours || null, t: b.t, svc: b.svc || null, guild: b.guild || null, org: b.org || null, district: d.id, dtype: d.type, home: extra.home || false });
     lights.push([x, y + h], [x + w - 1, y + h]);
     if (b.lore) lore.push({ bldg: b.id, key: b.lore });
     return p;

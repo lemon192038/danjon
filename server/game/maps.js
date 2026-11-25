@@ -162,7 +162,7 @@ export const WORLD = {
   for (const id of Object.keys(NEW_CITIES)) WORLD[id] = { name: NEW_CITIES[id].name, kind: 'town', links: {}, gates: [], continent: NEW_CITIES[id].continent };
   const link = (a, b) => { const A = WORLD[a], Bn = WORLD[b]; if (!A || !Bn || Object.values(A.links).includes(b)) return; const d = ORDER.find(x => !A.links[x] && !Bn.links[OPP[x]]); if (!d) return; A.links[d] = b; Bn.links[OPP[d]] = a; };
   for (const chains of Object.values(CHAINS)) for (const ch of chains) for (let i = 0; i + 1 < ch.length; i++) if (WORLD[ch[i]].kind !== WORLD[ch[i + 1]].kind || WORLD[ch[i]].kind === 'field') link(ch[i], ch[i + 1]);
-  link('haven', 'field_capital'); // the original western frontier joins the new heartland of Eldia on foot
+  link('haven', 'field_capital'); link('arcelia', 'gravel'); // Gravel sprawls right outside the capital's south-west wall // the original western frontier joins the new heartland of Eldia on foot
 }
 export function genOverworld(id) {
   const def = WORLD[id]; const r = rng(hash32('world:' + id));

@@ -16,6 +16,9 @@ export const FACTIONS = {
   dawn: { name: '夜明けの灯', guild: 'dawn', color: '#f0c050', trade: ['consumable', 'info'], hostileBelow: -50, desc: 'スラムに灯りを取り戻そうとする互助組織。' },
   scavs: { name: '屑拾い', guild: null, color: '#7a6a5a', trade: ['material'], hostileBelow: 999, desc: '縄張りを持たない漁り屋。誰にでも牙をむく。' },
 };
+// Gravel's seven organisations join the faction table (reputation is per organisation: ch.orgRep)
+import { ORGS } from './gravel.js';
+for (const [id, o] of Object.entries(ORGS)) FACTIONS[id] = { name: o.name, guild: null, org: true, color: o.color, trade: o.trade, hostileBelow: o.hostileBelow, desc: o.desc };
 // region = one extraction map per city underworld. tier = base danger (1 beginner .. 5 lethal). pvp from tier 3.
 export const REGIONS = {
   haven_old: { city: 'haven', name: '旧市街の地下水路', tier: 1, factions: ['dawn', 'scavs'], bias: { material: 1.2 }, theme: 'stone', desc: '石垣の下に広がる古い水路。初心者向け。装備を失わない。' },
@@ -23,6 +26,7 @@ export const REGIONS = {
   celestia_lower: { city: 'celestia', name: '外壁下層区・旧地下街', tier: 3, factions: ['greyrats', 'dawn', 'scavs'], bias: { artifact: 1.2, info: 1.4 }, theme: 'old', desc: '取り壊しを待つ下層区の地下に、王朝以前の街が眠る。' },
   vulcan_mines: { city: 'vulcan', name: '旧坑道スラム・廃鉱脈', tier: 3, factions: ['miners', 'scavs', 'heretics'], bias: { mech: 1.4, material: 1.3 }, theme: 'mine', desc: '黒の日以来放棄された坑道。魔導機械の残骸が眠る。' },
   arcanum_forbidden: { city: 'arcanum', name: '禁呪跡地・地下研究棟', tier: 4, factions: ['heretics', 'scavs'], bias: { arcane: 1.5, artifact: 1.3 }, theme: 'arcane', desc: '五百年前の暴走で消えた研究区画。異常現象が頻発する。' },
+  gravel_under: { city: 'gravel', name: 'グレイヴェル地下街', tier: 3, factions: ['crow', 'ironclaw', 'shadowstitch', 'redsnake', 'ashbell', 'blackforge', 'nameless', 'scavs'], bias: { contraband: 1.3, art: 1.2, info: 1.2 }, theme: 'kowloon', desc: '王都アルセリアの南西に広がる巨大貧民街の地下。七つの組織が縄張りを奪い合う。' },
   lumina_kowloon: { city: 'lumina', name: '旧炭鉱スラム「九層街」', tier: 5, factions: ['blackrose', 'greyrats', 'dawn', 'scavs'], bias: { contraband: 1.4, artifact: 1.2 }, theme: 'kowloon', desc: '増築に増築を重ねた九層の巨大違法建築。黒薔薇の本拠地。' },
 };
 // loot (SlumLootTable entries). w = weight(kg), v = base value, r = rarity 1..5, prov = default provenance,
@@ -115,6 +119,7 @@ export const RAID_MINUTES = 25;
 export const EXTRACT_SECONDS = 8;
 export const BASE_CAPACITY = 30; // kg
 export const FACTION_FAMS = { greyrats: ['thug', 'scav'], blackrose: ['gunman', 'enforcer'], seacats: ['thug', 'scav'], miners: ['enforcer', 'thug'], heretics: ['heretic'], dawn: ['thug'], scavs: ['scav', 'thug'] };
+for (const [id, o] of Object.entries(ORGS)) FACTION_FAMS[id] = o.fams;
 export const TIER_LV = [0, 6, 20, 38, 58, 80];
 // job-role bonuses in the slum (connects the 1,000-job system via role keys)
 export const ROLE_BONUS = { thief: { search: 0.6, cap: 5 }, scout: { search: 0.7 }, assassin: { search: 0.75 }, ninja: { search: 0.7 }, hunter: { search: 0.85, cap: 5 }, merchant: { sell: 1.1, buy: 0.95 }, scholar: { appraise: 0.5 }, astrologer: { appraise: 0.6 }, machinist: { craft: 1 }, alchemist: { craft: 1 }, wanderer: { cap: 10 }, warrior: { cap: 5 }, guardian: { cap: 8 }, berserker: { cap: 5 }, pirate: { sell: 1.05, cap: 5 } };

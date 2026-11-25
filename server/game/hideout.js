@@ -55,9 +55,10 @@ export class Hideout {
     const ch = s.ch, h = ch.hideout; if (!h) return s.send({ t: 'open', service: 'hideout', data: { owned: false, can: this.acquireOptions(ch), regions: Object.entries(REGIONS).map(([k, r]) => ({ k, name: r.name, city: CITIES[r.city].name, tier: r.tier })) } });
     this.check(s); const L = HIDEOUT_LEVELS[h.lv];
     s.send({ t: 'open', service: 'hideout', data: { owned: true, rid: h.rid, region: REGIONS[h.rid].name, lv: h.lv, name: L.name, next: HIDEOUT_LEVELS[h.lv + 1] ? { name: HIDEOUT_LEVELS[h.lv + 1].name, cost: HIDEOUT_LEVELS[h.lv + 1].cost } : null, slots: L.slots, storageCap: L.storage, stashCap: h.fac.stash ? 20 * h.fac.stash : 0,
-      fac: Object.entries(FACILITIES).map(([k, f]) => ({ k, name: f.name, desc: f.desc, lv: h.fac[k] || 0, cost: this.facCost(k, h.fac[k] || 0) })), storage: h.storage, stash: h.stash, exposure: Math.round(h.exposure), risk: this.riskLabel(h), vis: h.vis, log: h.log.slice(-8).reverse(), visits: (h.visits || []).slice(-5).reverse(), inv: ch.inventory.filter(i => i.kind === 'loot'), inside: s.actor?.zone?.hideout === ch.id } });
+      fac: Object.entries(FACILITIES).map(([k, f]) => ({ k, name: f.name, desc: f.desc, lv: h.fac[k] || 0, cost: this.facCost(k, h.fac[k] || 0) })), storage: h.storage, stash: h.stash, exposure: Math.round(h.exposure), risk: this.riskLabel(h), stage: this.stageLabel(h), vis: h.vis, log: h.log.slice(-8).reverse(), visits: (h.visits || []).slice(-5).reverse(), inv: ch.inventory.filter(i => i.kind === 'loot'), inside: s.actor?.zone?.hideout === ch.id } });
   }
   facCost(k, lv) { const c = FACILITIES[k].cost; const m = Math.pow(2.2, lv); return Object.fromEntries(Object.entries(c).map(([a, v]) => [a, Math.round(v * m)])); }
+  stageLabel(h) { return ['平穏', '調査されている', '警告を受けた', '侵入された', '襲撃'][h.stage || 0]; }
   riskLabel(h) { const e = h.exposure; return e < 20 ? '低' : e < 45 ? '中' : e < 70 ? '高' : '危険'; }
   upgrade(s) { const h = s.ch.hideout; if (!h) return; const N = HIDEOUT_LEVELS[h.lv + 1]; if (!N) return this.err(s, '最大段階です'); if (!this.pay(s, N.cost)) return; h.lv++; h.log.push({ t: Date.now(), v: `隠れ家を「${N.name}」へ拡張した` }); this.world.slumQuest(s, { kind: 'hideout' }); this.rebuild(s); this.world.sendSelf(s); this.view(s); }
   install(s, k) { const h = s.ch.hideout; const F = FACILITIES[k]; if (!h || !F) return; const lv = h.fac[k] || 0; if (!lv && Object.keys(h.fac).length >= HIDEOUT_LEVELS[h.lv].slots) return this.err(s, '設備枠が足りません（隠れ家を拡張してください）'); if (lv >= 3) return this.err(s, '最大強化です'); if (!this.pay(s, this.facCost(k, lv))) return; h.fac[k] = lv + 1; h.log.push({ t: Date.now(), v: `${F.name}を${lv ? '強化' : '設置'}した（Lv${lv + 1}）` }); this.rebuild(s); this.world.sendSelf(s); this.view(s); }
@@ -93,15 +94,22 @@ export class Hideout {
   check(s) {
     const ch = s.ch, h = ch.hideout; if (!h) return; const now = Date.now(); const hours = (now - (h.lastCheck || now)) / 3600000; h.lastCheck = now; if (hours <= 0.01) return;
     h.exposure = Math.max(0, h.exposure - hours * (1 + (h.fac.security || 0)));
-    const p = Math.min(0.5, hours * Math.max(0, h.exposure - 30) / 400); if (Math.random() >= p) return;
-    // abstract raid: security strength vs. faction pressure; losses limited to ≤10% of low-value loose storage
-    const def = (h.fac.security || 0) * 30 + 20 + Math.random() * 40; const atk = h.exposure + Math.random() * 40; const fac = FACTIONS[this.world.market.controller(h.rid)]?.name || '何者か';
-    if (def >= atk) { h.log.push({ t: now, v: `${fac}の手の者が隠れ家を嗅ぎ回ったが、警備で追い払った` }); h.exposure = Math.max(0, h.exposure - 15); this.world.note(s, { t: 'msg', v: '隠れ家への襲撃を撃退した！' }); return; }
-    const loose = h.storage.filter(i => LOOT[i.ref]?.v <= 300); const n = Math.max(0, Math.floor(h.storage.reduce((a, i) => a + i.n, 0) * 0.1)); const lost = [];
-    for (let k = 0; k < n && loose.length; k++) { const i = loose[Math.floor(Math.random() * loose.length)]; i.n--; lost.push(LOOT[i.ref].name); if (i.n <= 0) { h.storage.splice(h.storage.indexOf(i), 1); loose.splice(loose.indexOf(i), 1); } }
-    h.exposure = Math.max(0, h.exposure - 30); h.log.push({ t: now, v: `${fac}に荒らされた。${lost.length ? '失った物：' + lost.join('、') : '被害なし'}（隠し収納・設備・武器・所持金は無事）` });
-    this.world.note(s, { t: 'msg', v: `隠れ家が荒らされた（被害${lost.length}点）。警備設備で防げる。` });
+    const ctl = this.world.market.controller(h.rid); if (ch.org && this.world.orgs.s.orgs[ch.org]?.enemies.includes(ctl)) h.exposure = Math.min(100, h.exposure + hours * 1.5); // the ruling organisation hunts its enemies' members
+    // staged discovery (never an instant wipe): 0 none → 1 調査 → 2 警告 → 3 侵入 → 4 襲撃. Security can repel at every stage.
+    const STAGE = ['', '何者かが周辺を嗅ぎ回っている（調査）', '扉に脅しの印が刻まれていた（警告）', '留守中に何者かが侵入した（侵入）', '組織の手の者に踏み込まれた（襲撃）'];
+    const fac = FACTIONS[this.world.market.controller(h.rid)]?.name || '何者か'; h.stage ||= 0;
+    if (h.exposure < 25 && h.stage) { h.stage = Math.max(0, h.stage - 1); return; }
+    const p = Math.min(0.6, hours * Math.max(0, h.exposure - 25) / 300); if (Math.random() >= p) return;
+    const def = (h.fac.security || 0) * 30 + 20 + Math.random() * 40, atk = h.exposure + h.stage * 8 + Math.random() * 40;
+    if (h.stage >= 1 && def >= atk) { h.log.push({ t: now, v: `${fac}の動きを警備設備が察知し、追い払った` }); h.stage = 0; h.exposure = Math.max(0, h.exposure - 15); this.world.note(s, { t: 'msg', v: '隠れ家への接近を撃退した' }); return; }
+    h.stage = Math.min(4, h.stage + 1); const share = h.stage === 3 ? 0.05 : h.stage === 4 ? 0.1 : 0; const lost = [];
+    if (share) { const loose = h.storage.filter(i => LOOT[i.ref]?.v <= 300); const n = Math.floor(h.storage.reduce((a, i) => a + i.n, 0) * share);
+      for (let k = 0; k < n && loose.length; k++) { const i = loose[Math.floor(Math.random() * loose.length)]; i.n--; lost.push(LOOT[i.ref].name); if (i.n <= 0) { h.storage.splice(h.storage.indexOf(i), 1); loose.splice(loose.indexOf(i), 1); } } }
+    h.log.push({ t: now, v: `${fac}：${STAGE[h.stage]}${share ? `。${lost.length ? '失った物：' + lost.join('、') : '被害なし'}（隠し収納・設備・武器・所持金は無事）` : ''}` });
+    this.world.note(s, { t: 'msg', v: `隠れ家：${STAGE[h.stage]}${h.stage < 3 ? '。警備設備の強化や公開設定の見直しを' : ''}` });
+    if (h.stage === 4) { h.stage = 0; h.exposure = Math.max(0, h.exposure - 35); }
   }
+
   setVis(s, v) { const h = s.ch.hideout; if (!h || !['private', 'party', 'public'].includes(v)) return; h.vis = v; this.view(s); }
   canVisit(ch, owner) { const h = owner.hideout; if (!h) return false; if (owner.id === ch.id || h.vis === 'public') return true; return h.vis === 'party' && this.world.partyOf(owner.id)?.members.includes(ch.id); }
   visit(s, name) { const o = [...this.world.sessions.values()].find(x => x.ch?.name === name); if (!o || !this.canVisit(s.ch, o.ch)) return this.err(s, '訪問できません（相手の公開設定を確認）'); const key = `hideout:${o.ch.id}`; let z = this.world.zones.get(key); if (!z) { const cz = this.world.zones.get(REGIONS[o.ch.hideout.rid].city); z = new Zone(this.world, key, { kind: 'interior', hideout: true, owner: o.ch, city: REGIONS[o.ch.hideout.rid].city, door: cz.map.doors.find(d => d.svc === 'slum'), bldg: { id: 'hideout', name: '隠れ家', t: 'hideout' } }); this.world.zones.set(key, z); }

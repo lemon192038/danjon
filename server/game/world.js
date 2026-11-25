@@ -22,6 +22,7 @@ import { Slum, regionOfCity, weight, value } from './slum.js';
 import { Hideout } from './hideout.js';
 import { Market } from './market.js';
 import { EventEngine } from './events.js';
+import { Orgs } from './orgs.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
 export const isTown = z => z.kind === 'town' || z.kind === 'interior';
@@ -33,7 +34,7 @@ export class World {
     this.life = new Life(this); this.life.rollWeather(); this.guilds = new Guilds(this); this.guildEvent = (s, ev) => this.guilds.event(s, ev);
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
-    this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.slum = new Slum(this); this.hideout = new Hideout(this);
+    this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
@@ -131,7 +132,7 @@ export class World {
     return false;
   }
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
-  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save(), events: this.events.save() }); }
+  saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save(), events: this.events.save(), orgs: this.orgs.save() }); }
   enterZone(s, z, pos) {
     const old = s.actor;
     let hp = 1, sp = 1; if (old) { hp = old.hp / old.maxHp; sp = old.sp / old.maxSp; old.zone.remove(old); if (old.dead) hp = 1; }
@@ -286,7 +287,7 @@ export class World {
     const I = z.inst; const R = REGIONS[I.rid]; const sk = skeleton(I.rid); const grid = [];
     for (let y = 0; y < SH; y += 8) { const row = []; for (let x = 0; x < SW; x += 8) row.push(dangerAt(R.tier, z.layer, x + 4, y + 4, sk.entry[0], sk.entry[1])); grid.push(row); }
     const key = I.rid + ':' + z.layer; s.ch.progress.slumMap ||= {}; s.ch.progress.slumMap[key] = 1;
-    return { rid: I.rid, region: R.name, tier: R.tier, layer: z.layer, layers: LAYERS.map(l => l.name), danger: grid, cell: 8, events: I.events, fixedMap: !!s.ch.hideout?.fac?.maptable, pvp: R.tier >= 3, team: s.actor?.team, factions: R.factions.map(f => ({ k: f, name: FACTIONS[f].name, rep: FACTIONS[f].guild ? this.guilds.rep(s.ch, FACTIONS[f].guild) : null, hostileBelow: FACTIONS[f].hostileBelow })) };
+    return { rid: I.rid, region: R.name, tier: R.tier, layer: z.layer, layers: LAYERS.map(l => l.name), danger: grid, cell: 8, events: I.events, fixedMap: !!s.ch.hideout?.fac?.maptable, pvp: R.tier >= 3, team: s.actor?.team, factions: R.factions.map(f => ({ k: f, name: FACTIONS[f].name, rep: FACTIONS[f].guild || FACTIONS[f].org ? Math.round(this.slum.repOf(s.ch, f)) : null, hostileBelow: FACTIONS[f].hostileBelow })) };
   }
   slumQuest(s, ev) {
     const ch = s.ch; ch.squests ||= {};
@@ -418,6 +419,8 @@ export class World {
     if (this.econ?.services[service]) return this.econ.services[service](s, z, npc);
     if (service === 'guildhq') return this.guilds.open(s, npc.guild);
     if (service === 'slum') return this.slum.open(s, z, npc);
+    if (service === 'org') return this.orgs.open(s, npc.org);
+    if (service === 'graymarket') { this.events.record(s, 'sl_graymarket', '灰色市場を訪れた'); return this.openMarket(s, 'gravel_under', { who: '灰色市場' }); }
     if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
     const data = { service };
     if (service === 'weapon') data.stock = shopStock(town, 'weapon');
@@ -510,6 +513,7 @@ export class World {
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
+      case 'org': return this.orgs.menu(s, m);
       case 'slum': return this.slumMenu(s, m);
       case 'market': return this.marketMenu(s, m);
       case 'hideout': return this.hideoutMenu(s, m);
