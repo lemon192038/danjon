@@ -37,7 +37,7 @@ test('gravel story events', async () => {
     act('sl_auction', 'start'); act('sl_auction'); assert.ok(err().includes('夜')); setClockHour(22); act('sl_auction'); act('sl_auction'); act('sl_auction'); assert.ok(P('sl_auction').done); assert.ok(w.sev.unlocks(ch).auction);
     w.enterBuilding(s, gz.map.doors.find(d => d.id === 'gr_crow')); const lots = w.sev.lots();
     w.handle(s, { t: 'menu', op: 'sev', ev: 'sl_auction', act: 'auction', lot: lots[2].id, bid: lots[2].min }); // low bid can lose
-    const lw = lots[0]; const n0 = ch.inventory.filter(i => i.ref === lw.ref).length; w.handle(s, { t: 'menu', op: 'sev', ev: 'sl_auction', act: 'auction', lot: lw.id, bid: lw.value * 3 }); assert.equal(ch.inventory.filter(i => i.ref === lw.ref).length, n0 + 1, 'won lot');
+    ch.gold = 1e9; const lw = lots[0]; const n0 = ch.inventory.filter(i => i.ref === lw.ref).length; w.handle(s, { t: 'menu', op: 'sev', ev: 'sl_auction', act: 'auction', lot: lw.id, bid: lw.value * 3 }); assert.equal(ch.inventory.filter(i => i.ref === lw.ref).length, n0 + 1, 'won lot');
     w.handle(s, { t: 'menu', op: 'sev', ev: 'sl_auction', act: 'auction', lot: lw.id, bid: lw.value * 3 }); assert.ok(err().includes('既に'), 'one bid per lot'); setClockHour(12);
     // ── plague is world-shared: active until someone purifies it
     assert.equal(w.events.worldOf('sl_plague').state, 'active'); act('sl_plague', 'start'); act('sl_plague');

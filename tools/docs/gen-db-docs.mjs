@@ -17,13 +17,17 @@ for (const t of WEAPON_TYPES) { const d = gen(`types/${t.id}.json`); const c = [
 fs.writeFileSync(new URL('../../docs/ABYSS_WEAPON_DATABASE.md', import.meta.url), w);
 // ---- classes
 const tiers = {}; for (const j of jobs) (tiers[j.tierName] ||= []).push(j);
-const roles = {}; for (const j of jobs) (roles[j.role] ||= []).push(j);
+const roles = {}; for (const j of jobs) if (!j.event) (roles[j.role] ||= []).push(j);
 let c = `# ABYSS 職業データベース\n\n> 自動生成：\`node tools/docs/gen-db-docs.mjs\`（データ元：shared/gen/jobs.json ← tools/gen/jobs.mjs）。手で編集しないこと。\n\n`;
-c += `## 概要\n\n- 職業数：**${jobs.length}**（40系統 × 25系譜）\n- 武器種とは独立：どの職業でも86武器種すべてを装備可能。職業は「武器相性（best/good）」で補正するだけで、使用禁止はない\n- 1,000職 × 86武器種 = 86,000通りの組み合わせ\n- 各職業：固有パッシブ（ステータス補正mods）・固有アクティブスキル・ステータス補正・武器相性・属性・解放条件・上位職/派生職・熟練度上限\n- 職業熟練度はキャラクターごとに職業別で保存。転職しても武器熟練度は失われない\n\n`;
+c += `## 概要\n\n- 職業数：**${jobs.filter(j => !j.event).length}**（40系統 × 25系譜）＋固有職 ${jobs.filter(j => j.event).length}\n- 武器種とは独立：どの職業でも86武器種すべてを装備可能。職業は「武器相性（best/good）」で補正するだけで、使用禁止はない\n- 1,000職 × 86武器種 = 86,000通りの組み合わせ\n- 各職業：固有パッシブ（ステータス補正mods）・固有アクティブスキル・ステータス補正・武器相性・属性・解放条件・上位職/派生職・熟練度上限\n- 職業熟練度はキャラクターごとに職業別で保存。転職しても武器熟練度は失われない\n\n`;
 c += `## ランク別\n\n| ランク | 職数 | 代表的な解放条件 |\n|---|---|---|\n`;
 for (const [k, v] of Object.entries(tiers)) { const u = v[Math.floor(v.length / 2)].unlock; c += `| ${k} | ${v.length} | ${Object.entries(u).map(([a, b]) => `${a}=${typeof b === 'object' ? JSON.stringify(b) : b}`).join('、')} |\n`; }
 c += `\n## 解放条件の種類（実装済み）\n\nlevel（レベル）／job＋prof（前提職とその熟練度）／kills（討伐数）／clear（ダンジョン到達階）／boss（難易度別ボス討伐数）／abyss（ABYSS到達階）／hidden（隠し条件：深淵階層・NPC絆・特定アイテム）。サーバーの \`jobUnlockMet\` で検証。\n\n`;
-c += `## 固有名職業（企画で指定済み・未実装）\n\n既存1,000職の名称は変更しない。以下は「イベント職業」として別レジストリで追加する案（ABYSS_CONFLICT_REPORT.md C-07 参照）。\n\n| 職業 | 解放イベント | 系統 |\n|---|---|---|\n| 異端者 | 禁書庫：異端書1冊読了 | 大罪系 |\n| 強欲／暴食／嫉妬／怠惰／傲慢／憤怒／色欲の罪人 | 異端者＋主ルート選択 | 大罪系 |\n| 大罪司教（7系統） | 罪人熟練度＋最終試練、または継承決闘 | 大罪系 |\n| 剣理の探究者 | 放浪する最強の剣士「無銘の極致」 | 剣士系 |\n| 原初魔導師 | 失われた千の魔法「第零魔法」 | 魔法系 |\n| 月影の観測者 | 黒月の夜 → 月の裏側 | 特殊系 |\n| 闘技王 | 仮面の武闘祭 → 素顔の王 | 戦士系 |\n| 黒炉鍛冶師 | 黒炉の鍛冶師（グラド・ベルン） | 生産系 |\n| 神機技師関連職 | 地下に眠る巨大施設／神機降臨 | 古代文明系 |\n| デウス・エクス・マギア | 神機降臨（詳細未確定） | 神話系 |\n\n`;
+const { unlockText } = await import('../../shared/skillText.js');
+const evj = jobs.filter(j => j.event);
+c += `## 固有職（イベント職業・${evj.length}種）\n\n既存1,000職とは別枠（ID は \`ev_\` で始まる）。武器制限なし。解放条件はサーバーの \`jobUnlockMet\` で検証。大罪司教は1キャラクター1系統、罪人は主ルートと同じ系統のみ。\n\n| ID | 職業 | 固有パッシブ | 固有アクティブ | 解放条件 | 上位/派生元 |\n|---|---|---|---|---|---|\n`;
+for (const j of evj) c += `| ${j.id} | ${j.name} | ${j.passive.name} | ${j.active.name} | ${unlockText(j.unlock, {})} | ${j.parent ? jobs.find(x => x.id === j.parent)?.name : '-'} |\n`;
+c += '\n';
 c += `## 系統別一覧（40系統）\n\n| 系統 | 基本職 | 職数 | 武器相性(best) | 最上位例 |\n|---|---|---|---|---|\n`;
 for (const [k, v] of Object.entries(roles)) { const b = v.find(j => j.tier === 0); const top = v.reduce((a, x) => x.tier > a.tier ? x : a, v[0]); c += `| ${k} | ${b?.name} | ${v.length} | ${(b?.affinity?.best || []).join('・')} | ${top.name}（${top.tierName}） |\n`; }
 c += `\n## 全職業一覧\n\n| ID | 職業 | ランク | 固有パッシブ | 固有アクティブ | 解放条件 |\n|---|---|---|---|---|---|\n`;

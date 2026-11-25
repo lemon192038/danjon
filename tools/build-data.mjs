@@ -6,6 +6,7 @@ import { WEAPON_TYPES } from '../shared/data/weaponTypes.js';
 import { buildWeaponTypeSkill } from './gen/skills.mjs';
 import { buildWeapon } from './gen/weapons.mjs';
 import { buildJobs } from './gen/jobs.mjs';
+import { buildEventJobs } from './gen/eventjobs.mjs';
 import { buildLevelSkills, FAMILIES, BOSS_ARCHETYPES, DUNGEONS } from './gen/content.mjs';
 
 const OUT = path.resolve('shared/gen');
@@ -29,7 +30,7 @@ for (const wt of WEAPON_TYPES) {
   nSkills += skills.length; nWeapons += weapons.length;
   index.types.push({ id: wt.id, name: wt.name, weapons: weapons.map(w => [w.id, w.name, w.rar, w.lvl]) });
 }
-const jobs = buildJobs();
+const jobs = [...buildJobs(), ...buildEventJobs()]; // 1,000 base jobs (unchanged) + named event jobs
 write('jobs.json', jobs);
 write('levelSkills.json', buildLevelSkills());
 write('content.json', { families: FAMILIES, bosses: BOSS_ARCHETYPES, dungeons: DUNGEONS });

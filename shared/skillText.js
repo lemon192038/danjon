@@ -62,10 +62,14 @@ export function effText(e) {
 export function describeSkill(sk) { return sk.eff.map(effText).join(' → '); }
 export const SRC_NAMES = { wtype: '武器種スキル', weapon: '武器固有スキル', level: 'レベルスキル', job: '職業スキル' };
 export const ACQ_NAMES = { shop: 'ショップ', drop: 'モンスタードロップ', chest: '宝箱', boss: 'ボス報酬', quest: 'クエスト報酬', abyssBoss: 'ABYSSボス', godEvent: '神々のイベント', specialQuest: '特別クエスト', hiddenEvent: '隠しイベント', specialBoss: '特殊ボス討伐' };
+const EVENT_NAMES = { lib_forbidden: '禁書庫（異端書を読み通す）', lib_sins: '七つの大罪（最終試練）', ev_swordmaster: '放浪する最強の剣士', ev_thousand_spells: '失われた千の魔法', ev_blackmoon: '黒月の夜', ev_masquerade: '仮面の武闘祭', sl_blackforge: '黒炉の鍛冶師', lg_deus_machina: '神機降臨' };
+const FLAG_NAMES = { machinist: 'イベント「地下に眠る巨大施設」で神機文明の施設に触れる' };
+const SIN_NAMES = { greed: '強欲', gluttony: '暴食', envy: '嫉妬', sloth: '怠惰', pride: '傲慢', wrath: '憤怒', lust: '色欲' };
 export function unlockText(u, dungeons) {
   const r = [];
   if (u.level > 1) r.push(`Lv${u.level}以上`); if (u.job) r.push(`前提職熟練度${u.prof}`); if (u.kills) r.push(`累計撃破${u.kills}体`);
   if (u.clear) r.push(`${dungeons?.[u.clear.dungeon]?.name || u.clear.dungeon} ${u.clear.floor}階踏破`); if (u.boss) r.push(`${u.boss.diff}以上のボス${u.boss.count}体撃破`); if (u.abyss) r.push(`ABYSS ${u.abyss}階到達`);
+  if (u.event) r.push(`イベント「${EVENT_NAMES[u.event] || u.event}」達成`); if (u.flag) r.push(FLAG_NAMES[u.flag] || `条件「${u.flag}」`); if (u.sin) r.push(`主ルート「${SIN_NAMES[u.sin]}」を選択`); if (u.bishop) r.push('大罪司教は1キャラクター1系統（継承決闘でも就任可）');
   if (u.hidden) r.push(u.hidden.abyssFloor ? `【隠し】ABYSS${u.hidden.abyssFloor}階到達` : u.hidden.npcBond ? `【隠し】NPC冒険者との絆${u.hidden.npcBond}以上` : `【隠し】秘宝の入手`);
   return r.length ? r.join(' / ') : '初期解放';
 }

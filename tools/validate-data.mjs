@@ -24,13 +24,14 @@ for (const wt of WEAPON_TYPES) {
   if (new Set(d.weapons.map(w => w.name)).size !== 100) errs.push(`type ${wt.id} duplicate weapon names`);
 }
 const jobs = JSON.parse(fs.readFileSync('shared/gen/jobs.json'));
-const jids = new Set(jobs.map(j => j.id));
-if (jobs.length !== 1000 || jids.size !== 1000) errs.push('jobs count');
-if (new Set(jobs.map(j => j.name)).size !== 1000) errs.push('job names not unique');
+const jids = new Set(jobs.map(j => j.id)); const base = jobs.filter(j => !j.event), evj = jobs.filter(j => j.event);
+if (base.length !== 1000 || jids.size !== jobs.length) errs.push('jobs count (1,000 base jobs + unique event jobs)');
+if (new Set(jobs.map(j => j.name)).size !== jobs.length) errs.push('job names not unique');
+if (evj.length < 20 || evj.some(j => !j.id.startsWith('ev_'))) errs.push('event jobs');
 for (const j of jobs) { chk(j.active, j.id); if (j.unlock.job && !jids.has(j.unlock.job)) errs.push(`${j.id} unlock ref`); }
 // distinctness: no two jobs with identical passive+active
 const sig = new Set(jobs.map(j => JSON.stringify([j.passive.mods, j.active.eff, j.stats])));
-if (sig.size !== 1000) errs.push(`jobs not mechanically distinct: ${sig.size}`);
+if (sig.size !== jobs.length) errs.push(`jobs not mechanically distinct: ${sig.size}`);
 JSON.parse(fs.readFileSync('shared/gen/levelSkills.json')).forEach(s => chk(s, 'level'));
 const c = JSON.parse(fs.readFileSync('shared/gen/content.json'));
 const fam = new Set(c.families.map(f => f[0])), boss = new Set(c.bosses.map(b => b[0]));

@@ -7,7 +7,7 @@
 import { EVENTS, EVENT_BY_ID, EVENT_KINDS, EVENT_GROUPS } from '../../shared/data/events.js';
 import { PLACE } from '../../shared/data/world.js';
 import { STORIES } from './stories.js';
-import { addItem, grantXp } from './progress.js';
+import { addItem, grantXp, checkJobUnlocks } from './progress.js';
 
 const LOG_CAP = 200, HIST_CAP = 400, MAX_SIM_HOURS = 72;
 export class EventEngine {
@@ -44,7 +44,7 @@ export class EventEngine {
     if (outcome && d.outcomes.length && !d.outcomes.includes(outcome)) return { error: '不正な結末です' };
     p.done = true; p.outcome = outcome; p.finished = Date.now(); p.clears = (p.clears || 0) + 1;
     this.log(s.ch, id, `完了${outcome ? '：' + outcome : ''}`); this.history(id, `${s.ch.name}が「${d.name}」を${outcome ? `「${outcome}」で` : ''}達成`, { who: s.ch.name, outcome });
-    this.notify(s, id, opt.silent ? null : `達成${outcome ? '：' + outcome : ''}`); s.dirty = true; return { ok: true };
+    this.notify(s, id, opt.silent ? null : `達成${outcome ? '：' + outcome : ''}`); checkJobUnlocks(s.ch, n => this.world.note(s, n)); s.dirty = true; return { ok: true };
   }
   isDone(ch, id) { const p = this.prog(ch, id); return !!p?.done || (p?.clears || 0) > 0 || this.w.ev[id]?.state === 'resolved'; }
   // idempotent reward: key is unique per event (+ attempt for rechallenge rewards with perAttempt)
@@ -57,7 +57,7 @@ export class EventEngine {
     if (reward.title && !ch.progress.titles.includes(reward.title)) { ch.progress.titles.push(reward.title); note({ t: 'title', v: reward.title }); got.push(`称号「${reward.title}」`); }
     for (const it of reward.items || []) { addItem(ch, { ...it }, note); got.push(it.ref); }
     if (reward.flag) Object.assign(P.data ||= {}, { [reward.flag]: true });
-    this.log(ch, id, `報酬：${got.join('、') || key}`); s.dirty = true; return true;
+    this.log(ch, id, `報酬：${got.join('、') || key}`); checkJobUnlocks(ch, note); s.dirty = true; return true;
   }
   hasReward(ch, id, key) { return !!this.pc(ch).rewards[`${id}:${key}`]; }
   // ── world-shared state

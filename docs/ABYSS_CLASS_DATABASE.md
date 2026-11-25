@@ -4,7 +4,7 @@
 
 ## 概要
 
-- 職業数：**1000**（40系統 × 25系譜）
+- 職業数：**1000**（40系統 × 25系譜）＋固有職 23
 - 武器種とは独立：どの職業でも86武器種すべてを装備可能。職業は「武器相性（best/good）」で補正するだけで、使用禁止はない
 - 1,000職 × 86武器種 = 86,000通りの組み合わせ
 - 各職業：固有パッシブ（ステータス補正mods）・固有アクティブスキル・ステータス補正・武器相性・属性・解放条件・上位職/派生職・熟練度上限
@@ -20,27 +20,41 @@
 | 特殊職 | 200 | level=55、job=dancer_7、prof=6、clear={"dungeon":"d03","floor":30} |
 | 希少職 | 160 | level=85、job=dancer_12、prof=8、boss={"diff":"HARD","count":10}、clear={"dungeon":"d08","floor":60} |
 | 隠し職 | 120 | level=120、job=dancer_20、prof=10、hidden={"item":"relic_end"}、abyss=7 |
+| 固有職 | 23 | job=ev_heretic、prof=3、sin=wrath、level=70 |
 
 ## 解放条件の種類（実装済み）
 
 level（レベル）／job＋prof（前提職とその熟練度）／kills（討伐数）／clear（ダンジョン到達階）／boss（難易度別ボス討伐数）／abyss（ABYSS到達階）／hidden（隠し条件：深淵階層・NPC絆・特定アイテム）。サーバーの `jobUnlockMet` で検証。
 
-## 固有名職業（企画で指定済み・未実装）
+## 固有職（イベント職業・23種）
 
-既存1,000職の名称は変更しない。以下は「イベント職業」として別レジストリで追加する案（ABYSS_CONFLICT_REPORT.md C-07 参照）。
+既存1,000職とは別枠（ID は `ev_` で始まる）。武器制限なし。解放条件はサーバーの `jobUnlockMet` で検証。大罪司教は1キャラクター1系統、罪人は主ルートと同じ系統のみ。
 
-| 職業 | 解放イベント | 系統 |
-|---|---|---|
-| 異端者 | 禁書庫：異端書1冊読了 | 大罪系 |
-| 強欲／暴食／嫉妬／怠惰／傲慢／憤怒／色欲の罪人 | 異端者＋主ルート選択 | 大罪系 |
-| 大罪司教（7系統） | 罪人熟練度＋最終試練、または継承決闘 | 大罪系 |
-| 剣理の探究者 | 放浪する最強の剣士「無銘の極致」 | 剣士系 |
-| 原初魔導師 | 失われた千の魔法「第零魔法」 | 魔法系 |
-| 月影の観測者 | 黒月の夜 → 月の裏側 | 特殊系 |
-| 闘技王 | 仮面の武闘祭 → 素顔の王 | 戦士系 |
-| 黒炉鍛冶師 | 黒炉の鍛冶師（グラド・ベルン） | 生産系 |
-| 神機技師関連職 | 地下に眠る巨大施設／神機降臨 | 古代文明系 |
-| デウス・エクス・マギア | 神機降臨（詳細未確定） | 神話系 |
+| ID | 職業 | 固有パッシブ | 固有アクティブ | 解放条件 | 上位/派生元 |
+|---|---|---|---|---|---|
+| ev_heretic | 異端者 | 異端者の極意 | 異端の囁き | Lv60以上 / イベント「禁書庫（異端書を読み通す）」達成 | - |
+| ev_sinner_greed | 強欲の罪人 | 強欲の罪人の極意 | 強奪の手 | Lv70以上 / 前提職熟練度3 / 主ルート「強欲」を選択 | 異端者 |
+| ev_bishop_greed | 大罪司教・強欲担当 | 大罪司教・強欲担当の極意 | グリード・コレクター | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「強欲」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 強欲の罪人 |
+| ev_sinner_gluttony | 暴食の罪人 | 暴食の罪人の極意 | 魔力摂食 | Lv70以上 / 前提職熟練度3 / 主ルート「暴食」を選択 | 異端者 |
+| ev_bishop_gluttony | 大罪司教・暴食担当 | 大罪司教・暴食担当の極意 | グラトニー・イーター | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「暴食」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 暴食の罪人 |
+| ev_sinner_envy | 嫉妬の罪人 | 嫉妬の罪人の極意 | 鏡写し | Lv70以上 / 前提職熟練度3 / 主ルート「嫉妬」を選択 | 異端者 |
+| ev_bishop_envy | 大罪司教・嫉妬担当 | 大罪司教・嫉妬担当の極意 | エンヴィー・ミラー | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「嫉妬」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 嫉妬の罪人 |
+| ev_sinner_sloth | 怠惰の罪人 | 怠惰の罪人の極意 | 自律機構 | Lv70以上 / 前提職熟練度3 / 主ルート「怠惰」を選択 | 異端者 |
+| ev_bishop_sloth | 大罪司教・怠惰担当 | 大罪司教・怠惰担当の極意 | スロウス・オートマタ | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「怠惰」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 怠惰の罪人 |
+| ev_sinner_pride | 傲慢の罪人 | 傲慢の罪人の極意 | 王者の威圧 | Lv70以上 / 前提職熟練度3 / 主ルート「傲慢」を選択 | 異端者 |
+| ev_bishop_pride | 大罪司教・傲慢担当 | 大罪司教・傲慢担当の極意 | プライド・ドミニオン | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「傲慢」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 傲慢の罪人 |
+| ev_sinner_wrath | 憤怒の罪人 | 憤怒の罪人の極意 | 反撃衝動 | Lv70以上 / 前提職熟練度3 / 主ルート「憤怒」を選択 | 異端者 |
+| ev_bishop_wrath | 大罪司教・憤怒担当 | 大罪司教・憤怒担当の極意 | ラース・カウンター | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「憤怒」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 憤怒の罪人 |
+| ev_sinner_lust | 色欲の罪人 | 色欲の罪人の極意 | 幻惑 | Lv70以上 / 前提職熟練度3 / 主ルート「色欲」を選択 | 異端者 |
+| ev_bishop_lust | 大罪司教・色欲担当 | 大罪司教・色欲担当の極意 | ラスト・エンチャント | Lv100以上 / 前提職熟練度8 / イベント「七つの大罪（最終試練）」達成 / 主ルート「色欲」を選択 / 大罪司教は1キャラクター1系統（継承決闘でも就任可） | 色欲の罪人 |
+| ev_swordtheory | 剣理の探究者 | 剣理の探究者の極意 | 無銘の型 | Lv70以上 / イベント「放浪する最強の剣士」達成 | - |
+| ev_origin | 原初魔導師 | 原初魔導師の極意 | 第零詠唱 | Lv90以上 / イベント「失われた千の魔法」達成 | - |
+| ev_moonshadow | 月影の観測者 | 月影の観測者の極意 | 黒月の観測 | Lv80以上 / イベント「黒月の夜」達成 | - |
+| ev_arenaking | 闘技王 | 闘技王の極意 | 王者の一撃 | Lv80以上 / イベント「仮面の武闘祭」達成 | - |
+| ev_blackforge | 黒炉鍛冶師 | 黒炉鍛冶師の極意 | 黒炉の焼き入れ | Lv30以上 / イベント「黒炉の鍛冶師」達成 | - |
+| ev_godmachinist | 神機技師 | 神機技師の極意 | 神機展開 | Lv30以上 / イベント「地下に眠る巨大施設」で神機文明の施設に触れる | - |
+| ev_godpilot | 神機操者 | 神機操者の極意 | 神機同調 | Lv70以上 / 前提職熟練度6 | 神機技師 |
+| ev_deusmagia | デウス・エクス・マギア | デウス・エクス・マギアの極意 | 機神降臨 | Lv130以上 / 前提職熟練度8 / イベント「神機降臨」達成 | 神機操者 |
 
 ## 系統別一覧（40系統）
 
@@ -1091,3 +1105,26 @@ level（レベル）／job＋prof（前提職とその熟練度）／kills（討
 | avenger_22 | 終焉の復讐者 | 隠し職 | 終焉の復讐者の心得 | 終焉・報復 | level:120 job:avenger_20 prof:10 hidden:{abyssFloor:19} abyss:8 |
 | avenger_23 | 原初の復讐者 | 隠し職 | 原初の復讐者の心得 | 原初・報復 | level:120 job:avenger_21 prof:10 hidden:{abyssFloor:19} abyss:8 |
 | avenger_24 | 永劫の復讐者 | 隠し職 | 永劫の復讐者の心得 | 永劫・報復 | level:120 job:avenger_18 prof:10 hidden:{abyssFloor:19} abyss:8 |
+| ev_heretic | 異端者 | 固有職 | 異端者の極意 | 異端の囁き | event:lib_forbidden level:60 |
+| ev_sinner_greed | 強欲の罪人 | 固有職 | 強欲の罪人の極意 | 強奪の手 | job:ev_heretic prof:3 sin:greed level:70 |
+| ev_bishop_greed | 大罪司教・強欲担当 | 固有職 | 大罪司教・強欲担当の極意 | グリード・コレクター | job:ev_sinner_greed prof:8 sin:greed bishop:true event:lib_sins level:100 |
+| ev_sinner_gluttony | 暴食の罪人 | 固有職 | 暴食の罪人の極意 | 魔力摂食 | job:ev_heretic prof:3 sin:gluttony level:70 |
+| ev_bishop_gluttony | 大罪司教・暴食担当 | 固有職 | 大罪司教・暴食担当の極意 | グラトニー・イーター | job:ev_sinner_gluttony prof:8 sin:gluttony bishop:true event:lib_sins level:100 |
+| ev_sinner_envy | 嫉妬の罪人 | 固有職 | 嫉妬の罪人の極意 | 鏡写し | job:ev_heretic prof:3 sin:envy level:70 |
+| ev_bishop_envy | 大罪司教・嫉妬担当 | 固有職 | 大罪司教・嫉妬担当の極意 | エンヴィー・ミラー | job:ev_sinner_envy prof:8 sin:envy bishop:true event:lib_sins level:100 |
+| ev_sinner_sloth | 怠惰の罪人 | 固有職 | 怠惰の罪人の極意 | 自律機構 | job:ev_heretic prof:3 sin:sloth level:70 |
+| ev_bishop_sloth | 大罪司教・怠惰担当 | 固有職 | 大罪司教・怠惰担当の極意 | スロウス・オートマタ | job:ev_sinner_sloth prof:8 sin:sloth bishop:true event:lib_sins level:100 |
+| ev_sinner_pride | 傲慢の罪人 | 固有職 | 傲慢の罪人の極意 | 王者の威圧 | job:ev_heretic prof:3 sin:pride level:70 |
+| ev_bishop_pride | 大罪司教・傲慢担当 | 固有職 | 大罪司教・傲慢担当の極意 | プライド・ドミニオン | job:ev_sinner_pride prof:8 sin:pride bishop:true event:lib_sins level:100 |
+| ev_sinner_wrath | 憤怒の罪人 | 固有職 | 憤怒の罪人の極意 | 反撃衝動 | job:ev_heretic prof:3 sin:wrath level:70 |
+| ev_bishop_wrath | 大罪司教・憤怒担当 | 固有職 | 大罪司教・憤怒担当の極意 | ラース・カウンター | job:ev_sinner_wrath prof:8 sin:wrath bishop:true event:lib_sins level:100 |
+| ev_sinner_lust | 色欲の罪人 | 固有職 | 色欲の罪人の極意 | 幻惑 | job:ev_heretic prof:3 sin:lust level:70 |
+| ev_bishop_lust | 大罪司教・色欲担当 | 固有職 | 大罪司教・色欲担当の極意 | ラスト・エンチャント | job:ev_sinner_lust prof:8 sin:lust bishop:true event:lib_sins level:100 |
+| ev_swordtheory | 剣理の探究者 | 固有職 | 剣理の探究者の極意 | 無銘の型 | event:ev_swordmaster level:70 |
+| ev_origin | 原初魔導師 | 固有職 | 原初魔導師の極意 | 第零詠唱 | event:ev_thousand_spells level:90 |
+| ev_moonshadow | 月影の観測者 | 固有職 | 月影の観測者の極意 | 黒月の観測 | event:ev_blackmoon level:80 |
+| ev_arenaking | 闘技王 | 固有職 | 闘技王の極意 | 王者の一撃 | event:ev_masquerade level:80 |
+| ev_blackforge | 黒炉鍛冶師 | 固有職 | 黒炉鍛冶師の極意 | 黒炉の焼き入れ | event:sl_blackforge level:30 |
+| ev_godmachinist | 神機技師 | 固有職 | 神機技師の極意 | 神機展開 | flag:machinist level:30 |
+| ev_godpilot | 神機操者 | 固有職 | 神機操者の極意 | 神機同調 | job:ev_godmachinist prof:6 level:70 |
+| ev_deusmagia | デウス・エクス・マギア | 固有職 | デウス・エクス・マギアの極意 | 機神降臨 | job:ev_godpilot prof:8 event:lg_deus_machina level:130 |

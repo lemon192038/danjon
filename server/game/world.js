@@ -515,6 +515,7 @@ export class World {
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
+      case 'sinRoute': { if (!ch.jobs.ev_heretic) return err('異端者になると主ルートを選べる'); if (Object.keys(ch.jobs).some(k => k.startsWith('ev_sinner_'))) return err('罪人に進化した後は主ルートを変えられない'); if (!['greed', 'gluttony', 'envy', 'sloth', 'pride', 'wrath', 'lust'].includes(m.sin)) return; ch.progress.sinRoute = m.sin; return ok('主ルートを選んだ'); }
       case 'org': return this.orgs.menu(s, m);
       case 'sev': return this.sev.act(s, m);
       case 'slum': return this.slumMenu(s, m);

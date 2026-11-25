@@ -122,6 +122,11 @@ export function jobUnlockMet(ch, job) {
   if (u.clear && (p.clears[u.clear.dungeon]?.max || 0) < u.clear.floor) return false;
   if (u.boss && (p.bossKills[u.boss.diff] || 0) + (u.boss.diff === 'HARD' ? (p.bossKills.HELL || 0) + (p.bossKills.ABYSS || 0) : 0) < u.boss.count) return false;
   if (u.abyss && p.abyssMax < u.abyss) return false;
+  // event jobs (固有職)
+  if (u.event) { const P = ch.events?.prog?.[u.event]; if (!(P?.done || P?.clears)) return false; }
+  if (u.flag && !p.flags?.[u.flag]) return false;
+  if (u.sin && p.sinRoute !== u.sin) return false;
+  if (u.bishop && Object.keys(ch.jobs).some(k => k.startsWith('ev_bishop_') && k !== job.id)) return false;
   if (u.hidden) { const h = u.hidden; if (h.abyssFloor && p.abyssMax < h.abyssFloor) return false; if (h.npcBond && !Object.values(p.npcBond).some(v => v >= h.npcBond)) return false; if (h.item && !p.items[h.item]) return false; }
   return true;
 }
