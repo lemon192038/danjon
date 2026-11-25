@@ -13,6 +13,7 @@ import { DIFFICULTIES } from '../../shared/constants.js';
 import { rollLoot } from './progress.js';
 import { LOOT } from '../../shared/data/slum.js';
 import { artTrigger } from './artifacts.js';
+import { duelTick } from './duel.js';
 
 class Heap { constructor() { this.a = []; } push(x) { const a = this.a; a.push(x); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p].at <= a[i].at) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
   pop() { const a = this.a; const top = a[0]; const last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l].at < a[m].at) m = l; if (r < a.length && a[r].at < a[m].at) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
@@ -238,6 +239,8 @@ export class Zone {
     else if (a.kind === 'npc') this.world.npcs.fighterTick(this, a, now);
     else if (a.kind === 'player') this.playerTick(a, now);
     else if (a.kind === 'resident') this.world.life.tick(this, a, now);
+    else if (a.kind === 'duelist') duelTick(this, a, now);
+    else if (a.role === 'raven') this.world.duels?.tickWanderer(this, a, now);
     // integrate velocity
     if (a.vx || a.vy) {
       let mul = statusMoveMul(a); if (a.stopped || now < a.staggerUntil) mul = 0;
@@ -398,9 +401,10 @@ export class Zone {
   }
   describe(a) {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
-    if (a.kind === 'player' || a.kind === 'npc') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
+    if (a.kind === 'player' || a.kind === 'npc' || a.kind === 'duelist') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
     else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; if (a.faction) d.fac = a.faction; }
     else if (a.kind === 'resident' || a.kind === 'slumnpc') { d.look = a.look; d.job = a.job; if (a.faction) d.fac = a.faction; }
+    if (this.masq && (a.kind === 'player' || a.kind === 'duelist')) { d.name = '仮面の闘士'; d.look = { ...d.look, outfit: 5, hairColor: 9 }; d.mask = 1; d.job = null; } // identities hidden, appearance unified
     else { d.sk = a.sumKind; d.look = a.look; d.wt = a.owner?.wt?.id; }
     return d;
   }

@@ -89,6 +89,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   dmg *= 1 - Math.min(0.85, (tgt.stats.dr || 0) + (tgt.buffMods?.dr || 0) + (o.guarded || 0));
   if (zone.diffDmgTaken && tgt.team !== 'enemy') dmg *= zone.diffDmgTaken;
   dmg = Math.max(1, Math.round(dmg * (0.92 + Math.random() * 0.16)));
+  if (src.kind === 'duelist' && tgt.kind === 'player') dmg = Math.min(dmg, Math.round(tgt.maxHp * 0.35)); // duels: no single unavoidable one-shot
   if (tgt.shield && tgt.shield.until > now && tgt.shield.amt > 0) { const ab = Math.min(tgt.shield.amt, dmg); tgt.shield.amt -= ab; dmg -= ab; if (ab) zone.fx({ t: 'shield', id: tgt.id }); }
   tgt.hp -= dmg; tgt.lastHitBy = src.ownerId || src.id; tgt.lastHitAt = now; tgt.combatUntil = now + 5000;
   if (tgt.statuses.sleep) delete tgt.statuses.sleep;

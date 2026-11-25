@@ -11,18 +11,18 @@
 
 ## 集計
 
-総数 **71** ／ 未実装 60 ／ 実装済み 11
+総数 **71** ／ 実装済み 13 ／ 未実装 58
 
 ## 大型イベント（8章）（6）
 
 | ID | 名称 | 分類 | 地域 | 共有 | 状態 | 詳細度 |
 |---|---|---|---|---|---|---|
-| ev_swordmaster | 放浪する最強の剣士<br><small>THE WANDERING SWORDMASTER</small> | NPC遭遇・世界規模・隠し・称号・職業解放 | 中央大陸エルディア・北方大陸ノルディア・東方大陸シェンガル・南方大陸サハリア・西方大陸ヴァルグラン・外洋諸島アステリア | both | 未実装 | spec |
+| ev_swordmaster | 放浪する最強の剣士<br><small>THE WANDERING SWORDMASTER</small> | NPC遭遇・世界規模・隠し・称号・職業解放 | 中央大陸エルディア・北方大陸ノルディア・東方大陸シェンガル・南方大陸サハリア・西方大陸ヴァルグラン・外洋諸島アステリア | both | 実装済み | spec |
 | ev_sunken | 沈没した王国<br><small>THE SUNKEN KINGDOM</small> | 地域・ダンジョン・称号 | 外洋諸島アステリア・アトランティス：沈没王国 | both | 未実装 | spec |
 | ev_blackmoon | 黒月の夜<br><small>NIGHT OF THE BLACK MOON</small> | 世界規模・条件発生型・隠し・職業解放・称号 | 世界各地・月面領域ルナ・ヴェイル | both | 未実装 | spec |
 | ev_thousand_spells | 失われた千の魔法<br><small>THE LOST THOUSAND SPELLS</small> | 常設・職業解放・称号 | 世界各地 | personal | 未実装 | spec |
 | ev_calamity | 眠れる災厄<br><small>THE SLEEPING CALAMITY</small> | 世界規模・地域・条件発生型 | 西方大陸ヴァルグラン・外洋諸島アステリア・東方大陸シェンガル・南方大陸サハリア | both | 未実装 | spec |
-| ev_masquerade | 仮面の武闘祭<br><small>THE MASQUERADE TOURNAMENT</small> | 都市・時間限定・職業解放・称号 | 王都アルセリア・スラム・グレイヴェル | both | 未実装 | spec |
+| ev_masquerade | 仮面の武闘祭<br><small>THE MASQUERADE TOURNAMENT</small> | 都市・時間限定・職業解放・称号 | 王都アルセリア・スラム・グレイヴェル | both | 実装済み | spec |
 
 ### 放浪する最強の剣士（ev_swordmaster）
 
@@ -33,6 +33,7 @@
 - 解放：職業「剣理の探究者」の解放条件
 - 関連：ev_masquerade, ct_duelist, lg_undefeated
 - 再挑戦：再挑戦可
+- 備考：世界各地を巡回（約1時間ごとに移動）。決闘AIは相手の過去の戦い方を記録して戦術を変える（入力の先読みはしない）。3つの武器種で勝つと隠し試練「無銘の極致」
 
 ### 沈没した王国（ev_sunken）
 

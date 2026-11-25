@@ -13,7 +13,7 @@ export const EVENTS = [
   E('ev_swordmaster', '放浪する最強の剣士', 'THE WANDERING SWORDMASTER', 'major', { kinds: ['npc', 'world', 'hidden', 'title', 'job'], loc: ['eldia', 'nordia', 'shengar', 'saharia', 'valgran', 'asteria'], scope: 'both',
     trigger: 'NPCレイヴァン・クロイツが街道・山道・森林・荒野・遺跡・ダンジョン入口を巡回。遭遇して決闘を申請すると開始',
     stages: ['遭遇', '決闘申請', '決闘（学習AI）', '複数武器種で勝利を重ねる', '隠し試練「無銘の極致」', '真の能力との再戦'], outcomes: ['勝利', '敗北（何度でも再戦可）'],
-    rewards: ['称号「剣聖に認められし者」', '称号「無銘を超えし者」', '特殊剣技', '「無銘・天断」のレプリカ（オリジナルは入手不可）'], unlocks: ['職業「剣理の探究者」の解放条件'], links: ['ev_masquerade', 'ct_duelist', 'lg_undefeated'], repeat: 'rechallenge' }),
+    rewards: ['称号「剣聖に認められし者」', '称号「無銘を超えし者」', '特殊剣技', '「無銘・天断」のレプリカ（オリジナルは入手不可）'], unlocks: ['職業「剣理の探究者」の解放条件'], status: 'live', notes: '世界各地を巡回（約1時間ごとに移動）。決闘AIは相手の過去の戦い方を記録して戦術を変える（入力の先読みはしない）。3つの武器種で勝つと隠し試練「無銘の極致」', links: ['ev_masquerade', 'ct_duelist', 'lg_undefeated'], repeat: 'rechallenge' }),
   E('ev_sunken', '沈没した王国', 'THE SUNKEN KINGDOM', 'major', { kinds: ['regional', 'dungeon', 'title'], loc: ['asteria', 'atlantis'], trigger: '海底の石畳・巨大な門・古代文字・不自然な光・海底の鐘のいずれかを発見',
     stages: ['手がかり発見', '浅瀬探索（通常装備可）', '沈没港', '市民街', '王立図書館', '水晶研究所', '王宮（深部：水中装備・呼吸魔法が必要）', '深海神殿', '沈没王アトランティス戦', '結末選択'],
     outcomes: ['王国再生', '王国解放', '王国継承'], rewards: ['水中装備', '古代魔法', '水中都市へのアクセス', '称号「沈没王国の発見者」'], unlocks: ['アステリア海底地域'], links: ['ev_thousand_spells', 'ev_calamity'], repeat: 'rechallenge' }),
@@ -29,7 +29,7 @@ export const EVENTS = [
     outcomes: ['討伐', '再び眠らせる', '生態調査', '条件付き共存'], rewards: ['災厄素材', '伝説級武器レシピ', '称号', '生態記録', '災厄の眷属', '特殊装備'], links: ['lg_territory'], repeat: 'cycle', notes: '焦土の眠龍（火山）・深海の巨鯨（海底）・森羅の巨獣（森林）・砂塵の巨神（砂漠）。討伐しても世界から永久には消えない' }),
   E('ev_masquerade', '仮面の武闘祭', 'THE MASQUERADE TOURNAMENT', 'major', { kinds: ['city', 'timed', 'job', 'title'], loc: ['arcelia', 'gravel'], trigger: '裏路地・酒場・秘密の案内人に接触',
     stages: ['案内人に接触', '資格確認', '仮面受領', '登録', '予選', '本戦', '決勝', '仮面の王', '（複数回優勝＋正体記録）素顔の王'], outcomes: ['優勝', '敗退'],
-    rewards: ['大会報酬', '称号'], unlocks: ['職業「闘技王」への道'], links: ['ev_swordmaster', 'sl_colosseum'], repeat: 'cycle', notes: '参加者の名前・職業・称号は非表示、外観は統一、能力は均一化しない。不足時はNPC補充' }),
+    rewards: ['大会報酬', '称号'], unlocks: ['職業「闘技王」への道'], links: ['ev_swordmaster', 'sl_colosseum'], repeat: 'cycle', status: 'live', notes: '参加者の名前・職業・称号は非表示、外観は統一、能力は均一化しない。不足時はNPC補充' }),
   // ── 9. slum (Gravel)
   E('sl_graymarket', '灰色市場', 'GRAY MARKET', 'slum', { kinds: ['permanent', 'slum'], loc: ['gravel'], scope: 'world', trigger: '常設（グレイヴェル闇市場）', stages: ['入荷', '価格変動', '組織による市場支配'], rewards: ['希少品の購入機会'], links: ['sl_auction', 'sl_factions'], repeat: 'daily', status: 'live', notes: '地域「グレイヴェル地下街」の闇市相場。供給・需要・在庫・組織の支配率で価格が動き、上下限で暴騰暴落を防ぐ' }),
   E('sl_children', '消えた子供たち', 'THE MISSING CHILDREN', 'slum', { kinds: ['slum', 'conditional'], loc: ['gravel'], trigger: 'スラムで子供の失踪の噂を聞く', stages: ['調査', '証拠収集', '違法な魔力適性研究施設の発見', '救出', '関係者との対峙'], outcomes: ['救出成功', '一部救出'], rewards: ['名声', '無名の子供たちとの友好'], links: ['sl_factions'], notes: '過度に残虐な表現は避け、物語と救出を中心にする' }),

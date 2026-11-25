@@ -158,7 +158,7 @@ export class Renderer {
       const drawW = () => { if (!wt) return; const wsp = weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); g.drawImage(wsp, -2 + ext, -12); g.restore(); };
       if (dir === 1) drawW();
       g.save(); if (flip) g.scale(-1, 1); if (e.dodgeAt && now - e.dodgeAt < 250) { g.rotate((now - e.dodgeAt) / 250 * TAU * (flip ? -1 : 1) * 0.5); }
-      g.drawImage(spr, -8, -22); if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
+      g.drawImage(spr, -8, -22); if (d.mask && dir !== 1) { g.fillStyle = '#efe8d8'; g.fillRect(-5, -18, 10, 4); g.fillStyle = '#1a1a1a'; g.fillRect(-3, -17, 2, 1); g.fillRect(1, -17, 2, 1); } if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
       if (dir !== 1) drawW();
       if (e.flags & 4) { g.strokeStyle = 'rgba(140,200,255,.8)'; g.beginPath(); g.arc(Math.cos(e.facing) * 6, Math.sin(e.facing) * 6 - 8, 9, e.facing - 1, e.facing + 1); g.stroke(); }
       if (e.flags & 2048 || (e.stanceAt && now - e.stanceAt < 500)) { g.strokeStyle = `rgba(255,255,200,${0.5 + Math.sin(now / 50) * 0.3})`; g.beginPath(); g.arc(0, -10, 12, 0, TAU); g.stroke(); }

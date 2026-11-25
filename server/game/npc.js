@@ -155,7 +155,7 @@ export class NpcManager {
   leaveParty(n) { n.state = 'rest'; n.partyWith = null; n.zone = n.home; n.timer = 5; }
 }
 export function currentWeapon(ch) { const i = ch.inventory.find(x => x.uid === ch.equip.weapon); return DATA.weapons.get(i?.ref) || DATA.wtWeapons.get(ch.starterType)[0]; }
-function equipBest(ch, wt) {
+export function equipBest(ch, wt) {
   const list = DATA.wtWeapons.get(wt).filter(w => w.lvl <= ch.level && w.rar <= 3);
   const w = list[list.length - 1] || DATA.wtWeapons.get(wt)[0]; const u = uid();
   ch.inventory.push({ uid: u, kind: 'weapon', ref: w.id, plus: Math.floor(ch.level / 15) }); ch.equip.weapon = u;
