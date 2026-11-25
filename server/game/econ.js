@@ -176,7 +176,7 @@ export class Econ {
     az.fx({ t: 'phase', id: 0, v: `WAVE ${A.wave}` }); for (const p of az.players) p.session.send({ t: 'toast', v: `第${A.wave}試合 開始！`, cls: 'big' });
   }
   arenaKill(az) { if (!az.arena) return; if ([...az.actors.values()].some(a => a.kind === 'monster' && !a.dead)) return; if (az.arena.wave < 3) return void setTimeout(() => this.nextWave(az), 1500);
-    for (const p of az.players) { const s = p.session, ch = s.ch; const prize = 300 + az.arena.lv * 60; ch.gold += prize; ch.progress.arenaWins = (ch.progress.arenaWins || 0) + 1; this.world.events?.record(s, "ex_arena", `闘技場で3連戦に勝利（通算${ch.progress.arenaWins}勝）`, { clear: true }); this.world.guilds.addRep(ch, 'gladiators', 3); this.world.guilds.event(s, { kind: 'arena' }); this.world.note(s, { t: 'quest', v: `闘技場で勝利！ 賞金${prize}G` }); }
+    for (const p of az.players) { const s = p.session, ch = s.ch; const prize = 300 + az.arena.lv * 60; ch.gold += prize; ch.progress.arenaWins = (ch.progress.arenaWins || 0) + 1; this.world.sev?.onArenaWin(s, az.returnTo); this.world.events?.record(s, "ex_arena", `闘技場で3連戦に勝利（通算${ch.progress.arenaWins}勝）`, { clear: true }); this.world.guilds.addRep(ch, 'gladiators', 3); this.world.guilds.event(s, { kind: 'arena' }); this.world.note(s, { t: 'quest', v: `闘技場で勝利！ 賞金${prize}G` }); }
     az.arena.done = true; for (const p of [...az.players]) setTimeout(() => p.session.actor?.zone === az && this.leaveArena(p.session), 2500);
   }
   leaveArena(s) { const az = s.actor.zone; const back = az.arena?.from; this.world.enterZone(s, back && this.world.zones.has(back.id) ? back : this.world.zones.get(az.returnTo)); }

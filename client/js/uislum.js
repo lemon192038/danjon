@@ -124,3 +124,24 @@ export function installOrgs(UI) {
         <h4>歴代の首領</h4>${d.leaders.map(l => `<p class="dim"><small>${e(l.name)}${l.from ? `（${e(l.from)}から継承）` : ''}</small></p>`).join('')}</div>
       <div><h3>組織の仕事（本日）</h3>${jobs}<h4>スラムの噂</h4>${d.news.map(n => `<p class="dim"><small>・${e(n)}</small></p>`).join('') || '<p class="dim">静かなものだ</p>'}</div></div>`); };
 }
+// Gravel story events (host NPC dialog): steps, actions, choices, and unlocked services
+export function installSlumEvents(UI) {
+  const P = UI.prototype; const prevPanel = P.cityPanel; const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  P.cityPanel = function (s, data) { if (s === 'sev') { this.svc = data; if (this.panel !== 'sev' || !this.modalOpen) this.open('sev', s); else this.render(); return true; } return prevPanel.call(this, s, data); };
+  const prevAct = P.cityAct; P.cityAct = function (a, t) { if (a === 'sv') { const d = t.dataset; const bid = d.do === 'auction' ? +(this.modal.querySelector('#bid_' + d.lot)?.value || 0) : 0; return this.net.menu('sev', { ev: this.svc.ev, act: d.do, choice: d.choice, lot: d.lot, bid, uid: d.uid }) || true; } return prevAct.call(this, a, t); };
+  const ACT = { talk: '話を進める', night: '話を聞く（夜のみ）', deliver: '届ける', fund: '支払う', duel: '決闘に挑む' };
+  P.p_sev = function () { const d = this.svc; const c = d.cur;
+    const steps = d.steps.map((x, i) => `<li class="${x.done ? 'good' : x.cur ? 'cur' : 'dim'}">${x.done || x.cur ? e(x.k === 'choice' ? '決断のとき' : x.text.length > 40 && x.k === 'talk' ? '話を聞く' : x.text) : '？？？'}</li>`).join('');
+    let body = '';
+    if (!d.started) body = `<p class="say">${e(d.steps[0].text)}</p><button class="primary" data-act="sv" data-do="start">話を聞く</button>`;
+    else if (d.done) body = `<p class="good">このイベントは達成済み${d.outcome ? `（あなたの選択：${e(d.outcome)}）` : ''}</p>`;
+    else if (c) { const prog = c.k === 'kill' ? `（${c.prog}/${c.n}）` : c.k === 'raid' ? `（地下街で調べた物資 ${c.searched}/${c.n}・その後脱出）` : c.k === 'wins' ? `（${c.prog}/${c.n}勝）` : '';
+      body = `<p class="${c.k === 'talk' || c.k === 'night' || c.k === 'choice' ? 'say' : ''}">${e(c.text)} ${prog}</p>${c.k === 'choice' ? c.options.map(o => `<button class="primary" data-act="sv" data-do="go" data-choice="${o.id}">${e(o.label)}</button>`).join(' ') : ACT[c.k] ? `<button class="primary" data-act="sv" data-do="go" ${c.k === 'night' && !c.night ? 'disabled' : ''}>${ACT[c.k]}</button>` : '<p class="dim">（達成するとここで報告できる）</p>'}`; }
+    const w = d.world ? `<p class="${d.world.state === 'active' ? 'warn' : 'dim'}">世界の状況：${{ dormant: '沈静', omen: '前兆', active: '発生中', resolved: '終息' }[d.world.state]}${d.world.outcome ? `（${e(d.world.outcome)}）` : ''}</p>` : '';
+    const rw = d.reward ? `<p class="dim"><small>報酬：${[d.reward.gold && `${d.reward.gold.toLocaleString()}G`, d.reward.xp && `EXP${d.reward.xp.toLocaleString()}`, d.reward.title && `称号「${e(d.reward.title)}」`].filter(Boolean).join('・')}</small></p>` : '';
+    let svc = '';
+    if (d.auction) svc = `<h3>闇の競売会（本日の出品）</h3>${d.auction.open ? '' : '<p class="warn">開催は夜（20時〜5時）だけ</p>'}${d.auction.lots.map(l => `<div class="srow"><div class="sh"><b>${e(l.name)}</b><small>最低入札 ${l.min.toLocaleString()}G</small></div>${l.won ? '<span class="good">落札済み</span>' : l.tried ? '<span class="dim">競り負けた</span>' : `<input id="bid_${l.id}" type="number" min="${l.min}" value="${l.min}" style="width:110px"> <button data-act="sv" data-do="auction" data-lot="${l.id}" ${d.auction.open ? '' : 'disabled'}>入札（一度きり）</button>`}</div>`).join('')}<p class="dim"><small>入札は一品につき一度。競り負けても代金は払わない。</small></p>`;
+    if (d.bf) svc = `<h3>黒炉の改造（特性を1つ刻む・最大3つ）</h3><p>費用 ${d.bf.cost.toLocaleString()}G＋非合法武器部品×2（所持${d.bf.parts}）</p>${d.bf.weapons.map(x => `<div class="irow"><span>${e(x.name)} <small>${x.traits.map(e).join('・')}</small></span><button data-act="sv" data-do="bfmod" data-uid="${x.uid}">刻む</button></div>`).join('') || '<p class="dim">改造できる武器がない</p>'}`;
+    if (d.ranking) svc = `<h3>無名の地下闘技場ランキング</h3>${d.ranking.map((r, i) => `<p>${i + 1}. ${e(r.name)} — ${r.wins}勝</p>`).join('') || '<p class="dim">まだ誰も名を刻んでいない</p>'}<p class="dim"><small>20勝で称号「無名の覇者」</small></p>`;
+    return this.wrap(`${e(d.name)} <small>${e(d.en)} ・ ${e(d.host)}</small>`, `<div class="split"><div>${body}${w}${rw}</div><div><h4>進行</h4><ol class="stages">${steps}</ol>${svc}</div></div>`); };
+}
