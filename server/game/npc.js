@@ -6,6 +6,11 @@ import { STARTER_WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
 import { rng, hash32 } from '../../shared/util.js';
 import { reachOfType } from './reach.js';
 import { WORLD } from './maps.js';
+import { CITIES, ROUTES } from '../../shared/data/cities.js';
+import { WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
+// NPC players live in every town: level band by region, any non-mythic weapon type, local home city
+const LV_BAND = { eldia: [5, 45], nordia: [40, 75], shengar: [30, 70], saharia: [45, 85], valgran: [55, 100], asteria: [40, 85], realm: [70, 115] };
+export const PER_TOWN = 4;
 
 const SURN = ['アルト', 'ベル', 'カイ', 'ディア', 'エル', 'フィン', 'ガロ', 'ハル', 'イリス', 'ジン', 'クロエ', 'リオ', 'ミラ', 'ノア', 'オルカ', 'ペトラ', 'クレア', 'ルカ', 'セラ', 'ティオ', 'ユナ', 'ヴィクト', 'ウィル', 'ゼノ', 'アイラ', 'ブラム', 'シエル', 'ダリウス', 'エマ', 'フレイ', 'グレン', 'ヒナ', 'イザーク', 'ジュリア', 'カレン', 'レオン', 'マオ', 'ニーナ', 'オスカー', 'リリィ', 'ラウル', 'サラ', 'トーマ', 'ヴェラ', 'ゼファー', 'ロイ', 'ナギ', 'ソフィア'];
 const EPI = ['疾風の', '鉄壁の', '紅の', '静寂の', '放浪の', '黄金の', '蒼の', '若き', '老練の', '笑う', '眠れる', '孤高の', '陽気な', '慎重な', '無謀な', '寡黙な'];
@@ -23,7 +28,27 @@ export class NpcManager {
   constructor(world, saved) {
     this.world = world; this.list = saved?.npcs || this.generate(48); this.byId = new Map(this.list.map(n => [n.id, n])); this.next = 0;
     for (const n of this.list) { n.actorId = null; if (n.state === 'party') n.state = 'rest'; n.partyWith = null; }
+    this.populateTowns();
   }
+  towns() { return Object.keys(WORLD).filter(id => WORLD[id].kind === 'town' && CITIES[id]); }
+  // top up every town to PER_TOWN home-town NPC players (deterministic per town; existing NPCs and saves are kept)
+  populateTowns() { const types = WEAPON_TYPES.filter(w => !w.myth).map(w => w.id);
+    for (const town of this.towns()) { const have = this.list.filter(n => n.home === town).length; const r = rng(hash32('npc-town-v1:' + town)); const [lo, hi] = LV_BAND[CITIES[town].continent] || LV_BAND.eldia;
+      for (let i = have; i < PER_TOWN; i++) { const id = `npc_${town}_${i}`; if (this.byId.has(id)) continue;
+        const wt = r() < 0.5 ? STARTER_WEAPON_TYPES[Math.floor(r() * STARTER_WEAPON_TYPES.length)] : types[Math.floor(r() * types.length)];
+        const name = EPI[Math.floor(r() * EPI.length)] + SURN[Math.floor(r() * SURN.length)]; const lv = Math.round(lo + (hi - lo) * Math.pow(r(), 1.3));
+        const look = { body: Math.floor(r() * 3), skin: Math.floor(r() * 5), hair: Math.floor(r() * 6), hairColor: Math.floor(r() * 10), outfit: Math.floor(r() * 10) };
+        const ch = newCharacter(id, name, wt, look); ch.level = lv; const good = WT_BY_ID[wt].good.length ? WT_BY_ID[wt].good : ['str', 'vit']; for (let k = 0; k < (lv - 1) * 3; k++) { const st = good[k % good.length]; ch.stats[st] = (ch.stats[st] || 0) + 1; }
+        ch.mastery[wt] = { lv: Math.min(100, Math.round(lv * 0.8) + 1), xp: 0 }; equipBest(ch, wt);
+        const jobs = DATA.jobList.filter(j => j.tier <= (lv >= 35 ? 2 : lv >= 15 ? 1 : 0) && !j.id.startsWith('ev_')); const job = jobs[Math.floor(r() * jobs.length)]; ch.job = job.id; ch.jobs[job.id] = { rank: Math.min(10, Math.floor(lv / 8)), xp: 0 }; fillSlots(ch);
+        const p = PERS[Math.floor(r() * PERS.length)];
+        const n = { id, ch, pers: p.k, home: town, state: 'rest', zone: town, timer: 10 + Math.floor(r() * 80), gold: 500 + lv * 200, friends: [], rival: null, log: [], best: {}, bond: {}, local: true };
+        this.list.push(n); this.byId.set(id, n); }
+      const locals = this.list.filter(n => n.home === town); for (const n of locals) { const f = locals[(locals.indexOf(n) + 1) % locals.length]; if (f !== n && !n.friends.includes(f.id)) n.friends.push(f.id); } } }
+  neighbours(city) { return [...new Set(ROUTES.filter(r => r[0] === city || r[1] === city).map(r => r[0] === city ? r[1] : r[0]))].filter(c => WORLD[c]?.kind === 'town'); }
+  chatter(n, z) { const P = this.pers(n); const c = CITIES[z.cityId || z.id]; const best = Object.entries(n.best || {}).sort((a, b) => b[1] - a[1])[0]; const w = currentWeapon(n.ch);
+    const pool = [...P.lines, c ? `${c.name}は${n.home === (z.cityId || z.id) ? '地元なんだ。いい街だろ？' : 'いい街だな。旅の途中なんだ'}` : null, best ? `${DATA.dungeons.get(best[0])?.name}の${best[1]}階まで行ったぞ` : null,
+      `パーティー募集中！ Lv${n.ch.level}・${WT_BY_ID[w.wt]?.name}使いだ`, n.state === 'rest' && n.injured ? 'この前の探索で手ひどくやられてな……' : null].filter(Boolean); return pool[Math.floor(Math.random() * pool.length)]; }
   generate(N) {
     const r = rng(hash32('npc-world-v1')); const out = [];
     for (let i = 0; i < N; i++) {
@@ -84,7 +109,7 @@ export class NpcManager {
       }
     }
   }
-  goHome(n, msg) { n.state = 'rest'; n.zone = Math.random() < 0.7 ? n.home : TOWNS[Math.floor(Math.random() * 3)]; n.timer = 20 + Math.floor(Math.random() * 40); this.log(n, msg); fillSlots(n.ch); }
+  goHome(n, msg) { n.state = 'rest'; const nb = this.neighbours(n.home); n.zone = Math.random() < 0.8 || !nb.length ? n.home : nb[Math.floor(Math.random() * nb.length)]; n.timer = (n.local ? 60 : 20) + Math.floor(Math.random() * (n.local ? 120 : 40)); if (n.zone !== n.home) this.log(n, `${CITIES[n.zone]?.name}へ旅をした`); this.log(n, msg); fillSlots(n.ch); }
   // ---- materialize NPCs whose abstract location is an active overworld zone
   syncZones() {
     for (const n of this.list) {
@@ -134,7 +159,8 @@ export class NpcManager {
     }
     // follow party leader
     if (leader) { const dx = leader.x - a.x, dy = leader.y - a.y, d = Math.hypot(dx, dy); if (d > 300) { a.x = leader.x; a.y = leader.y; } else if (d > 40) { const nd = z.navDir(a, leader); a.vx = nd.x * 85 * a.stats.move; a.vy = nd.y * 85 * a.stats.move; } else a.vx = a.vy = 0; return; }
-    // town/field wandering
+    // town/field wandering (and a word now and then when someone is around)
+    if (z.kind === 'town' && now > (a.chatAt || 0)) { a.chatAt = now + 25000 + Math.random() * 45000; if ([...z.players].some(p => Math.hypot(p.x - a.x, p.y - a.y) < 180)) z.fx({ t: 'say', id: a.id, v: this.chatter(n, z) }); }
     if (!a.wander || now > a.wander.until) { const pts = z.map.plazas?.length ? z.map.plazas : z.map.npcs?.length ? z.map.npcs : null; const pk = pts && pts[Math.floor(Math.random() * pts.length)]; const tgt = pk && Math.random() < 0.5 ? z.tileCenter([pk.x + (Math.random() * 6 - 3 | 0), pk.y + 2]) : { x: a.x + (Math.random() - 0.5) * 120, y: a.y + (Math.random() - 0.5) * 120 }; a.wander = { x: tgt.x, y: tgt.y, until: now + 4000 + Math.random() * 6000 }; if (Math.random() < 0.15) z.fx({ t: 'say', id: a.id, v: this.pers(n).lines[Math.floor(Math.random() * 3)] }); }
     const dx = a.wander.x - a.x, dy = a.wander.y - a.y, d = Math.hypot(dx, dy);
     if (d > 8) { a.vx = dx / d * 40; a.vy = dy / d * 40; a.facing = Math.atan2(dy, dx); } else a.vx = a.vy = 0;

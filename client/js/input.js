@@ -44,6 +44,6 @@ export class Input {
     }
   }
   setTouchSkills(list) { if (!this.touchRoot) return; list.forEach((sk, i) => { const el = this.touchRoot.querySelector('#tsn' + i); if (el) { el.textContent = sk ? sk.name : '―'; el.style.color = sk?.color || ''; } }); }
-  setTouchInfo({ cds, pot, spc }) { if (!this.touchRoot) return; for (let i = 0; i < 4; i++) { const el = this.touchRoot.querySelector('#tcd' + i); if (el) { el.style.height = (cds[i] || 0) * 100 + '%'; } } if (pot != null) this.touchRoot.querySelector('#tpot').textContent = '回復 ' + pot; if (spc) this.touchRoot.querySelector('#tspc').textContent = spc; }
+  setTouchInfo({ cds, pot, spc }) { if (!this.touchRoot) return; for (let i = 0; i < 4; i++) { const el = this.touchRoot.querySelector('#tcd' + i); if (el) { el.style.height = (cds[i] || 0) * 100 + '%'; } } if (pot != null) this.touchRoot.querySelector('#tpot').textContent = pot; if (spc) this.touchRoot.querySelector('#tspc').textContent = spc; }
   showTouch(v) { if (v && !this.touchRoot) this.buildTouch(); if (this.touchRoot) this.touchRoot.style.display = v ? '' : 'none'; this.touchOn = !!v && !!this.touchRoot; document.body.classList.toggle('touchui', this.touchOn); }
 }

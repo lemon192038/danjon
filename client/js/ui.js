@@ -66,7 +66,7 @@ export class UI {
     const g = me.g ? Object.entries(me.g).filter(([k, v]) => v > 0) : []; this.$('#gauges').innerHTML = g.map(([k, v]) => `<span class="gauge">${GAUGE_NAMES[k] || k} ${Math.floor(v * 10) / 10}</span>`).join('') + (me.alt ? '<span class="gauge">第二形態</span>' : '');
     this.$('#buffs').innerHTML = me.bm ? `<span class="buff">${esc(modsText(me.bm)).slice(0, 80)}</span>` : '';
     for (let i = 0; i < 4; i++) { const id = this.self?.ch.skills.slots[i]; const el = this.$(`#sk${i} .cd`); if (!el) continue; const cd = id && me.cds[id]; const sk = D.skills.get(id); el.style.height = cd && sk ? Math.min(100, cd / sk.cd * 100) + '%' : '0'; this.$(`#sk${i} .cdt`).textContent = cd ? (cd / 1000).toFixed(1) : ''; }
-    if (this.self) { const ch = this.self.ch; this.ctx.input.setTouchInfo({ cds: ch.skills.slots.map(id => { const sk = D.skills.get(id); return id && me.cds[id] && sk ? Math.min(1, me.cds[id] / sk.cd) : 0; }), pot: ch.inventory.find(i => i.ref === 'hp')?.n || 0, spc: SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type] }); }
+    if (this.self) { const ch = this.self.ch; this.ctx.input.setTouchInfo({ cds: ch.skills.slots.map(id => { const sk = D.skills.get(id); return id && me.cds[id] && sk ? Math.min(1, me.cds[id] / sk.cd) : 0; }), pot: (() => { const r = (ch.potSlots || ['hp', 'sp'])[0]; return `${(ITEMS[r]?.name || r).slice(0, 4)} ${ch.inventory.filter(i => i.ref === r).reduce((t, i) => t + i.n, 0)}`; })(), spc: SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type] }); }
     this.$('#deadov').style.display = me.dead ? 'flex' : 'none';
     let boss = null; for (const e of this.state.ents.values()) if (e.seen && e.d.boss && !(e.flags & 1)) boss = e;
     this.$('#bossbar').style.display = boss ? 'block' : 'none'; if (boss) { this.$('#bossname').textContent = boss.d.name; this.$('.bar.boss i').style.width = boss.hp / 10 + '%'; }
@@ -88,7 +88,7 @@ export class UI {
     const ch = this.self.ch;
     this.$('#skillbar').innerHTML = `<div class="sk basic" title="通常攻撃 (左クリック)"><b>攻</b><small>LMB</small></div><div class="sk basic" title="${esc(SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type])} (右クリック/Shift)"><b>特</b><small>RMB</small></div>` +
       (this.touchSync(), ch.skills.slots).map((id, i) => { const s = D.skills.get(id); return `<div class="sk" id="sk${i}" title="${esc(s ? s.name + '\n' + describeSkill(s) : '空きスロット')}"><b style="color:${s?.el ? ELEMENT_COLORS[s.el] : '#fff'}">${s ? (KIND_ICON[s.kind] || '✧') : '·'}</b><span>${esc(s?.name?.slice(0, 6) || '')}</span><div class="cd"></div><div class="cdt"></div><small>${i + 1}</small></div>`; }).join('') +
-      `<div class="sk basic" title="回避 (Space)"><b>避</b><small>SPC</small></div><div class="sk basic pot" title="回復薬 (Q)"><b>薬</b><small>Q ${ch.inventory.find(i => i.ref === 'hp')?.n || 0}</small></div>`;
+      `<div class="sk basic" title="回避 (Space)"><b>避</b><small>SPC</small></div>${(ch.potSlots || ['hp', 'sp']).map((r, i) => `<div class="sk basic pot" title="${esc(ITEMS[r]?.name || r)} (${'QE'[i]})"><b>${esc((ITEMS[r]?.name || r).slice(0, 2))}</b><small>${'QE'[i]} ${ch.inventory.filter(x => x.ref === r).reduce((t, x) => t + x.n, 0)}</small></div>`).join('')}`;
   }
   touchSync() { const ch = this.self?.ch; if (!ch) return; this.ctx.input.setTouchSkills(ch.skills.slots.map(id => { const s = D.skills.get(id); return s ? { name: s.name, color: s.el ? ELEMENT_COLORS[s.el] : '' } : null; })); }
   flashSlot(i) { const e = this.$(`#sk${i}`); if (e) { e.classList.remove('fl'); void e.offsetWidth; e.classList.add('fl'); } }
@@ -135,6 +135,7 @@ export class UI {
   onClick(e) {
     const t = e.target.closest('[data-act]'); if (!t) { if (e.target === this.modal) this.closeModal(); return; }
     const a = t.dataset.act, v = t.dataset.v, m = this.net.menu.bind(this.net); sfx.ui(); if (this.cityAct(a, t)) return;
+    if (a === 'potSlot') { m('potSlot', { i: +t.dataset.i, ref: v }); return; }
     switch (a) {
       case 'close': return this.closeModal();
       case 'tab': this.sel[t.dataset.k] = v; return this.render();
@@ -177,7 +178,7 @@ export class UI {
       else if (it.kind === 'amat') det = `<h3>${esc(matName(it))}</h3><p>${esc(it.floor)}F ${esc(it.diff)} のボスから入手 ・ 強さ ${it.pow}</p><p class="dim">鍛冶屋でもう一方の核と組み合わせてアーティファクトを作る</p>`;
       else if (it.kind === 'armor') { const a = armorDef(it.slot, it.tier); det = `<h3>${a.name}${it.plus ? ' +' + it.plus : ''}</h3><p>防御 ${a.def} / HP+${a.hp}${a.sp ? ` / SP+${a.sp}` : ''}${a.crit ? ` / 会心+${pct(a.crit)}` : ''} ・ 必要Lv${Math.max(1, a.lvl - 10)}</p>`; }
       else if (it.kind === 'loot') { const L = LOOT[it.ref]; det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${['', '一般', '良品', '希少', '貴重', '伝説'][L.r]}・${L.w}kg・基準価値${L.v}G・品質${it.q}</p><p>出所：${PROV[it.prov]}（${it.prov === 'legal' || it.prov === 'laundered' ? '正規店で売却可' : '闇市・故買屋・鑑定屋で扱える'}）</p>`; }
-      else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${esc(ITEMS[it.ref]?.desc || '')}${it.ref === 'hp' ? ' [Q]' : it.ref === 'sp' ? ' [E]' : ''}</p>${ITEMS[it.ref]?.use ? `<button class="primary" data-act="useItem" data-v="${it.ref}">使う</button>` : ''}`;
+      else det = `<h3>${esc(name(it))} ×${it.n}</h3><p>${esc(ITEMS[it.ref]?.desc || '')}${(ch.potSlots || ['hp', 'sp']).map((r, i) => r === it.ref ? ` [${'QE'[i]}]` : '').join('')}</p>${ITEMS[it.ref]?.use ? `<button class="primary" data-act="useItem" data-v="${it.ref}">使う</button>` : ''}${it.kind === 'potion' || ITEMS[it.ref]?.use ? ` <button data-act="potSlot" data-i="0" data-v="${it.ref}">Q枠に設定</button> <button data-act="potSlot" data-i="1" data-v="${it.ref}">E枠に設定</button>` : ''}`;
       det += `<div class="btns">${(it.kind === 'weapon' || it.kind === 'armor') && !eq.has(it.uid) ? `<button class="primary" data-act="equip" data-v="${it.uid}">装備</button>` : ''}${inTown && (it.kind === 'weapon' || it.kind === 'armor') ? `<button data-act="enhance" data-v="${it.uid}">強化 (${(() => { const c = enhanceCost(it.kind === 'weapon' ? D.weapons.get(it.ref) : { lvl: it.tier * 15 + 1 }, it.plus || 0); return `${c.gold}G 鉱石${c.ore} 成功率${pct(c.rate)}`; })()})</button>` : ''}${inTown && !eq.has(it.uid) ? `<button data-act="sell" data-v="${it.uid}">売却</button>` : ''}</div>`;
     }
     const cargo = Object.entries(ch.cargo || {}).filter(([, n]) => n > 0).map(([g, n]) => `${({ wheat: '小麦', fish: '干物', spice: '香辛料', silk: '絹織物', ore: '星鉄鉱石', steel: '鋼材', crystal: '魔晶石', book: '魔導写本', wine: '葡萄酒' })[g]}×${n}`).join('、');

@@ -419,7 +419,13 @@ export class World {
       case 'dodge': a.dodge(a.zone, clampN(m.dx), clampN(m.dy)); break;
       case 'heavy': { if (a.dead) break; if (Number.isFinite(m.ax) && Number.isFinite(m.ay) && a.canAct(a.zone.now) && !a.action) { a.facing = Math.atan2(m.ay - a.y, m.ax - a.x); } const r = a.heavy(a.zone); if (r !== 'ok') s.send({ t: 'skillfail', i: -1, r }); break; }
       case 'skill': { const id = s.ch.skills.slots[m.i | 0]; if (!id || a.dead) break; if (!knownSkills(s.ch).includes(id)) break; const tx = Number.isFinite(m.tx) ? m.tx : undefined, ty = Number.isFinite(m.ty) ? m.ty : undefined; if (tx !== undefined && ty !== undefined && (tx !== a.x || ty !== a.y) && a.canAct(a.zone.now)) { a.facing = Math.atan2(ty - a.y, tx - a.x); a.aimX = tx; a.aimY = ty; } const r = a.useSkill(id, a.zone, { tx, ty }); if (r !== 'ok') s.send({ t: 'skillfail', i: m.i, r }); break; }
-      case 'potion': { const it = s.ch.inventory.find(i => i.kind === 'potion' && i.ref === m.ref && i.n > 0); if (!it || a.dead || (a.potCd || 0) > a.zone.now) break; a.potCd = a.zone.now + 3000; it.n--; if (it.n <= 0) s.ch.inventory = s.ch.inventory.filter(i => i !== it); const k = 1 + (a.stats.mods.potion || 0); if (m.ref === 'breath') { s.ch.progress.breathUntil = Date.now() + 600000; s.send({ t: 'toast', v: '呼吸の秘薬を飲んだ（10分間 水中で呼吸できる）' }); } else if (m.ref === 'hp') a.heal(a.maxHp * 0.35 * k, a.zone); else a.sp = Math.min(a.maxSp, a.sp + a.maxSp * 0.4 * k); this.sendSelf(s); break; }
+      case 'potion': { const ref = String(m.ref || ''); const ch2 = s.ch; const it = ch2.inventory.find(i => i.ref === ref && i.n > 0 && (i.kind === 'potion' || ITEMS[i.ref]?.use)); if (!it || a.dead || (a.potCd || 0) > a.zone.now) break;
+        const u = ITEMS[ref]?.use; if (u?.ret && a.zone.kind !== 'dungeon') { s.send({ t: 'err', v: 'ダンジョン内で使えます' }); break; }
+        a.potCd = a.zone.now + 3000; it.n--; if (it.n <= 0) ch2.inventory = ch2.inventory.filter(i => i !== it); const k = 1 + (a.stats.mods.potion || 0);
+        if (ref === 'breath') { ch2.progress.breathUntil = Date.now() + 600000; s.send({ t: 'toast', v: '呼吸の秘薬を飲んだ（10分間 水中で呼吸できる）' }); }
+        else if (ref === 'hp') a.heal(a.maxHp * 0.35 * k, a.zone); else if (ref === 'sp') a.sp = Math.min(a.maxSp, a.sp + a.maxSp * 0.4 * k);
+        else if (u) { if (u.heal) a.heal(a.maxHp, a.zone); if (u.sp) a.sp = a.maxSp; if (u.buff) a.addBuff(u.buff, u.dur, 'item_' + ref); if (u.ret) { this.sendSelf(s); this.leaveDungeon(s); break; } s.send({ t: 'toast', v: `${ITEMS[ref].name}を使った` }); }
+        this.sendSelf(s); break; }
       case 'interact': this.interact(s); break;
       case 'respawn': this.respawn(s); break;
       case 'chat': { const v = String(m.v || '').slice(0, 120); if (!v) break; const msg = { t: 'chat', from: s.ch.name, v }; for (const p of a.zone.players) p.session.send(msg); a.zone.fx({ t: 'say', id: a.id, v }); break; }
@@ -528,6 +534,7 @@ export class World {
       case 'spells': if (m.act) return this.spells.act(s, m); return this.spells.open(s);
       case 'sunken': return this.big.sunkenChoice(s, m);
       case 'calamity': return this.big.calAct(s, m);
+      case 'potSlot': { const i = m.i | 0; const ref = String(m.ref || ''); if (i < 0 || i > 1) return; if (!(['hp', 'sp', 'breath'].includes(ref) || (ITEMS[ref]?.use))) return err('その品はクイック枠に設定できません'); ch.potSlots = [...(ch.potSlots || ['hp', 'sp'])]; ch.potSlots[i] = ref; return ok(`${'QE'[i]}枠に「${ITEMS[ref]?.name || ref}」を設定した`); }
       case 'library': return this.library.menu(s, m);
       case 'cev': return this.cev.act(s, m);
       case 'realm': return this.cev.realmAct(s, m);
