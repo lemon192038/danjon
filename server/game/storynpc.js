@@ -45,7 +45,7 @@ export class StoryNpcs {
     else if (S.roam === 'trader') this.move(id, this.nextTraderCity(st)); } }
   // trader AI: score neighbours by demand (low supply), safety (weather, fire, calamity), freshness (not recently visited)
   nextTraderCity(st) { const here = st.city; const econ = this.world.econ; const W = this.world.life; const E = this.world.events;
-    const nb = [...new Set(ROUTES.filter(r => r[0] === here || r[1] === here).map(r => r[0] === here ? r[1] : r[0]))].filter(c => CITIES[c] && CITIES[c].continent !== 'realm');
+    const nb = [...new Set(ROUTES.filter(r => r[0] === here || r[1] === here).map(r => r[0] === here ? r[1] : r[0]))].filter(c => CITIES[c] && CITIES[c].continent !== 'realm' && (!this.world.society || this.world.society.routeOk(here, c)));
     if (!nb.length) return here; let best = here, bs = -1e9;
     for (const c of nb) { const sup = Object.values(econ.supply[c] || {}); const demand = sup.length ? sup.reduce((t, v) => t + (1.2 - v), 0) / sup.length : 0;
       const wx = W.weatherOf(c); const danger = (wx === 'storm' ? 1 : 0) + (c === 'arcelia' && E.w.ev.ct_great_fire?.state === 'active' ? 2 : 0);

@@ -206,6 +206,7 @@ for (const [a, b, mode, min, fee] of [
   ['nereia', 'bluecoast', 'ship', 60, 70], ['nereia', 'atlantia', 'ship', 70, 80], ['atlantia', 'aquaria', 'ship', 60, 70], ['bluecoast', 'seirune', 'ship', 80, 90],
   // between continents: ocean lanes from Eldia's port and sky lanes from the capital
   ['marinelia', 'nereia', 'ship', 240, 600], ['marinelia', 'frostheim', 'ship', 300, 700], ['marinelia', 'ryuga', 'ship', 320, 750], ['marinelia', 'valcanos', 'ship', 300, 700],
-  ['arcelia', 'azradia', 'airship', 200, 900], ['arcelia', 'ryuga', 'airship', 220, 950], ['nereia', 'ryuga', 'ship', 260, 650], ['valcanos', 'azradia', 'carriage', 280, 400]]) ROUTES.push([a, b, mode, min, fee]);
+  ['arcelia', 'azradia', 'airship', 200, 900], ['arcelia', 'ryuga', 'airship', 220, 950], ['nereia', 'ryuga', 'ship', 260, 650], ['valcanos', 'azradia', 'carriage', 280, 400],
+  ['elmgard', 'nameless_village', 'carriage', 60, 40]]) ROUTES.push([a, b, mode, min, fee]);
 export const TRANSPORT = { carriage: { name: '乗合馬車', stormBlocked: false }, ship: { name: '定期船', stormBlocked: true }, rail: { name: '魔導鉄道', stormBlocked: false }, airship: { name: '飛空艇', stormBlocked: true } };
 export const WEATHER = { clear: '晴れ', cloud: '曇り', rain: '雨', snow: '雪', fog: '霧', wind: '強風', storm: '嵐', smog: '煤煙', aurora: '魔力オーロラ' };

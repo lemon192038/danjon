@@ -26,7 +26,7 @@ test('city systems', async () => {
     const goNpc = (svc) => { const z = s.actor.zone; const n = z.map.npcs.find(x => x.service === svc); assert.ok(n, 'npc ' + svc + ' in ' + z.id); const p = z.tileCenter([n.x, n.y + 2]); s.actor.x = p.x; s.actor.y = p.y; out.length = 0; send({ t: 'interact' }); return last('open'); };
     const exit = () => { const z = s.actor.zone; const p = z.tileCenter([z.map.w >> 1, z.map.h - 1]); s.actor.x = p.x; s.actor.y = p.y; w.checkTiles(s); };
     // all 6 cities exist as towns with all named buildings
-    for (const id of Object.keys(CITIES)) { const z = w.zones.get(id); assert.equal(z.kind, 'town'); assert.equal(z.map.doors.filter(d => !d.home).length, CITIES[id].districts.flatMap(d => d.buildings).length, id); assert.ok(w.life.byCity[id].list.length > 30); }
+    for (const id of Object.keys(CITIES)) { const z = w.zones.get(id); assert.equal(z.kind, 'town'); assert.equal(z.map.doors.filter(d => !d.home).length, CITIES[id].districts.flatMap(d => d.buildings).length, id); assert.ok(w.life.byCity[id].list.length > (id === 'nameless_village' ? 4 : 30), id); } // the nameless village starts as a tiny settlement
     // enter guild hall, join adventurers guild, take & finish a quest
     goDoor('h_guild'); assert.equal(s.actor.zone.id, 'in:h_guild');
     const g = goNpc('guildhq'); assert.equal(g.service, 'guild'); assert.equal(g.data.member, false);

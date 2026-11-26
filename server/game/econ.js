@@ -55,7 +55,7 @@ export class Econ {
     s.send({ t: 'open', service: 'travel', data: { city, cityName: CITIES[city].name, routes, weather: WEATHER[wx] } });
   }
   travel(s, to) {
-    const z = s.actor.zone; const r = ROUTES.find(x => (x[0] === z.cityId && x[1] === to) || (x[1] === z.cityId && x[0] === to)); if (!r) return this.err(s, 'その路線はありません');
+    const z = s.actor.zone; const r = ROUTES.find(x => (x[0] === z.cityId && x[1] === to) || (x[1] === z.cityId && x[0] === to)); if (!r) return this.err(s, 'その路線はありません'); if (this.world.society && !this.world.society.routeOk(z.cityId, to)) return this.err(s, 'この交易路は不通になっている（交易路監督官に相談しよう）');
     const [, , mode, min, fee] = r; if (TRANSPORT[mode].stormBlocked && (this.world.life.weatherOf(z.cityId) === 'storm' || this.world.life.weatherOf(to) === 'storm')) return this.err(s, '嵐のため欠航しています');
     if (s.ch.gold < fee) return this.err(s, 'ゴールドが足りません'); s.ch.gold -= fee;
     s.send({ t: 'loading', v: `${TRANSPORT[mode].name}で${CITIES[to].name}へ（所要${min}分）`, mode, ms: 1200 + min * 12 });

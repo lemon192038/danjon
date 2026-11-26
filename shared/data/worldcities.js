@@ -1,4 +1,5 @@
 import { REALM_CITY_ROWS } from './realms.js';
+import { VILLAGE_ROW, VILLAGE_ARCH, VILLAGE_BASE, VILLAGE_ID } from './society.js';
 // New-world cities (PHASE 2): 6 continents. Each city = archetype (layout, districts, standard facilities) +
 // its own identity data (history, politics, culture, landmark, unique buildings, goods, climate). Output is
 // CITIES-compatible, so the existing city generator, life sim, guilds, economy and travel work unchanged.
@@ -19,6 +20,7 @@ const STD = {
 };
 // archetype layouts: districts (type → floor/wealth), standard facilities per district, map size, palette, water
 const ARCH = {
+  village: VILLAGE_ARCH, // PHASE E: the nameless village (its buildings grow with its facilities)
   capital: { size: [124, 94], pal: 'town', dist: [['rich', 0.5, 0.2, ['bank', 'outfit']], ['commerce', 0.5, 0.52, ['adv', 'weapon', 'item', 'trade', 'station', 'job']], ['common', 0.22, 0.75, ['inn', 'tavern', 'smith', 'armor', 'realty']], ['special', 0.8, 0.75, ['church', 'library', 'clinic']]] },
   trade: { size: [104, 80], pal: 'town', river: true, dist: [['rich', 0.75, 0.25, ['bank', 'outfit']], ['commerce', 0.45, 0.45, ['adv', 'trade', 'weapon', 'item', 'station']], ['common', 0.25, 0.75, ['inn', 'tavern', 'smith', 'armor', 'job', 'realty']], ['slum', 0.8, 0.78, ['info', 'black', 'clinic']]] },
   scholar: { size: [96, 74], pal: 'arcane', lake: true, dist: [['rich', 0.5, 0.18, ['library']], ['commerce', 0.3, 0.55, ['adv', 'item', 'weapon', 'station', 'job']], ['common', 0.72, 0.6, ['inn', 'tavern', 'smith', 'armor', 'realty', 'outfit']]] },
@@ -106,14 +108,14 @@ export const NEW_FIELDS = {
 };
 // overland chains per continent (city - field - city ...). The first field of each chain links the hub city.
 export const CHAINS = {
-  eldia: [['arcelia', 'field_capital', 'vermion'], ['arcelia', 'field_greatwood', 'elmgard'], ['vermion', 'luminas'], ['vermion', 'drakford'], ['arcelia', 'marinelia'], ['arcelia', 'celestia_holy']],
+  eldia: [['field_greatwood', VILLAGE_ID], ['arcelia', 'field_capital', 'vermion'], ['arcelia', 'field_greatwood', 'elmgard'], ['vermion', 'luminas'], ['vermion', 'drakford'], ['arcelia', 'marinelia'], ['arcelia', 'celestia_holy']],
   nordia: [['frostheim', 'frostvale', 'granberg'], ['granberg', 'weissberg', 'whiteridge'], ['frostheim', 'crystalwood', 'ignis_zero'], ['ignis_zero', 'glacial_grave', 'valhart'], ['valhart', 'arctica']],
   shengar: [['ryuga', 'seiryu_bamboo', 'kazane'], ['ryuga', 'yggdrasil_grove', 'elfilia'], ['kazane', 'voltplain', 'tenrai'], ['tenrai', 'tempest_ridge', 'shuraga'], ['shuraga', 'amatsukami']],
   saharia: [['azradia', 'endless_dune', 'bazaruk'], ['bazaruk', 'dustvale', 'mirage'], ['azradia', 'necropolis', 'nefer'], ['nefer', 'atum'], ['mirage', 'undersand', 'zal_qadim']],
   valgran: [['valcanos', 'inferno_rift', 'dragnia'], ['valcanos', 'ashland', 'greymoll'], ['greymoll', 'obsidian_wood', 'baldran'], ['baldran', 'magma_crevasse', 'ashbell'], ['ashbell', 'arcane_forge'], ['dragnia', 'draconic_nest']],
   asteria: [['nereia', 'crystal_reef', 'bluecoast'], ['nereia', 'abyssal_ocean', 'atlantia'], ['atlantia', 'silent_trench', 'aquaria'], ['aquaria', 'nereid_sanctuary'], ['bluecoast', 'storm_archipelago', 'seirune']],
 };
-C.push(...REALM_CITY_ROWS); // PHASE 9: hidden realm hubs (continent 'realm', reached only through realm gates)
+C.push(...REALM_CITY_ROWS); VILLAGE_ROW[6].extra = { common: VILLAGE_BASE }; C.push(VILLAGE_ROW); // PHASE 9: hidden realm hubs (continent 'realm', reached only through realm gates)
 export const CONT_OF = {}; export const NEW_CITIES = {};
 for (const [id, name, short, cont, arch, mode, o] of C) {
   const A = ARCH[arch]; CONT_OF[id] = cont; const pre = 'w_' + id;

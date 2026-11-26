@@ -32,6 +32,7 @@ import { CityEvents } from './cityevents.js';
 import { StoryNpcs } from './storynpc.js';
 import { Machina } from './machina.js';
 import { Explore } from './explore.js';
+import { Society } from './society.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
@@ -47,7 +48,7 @@ export class World {
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.machina = new Machina(this); this.machina.decorate(this.zones); this.explore = new Explore(this); this.explore.decorate(this.zones); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
-    this.story = new StoryNpcs(this);
+    this.story = new StoryNpcs(this); this.society = new Society(this); this.society.place(this.zones);
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
     setInterval(() => this.npcs.abstractTick(), 1000);
@@ -95,7 +96,7 @@ export class World {
     migrate(ch); s.ch = ch; this.sessions.set(cid, s); this.econ.catchUp(ch);
     const zid = this.zones.has(ch.pos.zone) && WORLD[ch.pos.zone] ? ch.pos.zone : 'haven';
     if (!(ch.raid && this.slum.rejoin(s))) { this.enterZone(s, this.zones.get(zid), ch.pos.zone === zid ? ch.pos : null); if (ch.raid) this.slum.fail(s, 'dc'); }
-    s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` });
+    s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` }); this.society.onLogin(s);
   }
   detach(s) {
     if (!s.ch) return;
@@ -170,7 +171,7 @@ export class World {
     // party NPCs follow the player
     for (const nid of this.partyOf(s.ch.id)?.npcs || []) { const n = this.npcs.byId.get(nid); if (!n) continue; this.npcs.despawn(n); this.npcs.spawn(n, z, { x: a.x + 12, y: a.y + 10 }); const na = n.actorId && z.actors.get(n.actorId); if (na) na.team = a.team; }
     if (z.kind === 'dungeon') { this.onFloorReached(s, z); this.big.onFloor(s, z); this.library.onEnterSealed(s, z); this.cev.onFloor(s, z, false); }
-    this.cev.onEnterZone(s, z);
+    this.cev.onEnterZone(s, z); this.society?.onEnterZone(s, z);
     if (z.kind === 'field') this.big.onEnterField(s, z);
   }
   // story NPCs: their own event panel, or the event whose current step needs them, or a plain talk with their current line
@@ -255,7 +256,7 @@ export class World {
       const floor = z.floor || Math.round((m.level || 1) * 0.8);
       const loot = z.kind === 'slum' ? [] : rollLoot({ floor, diff: z.diff || 'NORMAL', boss: false, luck: mods.drop ? mods.drop * 0.03 : 0, preferWt: f.wt.id });
       if (loot.length) z.dropLoot(f, m.x, m.y, loot);
-      this.questCheck(s, { kind: 'kill', fam: m.fam }); this.sev.onKill(s, m); this.guilds.event(s, { kind: 'kill', fam: m.fam, elite: !!m.elite }); this.econ.monsterMat(s, m); this.spells.dropFor(s, z, m); this.cev.onKill(s, m, f); this.machina.onKilled(s, m); if (this.big.bmActive() && Math.random() < 0.03) { addItem(ch, { kind: 'mat', ref: 'moonShard', n: 1 }); this.note(s, { t: 'msg', v: '月影の欠片を手に入れた' }); } this.econ.requestKill(s, m.fam); this.econ.storyEvent(s, { kind: 'kill', fam: m.fam });
+      this.questCheck(s, { kind: 'kill', fam: m.fam }); this.sev.onKill(s, m); this.guilds.event(s, { kind: 'kill', fam: m.fam, elite: !!m.elite }); this.econ.monsterMat(s, m); this.spells.dropFor(s, z, m); this.cev.onKill(s, m, f); this.machina.onKilled(s, m); this.society.onKill(s, m, z); if (this.big.bmActive() && Math.random() < 0.03) { addItem(ch, { kind: 'mat', ref: 'moonShard', n: 1 }); this.note(s, { t: 'msg', v: '月影の欠片を手に入れた' }); } this.econ.requestKill(s, m.fam); this.econ.storyEvent(s, { kind: 'kill', fam: m.fam });
     }
     if (z.duel) { if (m.duelBoss) { if (z.duel.cev) this.cev.onDuelKill(z); else this.sev.onDuelKill(z); } } else if (z.arena) this.econ.arenaKill(z);
     if (z.kind === 'slum') this.slum.onKill(z, m, killer?.kind === 'player' ? killer : [...z.players][0]);
@@ -473,6 +474,8 @@ export class World {
     if (service === 'cev') return this.cev.open(s, npc.ev);
     if (service === 'realmgate') return this.cev.realmGate(s);
     if (service === 'train') return this.explore.openTrain(s);
+    if (service === 'soc') return this.society.open(s, npc.ev);
+    if (service === 'village' || service === 'vshop') return this.society.openVillage(s);
     if (service === 'mapless') return this.explore.openMapless(s);
     if (service === 'graymarket') { this.events.record(s, 'sl_graymarket', '灰色市場を訪れた'); return this.openMarket(s, 'gravel_under', { who: '灰色市場' }); }
     if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
@@ -524,7 +527,7 @@ export class World {
       case 'enhance': { if (!inTown) return err('鍛冶屋で強化できます'); const r = enhance(ch, m.uid); if (r.error) return err(r.error); return ok(r.ok ? `強化成功！ +${r.plus}` : '強化失敗…（素材は消費されました）'); }
       case 'quest': { const board = questBoard(a.zone.id, day()); const q = board.find(x => x.id === m.id) || ch.progress.quests[m.id]?.def;
         if (m.act === 'accept') { if (!q || ch.progress.quests[q.id]) return; if (Object.values(ch.progress.quests).filter(x => !x.done).length >= 8) return err('同時受注は8件までです'); ch.progress.quests[q.id] = { def: q, prog: 0 }; return ok(`「${q.name}」を受注しました`); }
-        if (m.act === 'turnin') { const st = ch.progress.quests[m.id]; if (!st?.ready || st.done) return err('未達成です'); st.done = true; const r = st.def.reward; ch.gold += r.gold || 0; grantXp(ch, r.xp || 0, n => this.note(s, n)); if (r.ore) addItem(ch, { kind: 'mat', ref: 'ore', n: r.ore });
+        if (m.act === 'turnin') { const st = ch.progress.quests[m.id]; if (!st?.ready || st.done) return err('未達成です'); st.done = true; const r = st.def.reward; const qm = this.society.questMul(st, ch); ch.gold += Math.round((r.gold || 0) * qm); grantXp(ch, Math.round((r.xp || 0) * qm), n => this.note(s, n)); if (r.ore) addItem(ch, { kind: 'mat', ref: 'ore', n: r.ore });
           if (r.item === 'weaponBoss') for (const it of rollLoot({ floor: st.def.floor, diff: 'HARD', boss: true, preferWt: a.wt.id })) addItem(ch, it, n => this.note(s, n));
           if (r.myth) for (const it of rollLoot({ floor: 100, diff: 'ABYSS', boss: false, mythChance: 1 })) if (it.myth) addItem(ch, it, n => this.note(s, n));
           if (r.relic) ch.progress.items[r.relic] = 1; checkJobUnlocks(ch, n => this.note(s, n));
@@ -539,6 +542,7 @@ export class World {
       case 'cev': return this.cev.act(s, m);
       case 'realm': return this.cev.realmAct(s, m);
       case 'train': return this.explore.trainAct(s, m);
+      case 'soc': return this.society.menu(s, m);
       case 'mapless': return this.explore.readMapless(s, m.id);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });
       case 'leave': if (a.zone.kind === 'dungeon') this.leaveDungeon(s); return;
