@@ -2,6 +2,7 @@
 import { SPECIAL_DUNGEONS, EVENT_BOSSES } from '/shared/data/bigevents.js';
 import { SEALED, SEALED_BOSSES } from '/shared/data/library.js';
 import { CITY_DUNGEONS, CITY_BOSSES } from '/shared/data/cityevents.js';
+import { REALM_DUNGEONS, REALM_BOSSES } from '/shared/data/realms.js';
 export const D = { index: null, jobs: null, jobMap: new Map(), levelSkills: null, content: null, types: new Map(), skills: new Map(), weapons: new Map(), dungeons: {} };
 const J = p => fetch(p).then(r => r.json());
 export async function loadCore() {
@@ -10,7 +11,7 @@ export async function loadCore() {
   for (const j of jobs) { D.jobMap.set(j.id, j); D.skills.set(j.active.id, j.active); }
   for (const s of ls) D.skills.set(s.id, s); D.spells = spells; for (const s of spells) D.skills.set(s.id, s);
   for (const d of content.dungeons) D.dungeons[d.id] = d;
-  for (const d of [...Object.values(SPECIAL_DUNGEONS), SEALED, ...Object.values(CITY_DUNGEONS)]) D.dungeons[d.id] = d; for (const b of [...EVENT_BOSSES, ...SEALED_BOSSES, ...CITY_BOSSES]) if (!content.bosses.some(x => x[0] === b[0])) content.bosses.push(b);
+  for (const d of [...Object.values(SPECIAL_DUNGEONS), SEALED, ...Object.values(CITY_DUNGEONS), ...Object.values(REALM_DUNGEONS)]) D.dungeons[d.id] = d; for (const b of [...EVENT_BOSSES, ...SEALED_BOSSES, ...CITY_BOSSES, ...REALM_BOSSES]) if (!content.bosses.some(x => x[0] === b[0])) content.bosses.push(b);
   for (const t of index.types) for (const [id, name, rar, lvl] of t.weapons) D.weapons.set(id, { id, name, rar, lvl, wt: t.id, stub: true });
 }
 const pending = new Map();

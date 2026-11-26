@@ -9,6 +9,7 @@ const J = f => JSON.parse(fs.readFileSync(path.join(GEN, f), 'utf8'));
 import { SPECIAL_DUNGEONS, EVENT_BOSSES } from '../shared/data/bigevents.js';
 import { SEALED, SEALED_BOSSES } from '../shared/data/library.js';
 import { CITY_DUNGEONS, CITY_BOSSES } from '../shared/data/cityevents.js';
+import { REALM_DUNGEONS, REALM_BOSSES } from '../shared/data/realms.js';
 export const DATA = { weapons: new Map(), skills: new Map(), wtSkills: new Map(), wtWeapons: new Map(), jobs: new Map(), jobList: [], levelSkills: [], families: new Map(), bosses: new Map(), dungeons: new Map(), dungeonList: [] };
 
 for (const wt of WEAPON_TYPES) {
@@ -28,8 +29,8 @@ for (const b of c.bosses) DATA.bosses.set(b[0], { key: b[0], name: b[1], sprite:
 DATA.dungeonList = c.dungeons;
 for (const d of c.dungeons) DATA.dungeons.set(d.id, d);
 // PHASE 7 part 2: event bosses and hidden special dungeons (not part of dungeonList: never in gates/guild lists)
-for (const b of [...EVENT_BOSSES, ...SEALED_BOSSES, ...CITY_BOSSES]) if (!DATA.bosses.has(b[0])) DATA.bosses.set(b[0], { key: b[0], name: b[1], sprite: b[2], abilities: b[3] });
-for (const d of [...Object.values(SPECIAL_DUNGEONS), SEALED, ...Object.values(CITY_DUNGEONS)]) DATA.dungeons.set(d.id, d);
+for (const b of [...EVENT_BOSSES, ...SEALED_BOSSES, ...CITY_BOSSES, ...REALM_BOSSES]) if (!DATA.bosses.has(b[0])) DATA.bosses.set(b[0], { key: b[0], name: b[1], sprite: b[2], abilities: b[3] });
+for (const d of [...Object.values(SPECIAL_DUNGEONS), SEALED, ...Object.values(CITY_DUNGEONS), ...Object.values(REALM_DUNGEONS)]) DATA.dungeons.set(d.id, d);
 
 export const dataAccess = { weapon: id => DATA.weapons.get(id), job: id => DATA.jobs.get(id), wtSkills: wt => DATA.wtSkills.get(wt) };
 export { WEAPON_TYPES, WT_BY_ID };

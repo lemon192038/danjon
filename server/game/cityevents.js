@@ -2,7 +2,11 @@
 // generic steps hooked into the rest of the game (kills, floors, visits, gathering, quizzes, duels), choices with
 // world-shared effects, per-period repeatable rewards, and the services some events open (festival stalls, royal auction,
 // the hundred-arms festival, the midnight shop, the Drakford duelists, adventurer rank tests).
-import { CITY_EVENTS, CITY_DUNGEONS, RANK_TESTS, ADV_RANKS, DUELISTS } from '../../shared/data/cityevents.js';
+import { CITY_EVENTS as CITY_ONLY, CITY_DUNGEONS, RANK_TESTS, ADV_RANKS, DUELISTS } from '../../shared/data/cityevents.js';
+import { REALM_EVENTS, REALM_LINK, REALM_DUNGEONS } from '../../shared/data/realms.js';
+import { BOOKS } from '../../shared/data/library.js';
+import { PLACE } from '../../shared/data/world.js';
+const CITY_EVENTS = { ...CITY_ONLY, ...REALM_EVENTS }; // PHASE 9: realm discovery events run on the same engine
 import { EVENT_BY_ID } from '../../shared/data/events.js';
 import { ITEMS } from '../../shared/data/guilds.js';
 import { WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
@@ -16,7 +20,7 @@ import { addItem } from './progress.js';
 import { hash32, rng } from '../../shared/util.js';
 
 const night = () => { const h = clock().hour; return h >= 20 || h < 5; };
-const STEP_NAME = { talk: '会話', night: '夜の会話', midnight: '真夜中', fund: '資金', gather: '納品', kill: '討伐', arms: '武器種', duel: '決闘', floor: '探索', visit: '調査', quiz: '知識', spells: '魔法', rank: '昇格試験', choice: '決断' };
+const STEP_NAME = { level: '力', books: '読書', event: '前提', talk: '会話', night: '夜の会話', midnight: '真夜中', fund: '資金', gather: '納品', kill: '討伐', arms: '武器種', duel: '決闘', floor: '探索', visit: '調査', quiz: '知識', spells: '魔法', rank: '昇格試験', choice: '決断' };
 for (const [id, E] of Object.entries(CITY_EVENTS)) { const d = EVENT_BY_ID[id]; d.stages = E.steps.map(st => st.k === 'choice' ? '決断' : st.k === 'talk' ? '話を聞く' : (st.label || st.text || STEP_NAME[st.k]).replace(/[「」].*$/, '').slice(0, 30));
   d.outcomes = E.steps.flatMap(st => st.k === 'choice' ? st.options.map(o => o.label) : []); d.status = 'live'; d.repeat = E.repeat || 'none'; if (E.sched) d.notes = `${d.notes ? d.notes + '。' : ''}開催：${E.sched.label}`; }
 const MIDNIGHT = [{ ref: 'elixir', price: 700, max: 3 }, { ref: 'luckCharm', price: 900, max: 2 }, { ref: 'xpScroll', price: 1200, max: 2 }, { ref: 'returnWing', price: 200, max: 5 }, { ref: 'traitTicket', price: 30000, max: 1 }];
@@ -50,7 +54,7 @@ export class CityEvents {
       started: !!P, done: !!P?.done, clears: P?.clears || 0, outcome: P?.outcome || null, repeat: E.repeat || 'none', again: !!P?.done && E.repeat && E.repeat !== 'none' && (ch.progress.cevPeriod?.[ev] ?? -1) !== this.period(E),
       steps: E.steps.map((x, i) => ({ k: x.k, text: x.text || x.label, done: P ? P.done || i < P.stage : false, cur: P && !P.done && i === P.stage })),
       cur: st ? { k: st.k, text: st.text, n: st.n, prog: P.data.prog || 0, q: st.q, qopts: st.options && st.k === 'quiz' ? st.options : null, visited: P.data.visited || [], zones: st.zones?.length || 0, options: st.k === 'choice' ? st.options.map(o => ({ id: o.id, label: o.label })) : null, night: night(), midnight: clock().hour === 0 } : null,
-      world: w ? { state: w.state, outcome: w.outcome } : null, reward: E.reward, rank, gate: E.gate && P && (P.done || P.stage >= E.steps.findIndex(x => x.k === 'floor')) ? E.gate : null, service: this.serviceView(s, ev) }; }
+      world: w ? { state: w.state, outcome: w.outcome } : null, reward: E.reward, rank, realm: E.realm ? { name: PLACE[E.realm]?.name, open: !!ch.progress.realms?.[E.realm] } : null, gate: E.gate && P && (P.done || P.stage >= E.steps.findIndex(x => x.k === 'floor')) ? E.gate : null, service: this.serviceView(s, ev) }; }
   open(s, ev) { s.send({ t: 'open', service: 'cev', data: this.view(s, ev) }); }
   near(s, ev) { const z = s.actor.zone; return z.map.npcs?.some(n => n.service === 'cev' && n.ev === ev && Math.hypot(n.x * 16 + 8 - s.actor.x, n.y * 16 + 8 - s.actor.y) < 70); }
   // ── actions
@@ -59,6 +63,7 @@ export class CityEvents {
     if (!this.near(s, ev)) return err(`${E.host.name}のそばで話してください`);
     const closed = this.avail(ev, z.cityId || z.id); if (closed) return err(closed);
     if (m.act === 'svc') return this.service(s, ev, m);
+    if (m.act === 'gate' && E.realm) { if (!ch.progress.realms?.[E.realm]) return err('まだ道は開いていない'); return this.toRealm(s, E.realm); }
     if (m.act === 'gate') { if (!E.gate || !this.canEnter(ch, E.gate)) return err('まだ入口は開いていない'); return s.send({ t: 'open', service: 'gate', data: { dungeons: [E.gate], special: true } }); }
     let P = EV.prog(ch, ev);
     if (m.act === 'start') { if (P && !P.done) return this.open(s, ev); if (P?.done && (!E.repeat || E.repeat === 'none')) return err('このイベントは達成済み');
@@ -72,6 +77,9 @@ export class CityEvents {
       case 'fund': if (ch.gold < st.gold) return err(`${st.gold.toLocaleString()}G必要`); ch.gold -= st.gold; return this.next(s, ev);
       case 'gather': { if (!this.take(ch, st.ref, st.n)) return err(`${ITEMS[st.ref]?.name || st.ref}×${st.n}が必要`); return this.next(s, ev); }
       case 'quiz': { if ((m.choice | 0) !== st.a) { P.data.miss = (P.data.miss || 0) + 1; return err('……違うようだ。もう一度考えてみよう'); } return this.next(s, ev); }
+      case 'level': if (ch.level < st.n) return err(`Lv${st.n}が必要（現在Lv${ch.level}）`); return this.next(s, ev);
+      case 'books': { const n = BOOKS.filter(b => b.cat === st.cat && (ch.progress.books?.[b.id] || 0) >= b.pages.length).length; if (n < st.n) return err(`禁書庫の書を読み終える必要がある（${n}/${st.n}）`); return this.next(s, ev); }
+      case 'event': if (!EV.isDone(ch, st.id)) return err(`イベント「${EVENT_BY_ID[st.id].name}」を達成してから`); return this.next(s, ev);
       case 'spells': { const n = Object.values(ch.spells || {}).filter(v => v.stage >= 4).length; if (n < st.n) return err(`失われた魔法を${st.n}つ習得してから（現在${n}）`); return this.next(s, ev); }
       case 'duel': return this.duel(s, ev, st);
       case 'rank': return this.rankAct(s, ev, m);
@@ -88,6 +96,7 @@ export class CityEvents {
     if (W.state) EV.setWorld(ev, W.state, { outcome: o.label, note: `${s.ch.name}の働きで「${EVENT_BY_ID[ev].name}」が収まった：${o.effect}` });
     econ.addNews(`【${EVENT_BY_ID[ev].name}】${s.ch.name}の選択：${o.effect}`); EV.grant(s, ev, 'choice:' + o.id, this.rew(s, o.reward || {})); this.finish(s, ev, o.label); }
   finish(s, ev, outcome) { const E = CITY_EVENTS[ev], EV = this.world.events, ch = s.ch; EV.complete(s, ev, outcome); (ch.progress.cevPeriod ||= {})[ev] = this.period(E);
+    if (E.realm) this.unlockRealm(s, E.realm);
     const rep = E.repeat && E.repeat !== 'none'; EV.grant(s, ev, 'clear', this.rew(s, E.reward), { perAttempt: rep }); if (rep && E.reward.title) EV.grant(s, ev, 'title', { title: E.reward.title });
     this.world.sendSelf(s); if (this.near(s, ev)) this.open(s, ev); }
   rew(s, r) { const out = { gold: r.gold, xp: r.xp, title: r.title }; const ch = s.ch; if (r.flag) (ch.progress.flags ||= {})[r.flag] = true;
@@ -160,5 +169,17 @@ export class CityEvents {
       this.world.events.grant(s, 'ct_duelist', 'first', { title: '酒場の決闘者', xp: 4000 }); if (Object.keys(ch.progress.duelRec).filter(k => ch.progress.duelRec[k].w > 0).length >= DUELISTS.length) this.world.events.grant(s, 'ct_duelist', 'all', { title: 'ドラクフォードの勝ち頭', gold: 10000 });
       this.world.duels.leave(s, z, `${d.name}に勝利した！（賞金${gold.toLocaleString()}G）`); }
     else { g.w++; me.l++; g.rep = Math.min(100, (g.rep ?? d.rep) + 1); } }
-  canEnterDungeon(s, d) { if (!CITY_DUNGEONS[d.id]) return true; if (this.canEnter(s.ch, d.id)) return true; s.send({ t: 'err', v: `${d.name}への道はまだ見つかっていない` }); return false; }
+  // ── realms (PHASE 9): unlocked by their discovery event; reached through the host or a realm gate
+  unlockRealm(s, realm) { const ch = s.ch; (ch.progress.realms ||= {})[realm] = Date.now(); this.world.events.discover(s, realm); this.world.note(s, { t: 'msg', v: `特殊領域「${PLACE[realm]?.name}」への道が開いた` }); }
+  toRealm(s, realm) { const L = REALM_LINK[realm]; const hz = this.world.zones.get(L.hub); if (hz && L.hub !== 'celestia_holy') { s.send({ t: 'loading', v: PLACE[realm]?.name }); return this.world.enterZone(s, hz); }
+    s.send({ t: 'open', service: 'gate', data: { dungeons: [L.dungeon], special: true } }); }
+  realmOf(cityId) { return Object.entries(REALM_LINK).find(([, L]) => L.hub === cityId || L.hub2 === cityId)?.[0]; }
+  realmGate(s) { const z = s.actor.zone; const realm = this.realmOf(z.cityId); if (!realm) return; const L = REALM_LINK[realm]; const back = REALM_EVENTS[L.ev].host.city;
+    s.send({ t: 'open', service: 'realmgate', data: { realm: PLACE[realm]?.name, back, backName: CITIES[back]?.name, dungeon: L.dungeon, dungeonName: REALM_DUNGEONS[L.dungeon].name, other: L.hub2 ? (z.cityId === L.hub ? L.hub2 : L.hub) : null, otherName: L.hub2 ? CITIES[z.cityId === L.hub ? L.hub2 : L.hub]?.name : null } }); }
+  realmAct(s, m) { const z = s.actor.zone; const realm = this.realmOf(z.cityId); if (!realm || z.kind !== 'interior') return; const L = REALM_LINK[realm];
+    if (m.to === 'back') { const c = REALM_EVENTS[L.ev].host.city; s.send({ t: 'loading', v: CITIES[c].name }); return this.world.enterZone(s, this.world.zones.get(c)); }
+    if (m.to === 'other' && L.hub2) return this.world.enterZone(s, this.world.zones.get(z.cityId === L.hub ? L.hub2 : L.hub));
+    if (m.to === 'dungeon') return s.send({ t: 'open', service: 'gate', data: { dungeons: [L.dungeon], special: true } }); }
+  canEnterDungeon(s, d) { if (d.realm && !s.ch.progress.realms?.[d.realm]) { s.send({ t: 'err', v: `${PLACE[d.realm]?.name}はまだ見つかっていない` }); return false; }
+    if (!CITY_DUNGEONS[d.id]) return true; if (this.canEnter(s.ch, d.id)) return true; s.send({ t: 'err', v: `${d.name}への道はまだ見つかっていない` }); return false; }
 }

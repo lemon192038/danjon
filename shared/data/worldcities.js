@@ -1,3 +1,4 @@
+import { REALM_CITY_ROWS } from './realms.js';
 // New-world cities (PHASE 2): 6 continents. Each city = archetype (layout, districts, standard facilities) +
 // its own identity data (history, politics, culture, landmark, unique buildings, goods, climate). Output is
 // CITIES-compatible, so the existing city generator, life sim, guilds, economy and travel work unchanged.
@@ -8,7 +9,7 @@ const STD = {
   weapon: (p, n) => B(p + '_weapon', `${n}武具店`, 'shop', 'M', { svc: 'weapon', hours: [7, 20] }), armor: (p, n) => B(p + '_armor', `${n}防具工房`, 'shop', 'S', { svc: 'armor', hours: [8, 19] }),
   item: (p, n) => B(p + '_item', `${n}道具屋`, 'shop', 'S', { svc: 'item', hours: [6, 22] }), smith: (p, n) => B(p + '_smith', `${n}鍛冶屋`, 'smithy', 'M', { svc: 'smith', hours: [7, 19] }),
   inn: (p, n) => B(p + '_inn', `宿屋「${n}の灯」`, 'inn', 'M', { svc: 'inn' }), job: (p, n) => B(p + '_job', `職業ギルド ${n}支部`, 'guildhall', 'M', { svc: 'guild' }),
-  station: (p, n, mode) => B(p + '_station', mode === 'ship' ? `${n}港の発着所` : mode === 'airship' ? `${n}飛空艇発着場` : `${n}駅馬車の停留所`, 'station', 'S', { svc: 'travel' }),
+  station: (p, n, mode) => mode === 'portal' ? B(p + '_station', `${n}の転移門`, 'station', 'S', { svc: 'realmgate' }) : B(p + '_station', mode === 'ship' ? `${n}港の発着所` : mode === 'airship' ? `${n}飛空艇発着場` : `${n}駅馬車の停留所`, 'station', 'S', { svc: 'travel' }),
   realty: (p, n) => B(p + '_realty', `${n}不動産`, 'office', 'S', { svc: 'realty', hours: [8, 18] }), tavern: (p, n) => B(p + '_tavern', `酒場「${n}の杯」`, 'tavern', 'M', { hours: [11, 3] }),
   bank: (p, n) => B(p + '_bank', `${n}銀行`, 'bank', 'M', { svc: 'bank', hours: [9, 17] }), trade: (p, n) => B(p + '_trade', `${n}交易所`, 'office', 'M', { svc: 'trade', hours: [6, 20] }),
   church: (p, n) => B(p + '_church', `${n}聖堂`, 'church', 'M', { svc: 'inn' }), clinic: (p, n) => B(p + '_clinic', `${n}診療所`, 'clinic', 'S', { svc: 'inn' }),
@@ -112,6 +113,7 @@ export const CHAINS = {
   valgran: [['valcanos', 'inferno_rift', 'dragnia'], ['valcanos', 'ashland', 'greymoll'], ['greymoll', 'obsidian_wood', 'baldran'], ['baldran', 'magma_crevasse', 'ashbell'], ['ashbell', 'arcane_forge'], ['dragnia', 'draconic_nest']],
   asteria: [['nereia', 'crystal_reef', 'bluecoast'], ['nereia', 'abyssal_ocean', 'atlantia'], ['atlantia', 'silent_trench', 'aquaria'], ['aquaria', 'nereid_sanctuary'], ['bluecoast', 'storm_archipelago', 'seirune']],
 };
+C.push(...REALM_CITY_ROWS); // PHASE 9: hidden realm hubs (continent 'realm', reached only through realm gates)
 export const CONT_OF = {}; export const NEW_CITIES = {};
 for (const [id, name, short, cont, arch, mode, o] of C) {
   const A = ARCH[arch]; CONT_OF[id] = cont; const pre = 'w_' + id;

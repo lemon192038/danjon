@@ -13,7 +13,7 @@ export function clock(now = Date.now()) { const total = Math.floor((now + OFFSET
 // seasons: 4 seasons x 7 game days. Climate of each continent sets the base temperature; weather and night adjust it.
 export const SEASONS = [{ id: 'spring', name: '春', t: 0, wx: { rain: 1.5, clear: 1.1 } }, { id: 'summer', name: '夏', t: 9, wx: { storm: 1.8, clear: 1.3, snow: 0 } }, { id: 'autumn', name: '秋', t: -1, wx: { fog: 1.8, wind: 1.5, cloud: 1.2 } }, { id: 'winter', name: '冬', t: -11, wx: { snow: 3, clear: 0.8, storm: 0.6 } }];
 export const season = (day = clock().day) => SEASONS[Math.floor(((day % 28) + 28) % 28 / 7)];
-const BASE_T = { eldia: 16, nordia: -6, shengar: 18, saharia: 31, valgran: 27, asteria: 23 };
+const BASE_T = { realm: 15, eldia: 16, nordia: -6, shengar: 18, saharia: 31, valgran: 27, asteria: 23 };
 const WX_T = { clear: 2, cloud: 0, rain: -3, snow: -6, fog: -1, wind: -2, storm: -4, smog: 1, aurora: -3 };
 export function temperature(cityId, wx, c = clock()) { const cont = CITIES[cityId]?.continent || 'eldia'; const se = season(c.day); const night = c.hour < 6 || c.hour >= 20 ? (cont === 'saharia' ? -14 : -5) : 0; return Math.round(BASE_T[cont] + se.t * (cont === 'saharia' ? 0.4 : 1) + (WX_T[wx] || 0) + night); }
 export const isOpen = (hours, h) => !hours ? true : hours[0] < hours[1] ? h >= hours[0] && h < hours[1] : h >= hours[0] || h < hours[1] % 24 || (hours[1] === 24 && h >= hours[0]);

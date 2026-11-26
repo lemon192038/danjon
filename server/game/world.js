@@ -453,6 +453,7 @@ export class World {
     if (service === 'archive') { this.library.syncSins(s); return this.library.open(s); }
     if (service === 'sealgate') return this.library.sealGate(s);
     if (service === 'cev') return this.cev.open(s, npc.ev);
+    if (service === 'realmgate') return this.cev.realmGate(s);
     if (service === 'graymarket') { this.events.record(s, 'sl_graymarket', '灰色市場を訪れた'); return this.openMarket(s, 'gravel_under', { who: '灰色市場' }); }
     if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
     const data = { service };
@@ -515,6 +516,7 @@ export class World {
       case 'calamity': return this.big.calAct(s, m);
       case 'library': return this.library.menu(s, m);
       case 'cev': return this.cev.act(s, m);
+      case 'realm': return this.cev.realmAct(s, m);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });
       case 'leave': if (a.zone.kind === 'dungeon') this.leaveDungeon(s); return;
       case 'invite': { const t = [...this.sessions.values()].find(o => o.ch?.name === m.name); if (!t || t === s) return err('プレイヤーが見つかりません'); const p = this.ensureParty(ch.id); if (p.leader !== ch.id) return err('リーダーのみ招待できます'); if (p.members.length + p.npcs.length >= 6) return err('パーティーは6人までです'); p.invites.add(t.ch.id); t.send({ t: 'invite', from: ch.name, pid: p.id }); this.pushParty(ch.id); return ok(`${t.ch.name}を招待しました`); }

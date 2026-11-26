@@ -3,10 +3,13 @@ const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&
 const ACT = { talk: '話を進める', night: '話を聞く（夜のみ）', midnight: '鐘を聞く（0時台のみ）', gather: '届ける', fund: '支払う', duel: '決闘に挑む', spells: '研究者と語る' };
 export function installCev(UI) {
   const P = UI.prototype; const prevPanel = P.cityPanel;
-  P.cityPanel = function (s, data) { if (s === 'cev') { this.svc = data; if (this.panel !== 'cev' || !this.modalOpen) this.open('cev', s); else this.render(); return true; } return prevPanel.call(this, s, data); };
-  const prevAct = P.cityAct; P.cityAct = function (a, t) { const d = t.dataset; if (a !== 'cv') return prevAct.call(this, a, t);
+  P.cityPanel = function (s, data) { if (s === 'realmgate') { this.svc = data; this.open('realmgate', s); return true; } if (s === 'cev') { this.svc = data; if (this.panel !== 'cev' || !this.modalOpen) this.open('cev', s); else this.render(); return true; } return prevPanel.call(this, s, data); };
+  const prevAct = P.cityAct; P.cityAct = function (a, t) { const d = t.dataset; if (a === 'rg') { this.closeModal(); this.net.menu('realm', { to: d.to }); return true; } if (a !== 'cv') return prevAct.call(this, a, t);
     const o = { ev: this.svc.ev, act: d.do }; if (d.choice != null) o.choice = d.choice; if (d.ref) o.ref = d.ref; if (d.lot) { o.lot = d.lot; o.bid = +(this.modal.querySelector('#cbid_' + d.lot)?.value || 0); } if (d.wt) o.wt = +d.wt; if (d.op) o.mode = d.op; if (d.id) o.id = d.id; if (d.quiz != null) o.quiz = +d.quiz;
-    if (d.do === 'gate' || (d.do === 'svc' && d.id) || d.do === 'go' && this.svc.cur?.k === 'duel') this.closeModal(); this.net.menu('cev', o); return true; };
+    if (d.do === 'gate' || d.do === 'realm' || (d.do === 'svc' && d.id) || d.do === 'go' && this.svc.cur?.k === 'duel') this.closeModal(); this.net.menu('cev', o); return true; };
+  P.p_realmgate = function () { const d = this.svc;
+    return this.wrap(`${e(d.realm)} <small>転移門</small>`, `<p class="say">淡く光る門が、いくつかの場所へ通じている。</p>
+      <p><button class="primary" data-act="rg" data-to="dungeon">${e(d.dungeonName)}へ</button></p>${d.other ? `<p><button data-act="rg" data-to="other">${e(d.otherName)}へ</button></p>` : ''}<p><button data-act="rg" data-to="back">地上（${e(d.backName)}）へ戻る</button></p>`); };
   P.p_cev = function () { const d = this.svc; const c = d.cur;
     const steps = d.steps.map(x => `<li class="${x.done ? 'good' : x.cur ? 'cur' : 'dim'}">${x.done || x.cur ? e(x.k === 'choice' ? '決断のとき' : x.k === 'talk' ? '話を聞く' : x.text) : '？？？'}</li>`).join('');
     let body = d.closed ? `<p class="warn">${e(d.closed)}</p>` : '';
@@ -21,6 +24,7 @@ export function installCev(UI) {
       else body += ACT[c.k] ? `<button class="primary" data-act="cv" data-do="go" ${(c.k === 'night' && !c.night) || (c.k === 'midnight' && !c.midnight) ? 'disabled' : ''}>${ACT[c.k]}</button>` : '<p class="dim">（達成すると自動で進む）</p>'; }
     if (d.rank && (!c || c.k !== 'rank')) body += `<p>冒険者ランク：<b>${d.rank.rank}</b></p>`;
     if (d.gate) body += `<p><button class="primary" data-act="cv" data-do="gate">入口へ向かう</button></p>`;
+    if (d.realm?.open) body += `<p><button class="primary" data-act="cv" data-do="gate">${e(d.realm.name)}へ向かう</button></p>`; else if (d.realm) body += `<p class="dim">導く先：${e(d.realm.name)}（未発見）</p>`;
     const w = d.world ? `<p class="${d.world.state === 'active' ? 'warn' : 'dim'}">世界の状況：${{ dormant: '平穏', omen: '前兆', active: '発生中', resolved: '収束' }[d.world.state]}${d.world.outcome ? `（${e(d.world.outcome)}）` : ''}</p>` : '';
     const rw = d.reward ? `<p class="dim"><small>報酬：${[d.reward.gold && `${d.reward.gold.toLocaleString()}G`, d.reward.xp && `EXP${d.reward.xp.toLocaleString()}`, d.reward.title && `称号「${e(d.reward.title)}」`].filter(Boolean).join('・')}${d.repeat !== 'none' ? '（開催ごとに参加可）' : ''}</small></p>` : '';
     let svc = ''; const S = d.service;

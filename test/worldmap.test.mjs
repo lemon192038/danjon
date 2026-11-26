@@ -24,7 +24,9 @@ test('six-continent world', async () => {
     // route graph connects all cities; overland links are symmetric
     const adj = {}; for (const [a, b] of ROUTES) { (adj[a] ||= []).push(b); (adj[b] ||= []).push(a); }
     const seen = new Set(['haven']), q = ['haven']; while (q.length) for (const y of adj[q.pop()] || []) if (!seen.has(y)) { seen.add(y); q.push(y); }
-    assert.equal(seen.size, Object.keys(CITIES).length);
+    // hidden realm hubs (PHASE 9) are reached only through realm gates, never by routes
+    const realm = Object.keys(CITIES).filter(id => CITIES[id].continent === 'realm'); assert.equal(realm.length, 6); for (const id of realm) assert.ok(!seen.has(id), id + ' not on the route graph');
+    assert.equal(seen.size, Object.keys(CITIES).length - realm.length);
     for (const [k, v] of Object.entries(WORLD)) for (const t of Object.values(v.links)) assert.ok(Object.values(WORLD[t].links).includes(k), `${k}<->${t}`);
     // player: travel haven → arcelia (carriage) → marinelia → nereia (ocean lane)
     const out = []; const ws = { readyState: 1, send: x => out.push(JSON.parse(x)), close() {} }; const last = t => [...out].reverse().find(m => m.t === t);
