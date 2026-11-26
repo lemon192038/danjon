@@ -31,6 +31,7 @@ import { Library } from './library.js';
 import { CityEvents } from './cityevents.js';
 import { StoryNpcs } from './storynpc.js';
 import { Machina } from './machina.js';
+import { Explore } from './explore.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
@@ -44,7 +45,7 @@ export class World {
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
-    this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.machina = new Machina(this); this.machina.decorate(this.zones); this.big.decorate(this.zones);
+    this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.machina = new Machina(this); this.machina.decorate(this.zones); this.explore = new Explore(this); this.explore.decorate(this.zones); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.story = new StoryNpcs(this);
     this.last = Date.now();
@@ -145,6 +146,7 @@ export class World {
       case 'hstore': if (z.hideout === s.ch.id) return this.hideout.view(s); return false;
     }
     if (o.k === 'machinecore') return this.machina.observe(s, o);
+    if (['deepmarker', 'withersample', 'deadtree', 'statue17', 'hiddenruin', 'moonlake', 'lantern', 'ghoststation'].includes(o.k)) return this.explore.useObject(s, z, o);
     return this.big.useObject(s, z, o);
   }
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
@@ -464,6 +466,8 @@ export class World {
     if (service === 'sealgate') return this.library.sealGate(s);
     if (service === 'cev') return this.cev.open(s, npc.ev);
     if (service === 'realmgate') return this.cev.realmGate(s);
+    if (service === 'train') return this.explore.openTrain(s);
+    if (service === 'mapless') return this.explore.openMapless(s);
     if (service === 'graymarket') { this.events.record(s, 'sl_graymarket', '灰色市場を訪れた'); return this.openMarket(s, 'gravel_under', { who: '灰色市場' }); }
     if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
     const data = { service };
@@ -527,6 +531,8 @@ export class World {
       case 'library': return this.library.menu(s, m);
       case 'cev': return this.cev.act(s, m);
       case 'realm': return this.cev.realmAct(s, m);
+      case 'train': return this.explore.trainAct(s, m);
+      case 'mapless': return this.explore.readMapless(s, m.id);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });
       case 'leave': if (a.zone.kind === 'dungeon') this.leaveDungeon(s); return;
       case 'invite': { const t = [...this.sessions.values()].find(o => o.ch?.name === m.name); if (!t || t === s) return err('プレイヤーが見つかりません'); const p = this.ensureParty(ch.id); if (p.leader !== ch.id) return err('リーダーのみ招待できます'); if (p.members.length + p.npcs.length >= 6) return err('パーティーは6人までです'); p.invites.add(t.ch.id); t.send({ t: 'invite', from: ch.name, pid: p.id }); this.pushParty(ch.id); return ok(`${t.ch.name}を招待しました`); }
