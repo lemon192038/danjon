@@ -1,0 +1,32 @@
+// PHASE 6 UI: city events (host panel with steps, quizzes, choices, adventurer rank tests and event services).
+const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ACT = { talk: '話を進める', night: '話を聞く（夜のみ）', midnight: '鐘を聞く（0時台のみ）', gather: '届ける', fund: '支払う', duel: '決闘に挑む', spells: '研究者と語る' };
+export function installCev(UI) {
+  const P = UI.prototype; const prevPanel = P.cityPanel;
+  P.cityPanel = function (s, data) { if (s === 'cev') { this.svc = data; if (this.panel !== 'cev' || !this.modalOpen) this.open('cev', s); else this.render(); return true; } return prevPanel.call(this, s, data); };
+  const prevAct = P.cityAct; P.cityAct = function (a, t) { const d = t.dataset; if (a !== 'cv') return prevAct.call(this, a, t);
+    const o = { ev: this.svc.ev, act: d.do }; if (d.choice != null) o.choice = d.choice; if (d.ref) o.ref = d.ref; if (d.lot) { o.lot = d.lot; o.bid = +(this.modal.querySelector('#cbid_' + d.lot)?.value || 0); } if (d.wt) o.wt = +d.wt; if (d.op) o.mode = d.op; if (d.id) o.id = d.id; if (d.quiz != null) o.quiz = +d.quiz;
+    if (d.do === 'gate' || (d.do === 'svc' && d.id) || d.do === 'go' && this.svc.cur?.k === 'duel') this.closeModal(); this.net.menu('cev', o); return true; };
+  P.p_cev = function () { const d = this.svc; const c = d.cur;
+    const steps = d.steps.map(x => `<li class="${x.done ? 'good' : x.cur ? 'cur' : 'dim'}">${x.done || x.cur ? e(x.k === 'choice' ? '決断のとき' : x.k === 'talk' ? '話を聞く' : x.text) : '？？？'}</li>`).join('');
+    let body = d.closed ? `<p class="warn">${e(d.closed)}</p>` : '';
+    if (d.roamCity) body += `<p class="dim">今日の滞在地：${e(d.roamCity)}</p>`; if (d.sched) body += `<p class="dim">開催：${e(d.sched)}</p>`;
+    if (!d.started || d.again) body += `${d.again ? `<p class="good">前回：${e(d.outcome || '達成')}</p>` : `<p class="say">${e(d.steps[0].text)}</p>`}${d.closed ? '' : `<button class="primary" data-act="cv" data-do="start">${d.again ? 'もう一度参加する' : '話を聞く'}</button>`}`;
+    else if (d.done) body += `<p class="good">達成済み${d.outcome ? `（あなたの選択：${e(d.outcome)}）` : ''}</p>`;
+    else if (c) { const prog = c.k === 'kill' || c.k === 'arms' ? `（${c.prog}/${c.n}）` : c.k === 'visit' ? `（${c.visited.length}/${c.zones}）` : '';
+      body += `<p class="${['talk', 'night', 'midnight', 'choice'].includes(c.k) ? 'say' : ''}">${e(c.text)} ${prog}</p>`;
+      if (c.k === 'choice') body += c.options.map(o => `<button class="primary" data-act="cv" data-do="go" data-choice="${o.id}">${e(o.label)}</button>`).join(' ');
+      else if (c.k === 'quiz') body += `<p><b>${e(c.q)}</b></p>${c.qopts.map((o, i) => `<button data-act="cv" data-do="go" data-choice="${i}">${e(o)}</button>`).join(' ')}`;
+      else if (c.k === 'rank' && d.rank) { const r = d.rank; body += r.test ? `<p>現在：<b>${r.rank}</b>ランク → 次：<b>${r.next}</b></p><ul><li>戦闘：魔物を${r.test.kill}体（${r.test.have.kill}）</li><li>探索：ダンジョン${r.test.floor}階到達（${r.test.have.floor}）</li><li>採集：${e(r.test.gather.name)}×${r.test.gather.n}を納品</li><li>知識：${r.test.have.quiz ? '<span class="good">合格</span>' : e(r.test.q)}</li></ul>${r.test.have.quiz ? '' : r.test.options.map((o, i) => `<button data-act="cv" data-do="go" data-quiz="${i}">${e(o)}</button>`).join(' ')} <button class="primary" data-act="cv" data-do="go">昇格を申請する</button>` : '<p class="good">あなたはSランク冒険者だ</p>'; }
+      else body += ACT[c.k] ? `<button class="primary" data-act="cv" data-do="go" ${(c.k === 'night' && !c.night) || (c.k === 'midnight' && !c.midnight) ? 'disabled' : ''}>${ACT[c.k]}</button>` : '<p class="dim">（達成すると自動で進む）</p>'; }
+    if (d.rank && (!c || c.k !== 'rank')) body += `<p>冒険者ランク：<b>${d.rank.rank}</b></p>`;
+    if (d.gate) body += `<p><button class="primary" data-act="cv" data-do="gate">入口へ向かう</button></p>`;
+    const w = d.world ? `<p class="${d.world.state === 'active' ? 'warn' : 'dim'}">世界の状況：${{ dormant: '平穏', omen: '前兆', active: '発生中', resolved: '収束' }[d.world.state]}${d.world.outcome ? `（${e(d.world.outcome)}）` : ''}</p>` : '';
+    const rw = d.reward ? `<p class="dim"><small>報酬：${[d.reward.gold && `${d.reward.gold.toLocaleString()}G`, d.reward.xp && `EXP${d.reward.xp.toLocaleString()}`, d.reward.title && `称号「${e(d.reward.title)}」`].filter(Boolean).join('・')}${d.repeat !== 'none' ? '（開催ごとに参加可）' : ''}</small></p>` : '';
+    let svc = ''; const S = d.service;
+    if (S?.kind === 'shop') svc = `<h3>${e(S.title)}</h3>${S.items.map(x => `<div class="irow"><span>${e(x.name)} <small>${x.price.toLocaleString()}G ・ 残り${x.left}</small></span><button data-act="cv" data-do="svc" data-ref="${x.ref}" ${x.left <= 0 || d.closed ? 'disabled' : ''}>買う</button></div>`).join('')}`;
+    if (S?.kind === 'auction') svc = `<h3>${e(S.title)}</h3>${S.ok ? '' : '<p class="dim">保証金を預けると入札できる</p>'}${S.lots.map(l => `<div class="srow"><div class="sh"><b>${e(l.name)}</b><small>最低 ${l.min.toLocaleString()}G</small></div>${l.state === 'won' ? '<span class="good">落札済み</span>' : l.state === 'lost' ? '<span class="dim">競り負けた</span>' : `<input id="cbid_${l.id}" type="number" min="${l.min}" value="${l.min}" style="width:110px"> <button data-act="cv" data-do="svc" data-lot="${l.id}" ${S.ok && !d.closed ? '' : 'disabled'}>入札</button>`}</div>`).join('')}`;
+    if (S?.kind === 'arms') svc = `<h3>${e(S.title)}</h3><p class="dim"><small>試用：各武器種の入門品を1本ずつ無料で受け取れる ・ 製作：強化鉱石×3＋3,000Gでその武器種の武器（★3以下）</small></p><div class="slist" style="max-height:260px;overflow:auto">${S.types.map(w => `<div class="irow"><span>${w.id}. ${e(w.name)}${w.myth ? ' <small>（神話）</small>' : ''}</span><span><button data-act="cv" data-do="svc" data-op="try" data-wt="${w.id}" ${S.tried.includes(w.id) || d.closed || w.myth ? 'disabled' : ''}>試用</button> <button data-act="cv" data-do="svc" data-op="craft" data-wt="${w.id}" ${d.closed || w.myth ? 'disabled' : ''}>製作</button></span></div>`).join('')}</div>`;
+    if (S?.kind === 'duelists') svc = `<h3>決闘者たち</h3>${S.list.map(x => `<div class="srow"><div class="sh"><b>${e(x.name)}</b><small>${e(x.wt)} ・ ${e(x.pers)} ・ 評判${x.rep} ・ 戦績${e(x.rec)}</small></div><p>あなたとの戦績：${e(x.me)}${S.today === x.id ? ' ・ <span class="warn">今日あなたに決闘を申し込んできた（賞金1.5倍）</span>' : ''}</p><button class="primary" data-act="cv" data-do="svc" data-id="${x.id}">決闘を受ける</button></div>`).join('')}<p class="dim"><small>決闘者は性格と戦績で戦い方が変わり、あなたとの過去の戦いから戦術を学ぶ。</small></p>`;
+    return this.wrap(`${e(d.name)} <small>${e(d.en)} ・ ${e(d.host)}</small>`, `<div class="split"><div>${body}${w}${rw}</div><div><h4>進行</h4><ol class="stages">${steps}</ol>${svc}</div></div>`); };
+}

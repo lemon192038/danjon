@@ -8,6 +8,7 @@ import { rng, hash32 } from '../../shared/util.js';
 export const GAME_MIN_MS = 2000; // 1 game minute = 2 real seconds -> 1 day = 48 minutes
 let OFFSET = 0; // ms; test hook to pin the game hour
 export function setClockHour(h) { const t = Math.floor(Date.now() / GAME_MIN_MS); const cur = Math.floor(t / 60) % 24; OFFSET = ((h - cur + 24) % 24) * 60 * GAME_MIN_MS; }
+export function setClockAt(day, h) { OFFSET = (day * 1440 + h * 60) * GAME_MIN_MS - Date.now() + 1000; } // test hook: pin game day and hour
 export function clock(now = Date.now()) { const total = Math.floor((now + OFFSET) / GAME_MIN_MS); return { total, day: Math.floor(total / 1440), hour: Math.floor(total / 60) % 24, minute: total % 60 }; }
 // seasons: 4 seasons x 7 game days. Climate of each continent sets the base temperature; weather and night adjust it.
 export const SEASONS = [{ id: 'spring', name: '春', t: 0, wx: { rain: 1.5, clear: 1.1 } }, { id: 'summer', name: '夏', t: 9, wx: { storm: 1.8, clear: 1.3, snow: 0 } }, { id: 'autumn', name: '秋', t: -1, wx: { fog: 1.8, wind: 1.5, cloud: 1.2 } }, { id: 'winter', name: '冬', t: -11, wx: { snow: 3, clear: 0.8, storm: 0.6 } }];

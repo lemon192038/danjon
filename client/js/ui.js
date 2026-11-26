@@ -14,6 +14,7 @@ import { installItems, matName, artDesc } from './uiitems.js';
 import { installDuels } from './uiduels.js';
 import { installBig, xName } from './uibig.js';
 import { installLib } from './uilib.js';
+import { installCev } from './uicev.js';
 import { CONTINENTS, REALMS, LEGACY_CITIES } from '/shared/data/world.js';
 import { CITIES } from '/shared/data/cities.js';
 import { LOOT, PROV } from '/shared/data/slum.js';
@@ -28,7 +29,7 @@ const DODGE = { roll: 'ローリング', dash: 'ダッシュ', step: 'ステッ�
 const SPECIAL_NAMES = { guard: 'ガード/盾撃', charge: '溜め斬り', iai: '居合', frenzy: '乱舞', parry: 'パリィ', riposte: '受け流し', dashStrike: '突進斬り', execute: '処刑', throwSpin: '回転投擲', backstab: '背面取り', bloodPact: '血の契約', orbit: '周回刃', vault: '棒高跳び', guardCharge: '盾突進', hook: '鉤引き', sweepTrip: '足払い', tide: '激流', spinGuard: '回転防御', leap: '跳躍斬り', brace: '迎撃構え', reap: '刈り取り', rage: '激昂', whirl: '大旋回', spin: '遠心回転', volley: '一斉投擲', armorBreak: '鎧砕き', superArmor: '不動', blessStrike: '祝福打', spikeBurst: '棘爆', tauntRoar: '咆哮', roll: '鉄球転がし', pileLoad: '杭装填', chi: '気功解放', grab: '掴み投げ', pounce: '飛びかかり', tempo: 'テンポ解放', launch: '蹴り上げ', overclock: '過駆動', auraBurst: '闘気解放', aim: '引き絞り', boltSwap: '矢弾切替', barrage: '制圧射撃', manaArrow: '魔力矢', spirit: '精霊召喚', pinThrow: '縫い止め', ricochet: '跳弾', recallStrike: '呼び戻し', heatVent: '排熱爆破', channel: '詠唱', elemShift: '属性切替', quickcast: '高速詠唱', pageSummon: '頁召喚', spellChain: '連鎖詠唱', orbBarrier: '魔力障壁', ringSwap: '指輪切替', rune: 'ルーン刻印', library: '書架展開', modeToggle: '形態切替', transform: '変形', lash: '絡め取り', wireTrap: '鋼線罠', hammerThrow: '鉄球投擲', drill: '穿孔', rev: '回転鋸', umbrellaGuard: '傘防御・反射', rally: '軍旗', song: '旋律', puppet: '人形召喚', divineJudgment: '神の裁き', demonForm: '魔神化', dragonBreath: '竜の吐息', wings: '光翼', soulHarvest: '魂の解放', timeStop: '時間停止', gravityWell: '重力井戸', erase: '消去', meteor: '流星群', unlock: '解錠' };
 
 export class UI {
-  static install() { installCity(UI); installSlum(UI); installEvents(UI); installItems(UI); installOrgs(UI); installSlumEvents(UI); installDuels(UI); installBig(UI); installLib(UI); }
+  static install() { installCity(UI); installSlum(UI); installEvents(UI); installItems(UI); installOrgs(UI); installSlumEvents(UI); installDuels(UI); installBig(UI); installLib(UI); installCev(UI); }
   constructor(net, state, ctx) {
     this.net = net; this.state = state; this.ctx = ctx; this.modalOpen = false; this.chatOpen = false; this.panel = null; this.service = null; this.sel = {};
     const hud = document.getElementById('hud');
