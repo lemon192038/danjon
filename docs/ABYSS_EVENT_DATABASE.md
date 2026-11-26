@@ -11,7 +11,7 @@
 
 ## 集計
 
-総数 **71** ／ 実装済み 17 ／ 未実装 54
+総数 **71** ／ 実装済み 21 ／ 未実装 50
 
 ## 大型イベント（8章）（6）
 
@@ -268,10 +268,10 @@
 
 | ID | 名称 | 分類 | 地域 | 共有 | 状態 | 詳細度 |
 |---|---|---|---|---|---|---|
-| lib_sealed_abyss | 封印されし深淵<br><small>SEALED ABYSS</small> | ダンジョン・常設 | 王都アルセリア | personal | 未実装 | spec |
-| lib_forbidden | 禁書庫<br><small>THE FORBIDDEN ARCHIVE</small> | 隠し・職業解放・称号 | 王都アルセリア | personal | 未実装 | spec |
-| lib_sins | 七つの大罪<br><small>SEVEN SINS</small> | 職業解放・世界規模 | 王都アルセリア | both | 未実装 | spec |
-| lib_succession | 大罪司教の継承決闘<br><small>SUCCESSION DUEL</small> | 世界規模・NPC遭遇 | 王都アルセリア | world | 未実装 | spec |
+| lib_sealed_abyss | 封印されし深淵<br><small>SEALED ABYSS</small> | ダンジョン・常設 | 王都アルセリア | personal | 実装済み | spec |
+| lib_forbidden | 禁書庫<br><small>THE FORBIDDEN ARCHIVE</small> | 隠し・職業解放・称号 | 王都アルセリア | personal | 実装済み | spec |
+| lib_sins | 七つの大罪<br><small>SEVEN SINS</small> | 職業解放・世界規模 | 王都アルセリア | both | 実装済み | spec |
+| lib_succession | 大罪司教の継承決闘<br><small>SUCCESSION DUEL</small> | 世界規模・NPC遭遇 | 王都アルセリア | world | 実装済み | spec |
 
 ### 封印されし深淵（lib_sealed_abyss）
 
@@ -280,6 +280,7 @@
 - 報酬：禁書庫の鍵（10F毎ボス：P% = 階層/10、個別抽選、取引・売却不可、入場時1本消費）
 - 関連：lib_forbidden
 - 再挑戦：再挑戦可
+- 備考：入口は王都アルセリアの王城（地下への封印門）。全100階。51〜100階は1〜50階の環境の深層版（C-12）
 
 ### 禁書庫（lib_forbidden）
 
@@ -290,6 +291,7 @@
 - 解放：職業「異端者」
 - 関連：lib_sins, ev_thousand_spells, sl_carriers, lg_other_side
 - 再挑戦：なし（一度きり）
+- 備考：大図書館の受付で鍵を1本消費。31冊（異端書・禁忌書・失伝書・予言書・異界書・大罪の書7）。『魔力の存在証明』は第零魔法の条件
 
 ### 七つの大罪（lib_sins）
 

@@ -76,6 +76,7 @@ export class Duels {
   onDuelistDown(z, f) {
     const b = z.bout; if (!b || b.foe !== f || b.done) return; b.done = true; const s = this.world.sessions.get(b.sid); if (!s) return; const ch = s.ch, E = this.world.events;
     this.learn(b, f, ch, false);
+    if (b.kind === 'sintrial' || b.kind === 'succession') return this.world.library.onDuelEnd(s, z, b, true);
     if (b.kind === 'observer') { this.world.big.onObserverDown(s); this.leave(s, z, '観測者の影が月光に溶けて消えた'); return; }
     if (b.kind === 'raven') { const R = this.rv(ch); R.wins[b.wt] = (R.wins[b.wt] || 0) + 1;
       E.grant(s, 'ev_swordmaster', 'firstwin', { title: '剣聖に認められし者', xp: 8000 });
@@ -93,7 +94,7 @@ export class Duels {
       this.leave(s, z, `仮面の王を破り優勝した！（優勝${M.titles}回・正体の記録${M.records}/3）`); return; }
     M.round++; s.send({ t: 'toast', v: '勝利！ 次の試合まで少し休め', cls: 'big' }); setTimeout(() => { if (s.actor?.zone === z) this.masqBout(s); }, 3000);
   }
-  onPlayerDown(z, s) { const b = z.bout; if (!b || b.done) return; b.done = true; this.learn(b, b.foe, s.ch, true); if (b.kind === 'raven') this.rv(s.ch).losses++; s.send({ t: 'toast', v: b.kind === 'raven' ? '「……悪くない。また来るといい」' : '敗退した。また挑め', cls: 'big' }); }
-  learn(b, f, ch, won) { const key = b.kind === 'raven' ? 'raven' : b.kind === 'observer' ? 'observer' : b.spec?.kind === 'king' || b.face ? 'maskedking' : 'masq'; const r = this.mem.get(key, ch.id); const m = f.duel.mem; r.fights++; if (won) r.wins++; else r.losses++; r.wt[b.wt] = (r.wt[b.wt] || 0) + 1; for (const k of ['melee', 'ranged', 'dodges', 'skills', 'swings']) r[k] += m[k]; }
+  onPlayerDown(z, s) { const b = z.bout; if (!b || b.done) return; b.done = true; this.learn(b, b.foe, s.ch, true); if (b.kind === 'sintrial' || b.kind === 'succession') this.world.library.onDuelEnd(s, z, b, false); if (b.kind === 'raven') this.rv(s.ch).losses++; s.send({ t: 'toast', v: b.kind === 'raven' ? '「……悪くない。また来るといい」' : '敗退した。また挑め', cls: 'big' }); }
+  learn(b, f, ch, won) { const key = b.memKey ? b.memKey : b.kind === 'raven' ? 'raven' : b.kind === 'observer' ? 'observer' : b.spec?.kind === 'king' || b.face ? 'maskedking' : 'masq'; const r = this.mem.get(key, ch.id); const m = f.duel.mem; r.fights++; if (won) r.wins++; else r.losses++; r.wt[b.wt] = (r.wt[b.wt] || 0) + 1; for (const k of ['melee', 'ranged', 'dodges', 'skills', 'swings']) r[k] += m[k]; }
   leave(s, z, msg) { s.send({ t: 'toast', v: msg, cls: 'big' }); this.world.sendSelf(s); setTimeout(() => { if (s.actor?.zone === z) { const to = this.world.zones.get(z.returnField || z.returnTo || 'arcelia'); this.world.enterZone(s, to); } this.world.zones.delete(z.id); }, 2500); }
 }

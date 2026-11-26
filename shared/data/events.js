@@ -78,13 +78,13 @@ export const EVENTS = [
     .map(([id, n, en, loc, notes]) => E(id, n, en, 'large', { loc, kinds: ['world'], notes, detail: 'outline', ...(LIVE[id] || {}) })),
   // ── 12-14 library & sins
   E('lib_sealed_abyss', '封印されし深淵', 'SEALED ABYSS', 'library', { kinds: ['dungeon', 'permanent'], loc: ['arcelia'], scope: 'personal', trigger: 'アルセリア地下。HARD以上限定', stages: ['1-10 忘却の地下墓地（墓守の巨人）', '11-20 腐蝕の菌窟（腐蝕母樹）', '21-30 灼熱の地底炉（熔鉄の処刑者）', '31-40 沈黙の水没神殿（深海の祭司）', '41-50 失われた機械都市（機械王オルディウス）', '51-100（環境・ボス未定義）'],
-    rewards: ['禁書庫の鍵（10F毎ボス：P% = 階層/10、個別抽選、取引・売却不可、入場時1本消費）'], links: ['lib_forbidden'], repeat: 'rechallenge' }),
+    rewards: ['禁書庫の鍵（10F毎ボス：P% = 階層/10、個別抽選、取引・売却不可、入場時1本消費）'], links: ['lib_forbidden'], repeat: 'rechallenge', status: 'live', notes: '入口は王都アルセリアの王城（地下への封印門）。全100階。51〜100階は1〜50階の環境の深層版（C-12）' }),
   E('lib_forbidden', '禁書庫', 'THE FORBIDDEN ARCHIVE', 'library', { kinds: ['hidden', 'job', 'title'], loc: ['arcelia'], scope: 'personal', trigger: '大図書館に禁書庫の鍵を持って入場（1本消費）', prereq: ['lib_sealed_abyss'],
-    stages: ['初回訪問（称号「初めての禁書庫」）', '書籍閲覧（異端書・禁忌書・失伝書・予言書・異界書）', '異端書1冊読了 → 異端者'], rewards: ['称号「初めての禁書庫」'], unlocks: ['職業「異端者」'], links: ['lib_sins', 'ev_thousand_spells', 'sl_carriers', 'lg_other_side'] }),
+    stages: ['初回訪問（称号「初めての禁書庫」）', '書籍閲覧（異端書・禁忌書・失伝書・予言書・異界書）', '異端書1冊読了 → 異端者'], rewards: ['称号「初めての禁書庫」'], unlocks: ['職業「異端者」'], links: ['lib_sins', 'ev_thousand_spells', 'sl_carriers', 'lg_other_side'], status: 'live', notes: '大図書館の受付で鍵を1本消費。31冊（異端書・禁忌書・失伝書・予言書・異界書・大罪の書7）。『魔力の存在証明』は第零魔法の条件' }),
   E('lib_sins', '七つの大罪', 'SEVEN SINS', 'library', { kinds: ['job', 'world'], loc: ['arcelia'], scope: 'both', trigger: '異端者になる', prereq: ['lib_forbidden'],
-    stages: ['主ルート選択（強欲・暴食・嫉妬・怠惰・傲慢・憤怒・色欲）', '罪人', '熟練度・条件', '最終試練（再挑戦可・失敗しても職業/熟練度は失わない）', '大罪司教'], unlocks: ['罪人7種', '大罪司教7系統（1キャラ1系統）'], links: ['lib_succession'] }),
+    stages: ['主ルート選択（強欲・暴食・嫉妬・怠惰・傲慢・憤怒・色欲）', '罪人', '熟練度・条件', '最終試練（再挑戦可・失敗しても職業/熟練度は失わない）', '大罪司教'], unlocks: ['罪人7種', '大罪司教7系統（1キャラ1系統）'], links: ['lib_succession'], status: 'live' }),
   E('lib_succession', '大罪司教の継承決闘', 'SUCCESSION DUEL', 'library', { kinds: ['world', 'npc'], loc: ['arcelia'], scope: 'world', trigger: '現職の大罪司教（プレイヤーまたはNPC）に継承決闘を申請。NPCは必ず受諾', prereq: ['lib_sins'],
-    stages: ['申請', '決闘', '継承または防衛'], outcomes: ['挑戦者が継承（敗者は元大罪司教として残る）', '現職が防衛'], links: ['lib_sins'], repeat: 'rechallenge', notes: '継承履歴（現職・歴代・日時・勝敗・職業・武器種）を世界状態に記録。座の継承だけで試練報酬は自動解放しない' }),
+    stages: ['申請', '決闘', '継承または防衛'], outcomes: ['挑戦者が継承（敗者は元大罪司教として残る）', '現職が防衛'], links: ['lib_sins'], repeat: 'rechallenge', status: 'live', notes: '継承履歴（現職・歴代・日時・勝敗・職業・武器種）を世界状態に記録。座の継承だけで試練報酬は自動解放しない' }),
 ];
 // already-implemented content that the event engine adopts (kept as-is; see docs/ABYSS_CONFLICT_REPORT.md)
 EVENTS.push(

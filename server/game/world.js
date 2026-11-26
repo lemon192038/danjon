@@ -27,6 +27,7 @@ import { SlumEvents } from './slumevents.js';
 import { Duels } from './duels.js';
 import { Spells } from './spells.js';
 import { BigEvents } from './bigevents.js';
+import { Library } from './library.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
 export const isTown = z => z.kind === 'town' || z.kind === 'interior';
@@ -39,7 +40,7 @@ export class World {
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
-    this.spells = new Spells(this); this.big = new BigEvents(this); this.big.decorate(this.zones);
+    this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
@@ -115,7 +116,7 @@ export class World {
     else { key = `in:${door.id}`; opts = { kind: 'interior', city: z.cityId, bldg: b, door }; }
     let iz = this.zones.get(key); if (!iz) { iz = new Zone(this, key, opts); this.zones.set(key, iz); }
     if (iz.home) this.home?.decorate(iz, s.ch);
-    s.send({ t: 'loading', v: door.name }); this.enterZone(s, iz);
+    s.send({ t: 'loading', v: door.name }); this.enterZone(s, iz, door.id === 'ar_biglib' ? this.library.libraryPos(s, iz) : null);
   }
   useObject(s, z, o) {
     const b = z.bldgId ? findBuilding(z.cityId, z.bldgId) : null;
@@ -160,7 +161,7 @@ export class World {
     this.sendSelf(s);
     // party NPCs follow the player
     for (const nid of this.partyOf(s.ch.id)?.npcs || []) { const n = this.npcs.byId.get(nid); if (!n) continue; this.npcs.despawn(n); this.npcs.spawn(n, z, { x: a.x + 12, y: a.y + 10 }); const na = n.actorId && z.actors.get(n.actorId); if (na) na.team = a.team; }
-    if (z.kind === 'dungeon') { this.onFloorReached(s, z); this.big.onFloor(s, z); }
+    if (z.kind === 'dungeon') { this.onFloorReached(s, z); this.big.onFloor(s, z); this.library.onEnterSealed(s, z); }
     if (z.kind === 'field') this.big.onEnterField(s, z);
   }
   sendSelf(s) {
@@ -191,24 +192,31 @@ export class World {
     if (d.id === 'sunken' && !this.events.prog(s.ch, 'ev_sunken')) return s.send({ t: 'err', v: '沈没王国への道はまだ見つかっていない' });
     if (d.id === 'luna' && !this.events.isDone(s.ch, 'ev_blackmoon')) return s.send({ t: 'err', v: '月面転移門は閉ざされている' });
     if (d.maxFloor && floor > d.maxFloor) floor = 1;
+    if (d.hardOnly && !['HARD', 'HELL', 'ABYSS'].includes(diff)) return s.send({ t: 'err', v: `${d.name}はHARD以上でのみ挑める` });
     const best = s.ch.progress.clears[dId]?.[diff] || 0;
     if (floor !== 1 && (floor - 1) % 10 !== 0) floor = 1; if (floor > best + 1) floor = 1;
     if (diff === 'ABYSS' && !(s.ch.progress.clears[dId]?.HELL >= 100) && s.ch.level < 150) return s.send({ t: 'err', v: 'ABYSSはHELL100階踏破またはLv150以上で解放されます' });
     if (diff === 'HELL' && !(s.ch.progress.clears[dId]?.HARD >= 50) && s.ch.level < 80) return s.send({ t: 'err', v: 'HELLはHARD50階踏破またはLv80以上で解放されます' });
-    const ret = s.actor.zone.kind === 'dungeon' ? s.actor.zone.returnTo : s.actor.zone.id;
+    // return point: interiors are freed when empty, so remember the city and the door instead of the interior itself
+    const cz = s.actor.zone; let ret = cz.id, retPos = null;
+    if (cz.kind === 'dungeon') { ret = cz.returnTo; retPos = cz.returnPos; } else if (cz.kind === 'interior' && cz.cityId) { ret = cz.cityId; const cty = this.zones.get(cz.cityId); if (cz.door && cty) retPos = cty.tileCenter([cz.door.x, cz.door.y + 1]); }
     const members = this.partyMembersHere(s);
     const key = this.partyOf(s.ch.id)?.id || s.ch.id;
-    const z = this.instance(key, dId, diff, floor); z.returnTo = ret;
+    const z = this.instance(key, dId, diff, floor); z.returnTo = ret; z.returnPos = retPos;
     for (const m of members) this.enterZone(m, z);
   }
   instance(key, dId, diff, floor) { const id = `dg:${key}:${dId}:${diff}:${floor}`; let z = this.zones.get(id); if (!z) { z = new Zone(this, id, { kind: 'dungeon', dungeon: dId, diff, floor }); this.zones.set(id, z); } return z; }
   partyMembersHere(s) { const p = this.partyOf(s.ch.id); if (!p) return [s]; return p.members.map(id => this.sessions.get(id)).filter(m => m?.actor && m.actor.zone === s.actor.zone); }
   nextFloor(s, z) {
     if (z.floor >= (z.dungeon.maxFloor || 100)) { this.leaveDungeon(s); return; }
-    const nz = this.instance(this.partyOf(s.ch.id)?.id || s.ch.id, z.dungeon.id, z.diff, z.floor + 1); nz.returnTo = z.returnTo;
+    const nz = this.instance(this.partyOf(s.ch.id)?.id || s.ch.id, z.dungeon.id, z.diff, z.floor + 1); nz.returnTo = z.returnTo; nz.returnPos = z.returnPos;
     for (const m of [...z.players].map(p => p.session)) this.enterZone(m, nz);
   }
-  leaveDungeon(s) { const z = s.actor.zone; const to = this.zones.get(z.returnTo || 'haven'); const g = (to.map.gates || []).find(g => g.dungeon === z.dungeon?.id); this.enterZone(s, to, g ? to.tileCenter([g.x, g.y + 2]) : null); }
+  leaveDungeon(s) { const z = s.actor.zone; let to = this.zones.get(z.returnTo), pos = z.returnPos || null;
+    if (!to && String(z.returnTo).startsWith('in:')) { const did = z.returnTo.slice(3); for (const tz of this.zones.values()) { const d = tz.kind === 'town' && (tz.map.doors || []).find(x => x.id === did); if (d) { to = tz; pos = tz.tileCenter([d.x, d.y + 1]); break; } } }
+    if (!to || to.kind === 'dungeon' || to.kind === 'arena') { to = this.zones.get(this.cityNear(z)) || this.zones.get('haven'); pos = null; } // freed or invalid return zone: go to the nearest town
+    if (!pos) { const g = (to.map.gates || []).find(g => g.dungeon === z.dungeon?.id); pos = g ? to.tileCenter([g.x, g.y + 2]) : null; }
+    this.enterZone(s, to, pos); }
   onFloorReached(s, z) {
     const c = s.ch.progress.clears[z.dungeon.id] ||= {};
     const reached = z.floor - 1; if (reached > (c[z.diff] || 0)) c[z.diff] = reached;
@@ -252,7 +260,7 @@ export class World {
       const c = ch.progress.clears[z.dungeon.id] ||= {}; if (z.floor > (c[diff] || 0)) c[diff] = z.floor; c.max = Math.max(c.max || 0, z.floor);
       if (['HARD', 'HELL', 'ABYSS'].includes(diff) && z.floor >= 50) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 2 }); this.note(s, { t: 'msg', v: '特性変更チケット×2を手に入れた' }); }
       const am = rollArtifactMat(z, ch); if (am) this.note(s, { t: 'msg', v: `アーティファクト素材：${matName(am)}（${z.dungeon.name} ${z.floor}F ${diff}）を手に入れた` });
-      this.big.onSunkenBoss(s, z); this.big.onLunaBoss(s, z); this.big.onBoss();
+      this.big.onSunkenBoss(s, z); this.big.onLunaBoss(s, z); this.big.onBoss(); this.library.onBossKilled(s, z);
       checkJobUnlocks(ch, n => this.note(s, n));
       this.sendSelf(s);
       void di;
@@ -438,6 +446,9 @@ export class World {
     if (service === 'org') return this.orgs.open(s, npc.org);
     if (service === 'sev') return this.sev.open(s, npc.ev);
     if (service === 'masq') return this.duels.openMasq(s);
+    if (service === 'library') return this.library.openLibrary(s);
+    if (service === 'archive') { this.library.syncSins(s); return this.library.open(s); }
+    if (service === 'sealgate') return this.library.sealGate(s);
     if (service === 'graymarket') { this.events.record(s, 'sl_graymarket', '灰色市場を訪れた'); return this.openMarket(s, 'gravel_under', { who: '灰色市場' }); }
     if (service === 'hfence') return this.openMarket(s, s.ch.hideout?.rid, { fence: true, who: '故買屋' });
     const data = { service };
@@ -498,6 +509,7 @@ export class World {
       case 'spells': if (m.act) return this.spells.act(s, m); return this.spells.open(s);
       case 'sunken': return this.big.sunkenChoice(s, m);
       case 'calamity': return this.big.calAct(s, m);
+      case 'library': return this.library.menu(s, m);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });
       case 'leave': if (a.zone.kind === 'dungeon') this.leaveDungeon(s); return;
       case 'invite': { const t = [...this.sessions.values()].find(o => o.ch?.name === m.name); if (!t || t === s) return err('プレイヤーが見つかりません'); const p = this.ensureParty(ch.id); if (p.leader !== ch.id) return err('リーダーのみ招待できます'); if (p.members.length + p.npcs.length >= 6) return err('パーティーは6人までです'); p.invites.add(t.ch.id); t.send({ t: 'invite', from: ch.name, pid: p.id }); this.pushParty(ch.id); return ok(`${t.ch.name}を招待しました`); }
@@ -535,12 +547,13 @@ export class World {
         if (m.cal) { const c = this.events.w.flags.cal[m.cal]; if (c) { c.stage = m.stage | 0; c.outcome = null; } this.big.calSync(); }
         if (m.spfrag) { const sp = DATA.skills.get(m.spfrag); if (sp?.src === 'spell') for (let i = 0; i < (m.n | 0 || 1); i++) this.spells.giveFrag(s, sp); }
         if (m.flag) (ch.progress.flags ||= {})[m.flag] = true;
+        if (m.key) addItem(ch, { kind: 'mat', ref: 'archiveKey', n: m.key | 0 });
         if (m.hour != null) setClockHour(m.hour | 0);
         if (m.raven) { ch.level = Math.max(ch.level, m.level | 0); this.enterZone(s, this.zones.get(this.duels.ravenZone())); this.duels.sync(); const r = [...s.actor.zone.actors.values()].find(x => x.role === 'raven'); if (r) { s.actor.x = r.x + 12; s.actor.y = r.y; } return this.sendSelf(s); }
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });
-      case 'sinRoute': { if (!ch.jobs.ev_heretic) return err('異端者になると主ルートを選べる'); if (Object.keys(ch.jobs).some(k => k.startsWith('ev_sinner_'))) return err('罪人に進化した後は主ルートを変えられない'); if (!['greed', 'gluttony', 'envy', 'sloth', 'pride', 'wrath', 'lust'].includes(m.sin)) return; ch.progress.sinRoute = m.sin; return ok('主ルートを選んだ'); }
+      case 'sinRoute': { if (!ch.jobs.ev_heretic) return err('異端者になると主ルートを選べる'); if (Object.keys(ch.jobs).some(k => k.startsWith('ev_sinner_'))) return err('罪人に進化した後は主ルートを変えられない'); if (!['greed', 'gluttony', 'envy', 'sloth', 'pride', 'wrath', 'lust'].includes(m.sin)) return; ch.progress.sinRoute = m.sin; this.library.onRoute(s); if (a.zone.archive) this.library.open(s); return ok('主ルートを選んだ'); }
       case 'org': return this.orgs.menu(s, m);
       case 'sev': return this.sev.act(s, m);
       case 'raven': return this.duels.ravenDuel(s, m.act === 'true');
