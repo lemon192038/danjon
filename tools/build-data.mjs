@@ -7,6 +7,7 @@ import { buildWeaponTypeSkill } from './gen/skills.mjs';
 import { buildWeapon } from './gen/weapons.mjs';
 import { buildJobs } from './gen/jobs.mjs';
 import { buildEventJobs } from './gen/eventjobs.mjs';
+import { buildSpells } from './gen/spells.mjs';
 import { buildLevelSkills, FAMILIES, BOSS_ARCHETYPES, DUNGEONS } from './gen/content.mjs';
 
 const OUT = path.resolve('shared/gen');
@@ -33,7 +34,8 @@ for (const wt of WEAPON_TYPES) {
 const jobs = [...buildJobs(), ...buildEventJobs()]; // 1,000 base jobs (unchanged) + named event jobs
 write('jobs.json', jobs);
 write('levelSkills.json', buildLevelSkills());
+const spells = buildSpells(); write('spells.json', spells);
 write('content.json', { families: FAMILIES, bosses: BOSS_ARCHETYPES, dungeons: DUNGEONS });
-index.counts = { weaponTypes: WEAPON_TYPES.length, weaponTypeSkills: nSkills, weapons: nWeapons, uniqueSkills: nWeapons, jobs: jobs.length, dungeons: DUNGEONS.length, floors: DUNGEONS.length * 100 };
+index.counts = { weaponTypes: WEAPON_TYPES.length, weaponTypeSkills: nSkills, weapons: nWeapons, uniqueSkills: nWeapons, jobs: jobs.length, spells: spells.length, dungeons: DUNGEONS.length, floors: DUNGEONS.length * 100 };
 write('index.json', index);
 console.log(index.counts);

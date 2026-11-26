@@ -11,17 +11,17 @@
 
 ## 集計
 
-総数 **71** ／ 実装済み 13 ／ 未実装 58
+総数 **71** ／ 実装済み 17 ／ 未実装 54
 
 ## 大型イベント（8章）（6）
 
 | ID | 名称 | 分類 | 地域 | 共有 | 状態 | 詳細度 |
 |---|---|---|---|---|---|---|
 | ev_swordmaster | 放浪する最強の剣士<br><small>THE WANDERING SWORDMASTER</small> | NPC遭遇・世界規模・隠し・称号・職業解放 | 中央大陸エルディア・北方大陸ノルディア・東方大陸シェンガル・南方大陸サハリア・西方大陸ヴァルグラン・外洋諸島アステリア | both | 実装済み | spec |
-| ev_sunken | 沈没した王国<br><small>THE SUNKEN KINGDOM</small> | 地域・ダンジョン・称号 | 外洋諸島アステリア・アトランティス：沈没王国 | both | 未実装 | spec |
-| ev_blackmoon | 黒月の夜<br><small>NIGHT OF THE BLACK MOON</small> | 世界規模・条件発生型・隠し・職業解放・称号 | 世界各地・月面領域ルナ・ヴェイル | both | 未実装 | spec |
-| ev_thousand_spells | 失われた千の魔法<br><small>THE LOST THOUSAND SPELLS</small> | 常設・職業解放・称号 | 世界各地 | personal | 未実装 | spec |
-| ev_calamity | 眠れる災厄<br><small>THE SLEEPING CALAMITY</small> | 世界規模・地域・条件発生型 | 西方大陸ヴァルグラン・外洋諸島アステリア・東方大陸シェンガル・南方大陸サハリア | both | 未実装 | spec |
+| ev_sunken | 沈没した王国<br><small>THE SUNKEN KINGDOM</small> | 地域・ダンジョン・称号 | 外洋諸島アステリア・アトランティス：沈没王国 | both | 実装済み | spec |
+| ev_blackmoon | 黒月の夜<br><small>NIGHT OF THE BLACK MOON</small> | 世界規模・条件発生型・隠し・職業解放・称号 | 世界各地・月面領域ルナ・ヴェイル | both | 実装済み | spec |
+| ev_thousand_spells | 失われた千の魔法<br><small>THE LOST THOUSAND SPELLS</small> | 常設・職業解放・称号 | 世界各地 | personal | 実装済み | spec |
+| ev_calamity | 眠れる災厄<br><small>THE SLEEPING CALAMITY</small> | 世界規模・地域・条件発生型 | 西方大陸ヴァルグラン・外洋諸島アステリア・東方大陸シェンガル・南方大陸サハリア | both | 実装済み | spec |
 | ev_masquerade | 仮面の武闘祭<br><small>THE MASQUERADE TOURNAMENT</small> | 都市・時間限定・職業解放・称号 | 王都アルセリア・スラム・グレイヴェル | both | 実装済み | spec |
 
 ### 放浪する最強の剣士（ev_swordmaster）
@@ -44,6 +44,7 @@
 - 解放：アステリア海底地域
 - 関連：ev_thousand_spells, ev_calamity
 - 再挑戦：再挑戦可
+- 備考：アビサル・オーシャンの手がかりから隠しダンジョン「沈没王国アトランティス」（全60階・6区域）へ。21階以降の深部は潜水装備か呼吸の秘薬がないと酸素が尽きる。水中では火属性半減・水/雷1.25倍・飛び道具が遅い。結末は世界状態に記録
 
 ### 黒月の夜（ev_blackmoon）
 
@@ -54,6 +55,7 @@
 - 解放：職業「月影の観測者」、ルナ・ヴェイル
 - 関連：lg_last_observer, lg_other_side
 - 再挑戦：世界状態で再発生
+- 備考：月の気配（時間・遺跡・古書・強敵討伐で蓄積）が満ちた夜にのみ発生。観測者は戦い方を記録して戦術を変える。観測者2回撃退＋観測装置4基で月紋の石門（アマツカミ）が開く
 
 ### 失われた千の魔法（ev_thousand_spells）
 
@@ -63,6 +65,7 @@
 - 解放：職業「原初魔導師」
 - 関連：lib_forbidden, ct_academy
 - 再挑戦：なし（一度きり）
+- 備考：1000種の失われた魔法＋第零魔法。研究は図書館・学院・研究所・観測所で。改良は合計4点の配分制（全性能の同時最大化は不可）。第零魔法には七つの重要魔法と禁書『魔力の存在証明』（PHASE 8の禁書庫で入手）が必要
 
 ### 眠れる災厄（ev_calamity）
 
@@ -72,7 +75,7 @@
 - 報酬：災厄素材、伝説級武器レシピ、称号、生態記録、災厄の眷属、特殊装備
 - 関連：lg_territory
 - 再挑戦：世界状態で再発生
-- 備考：焦土の眠龍（火山）・深海の巨鯨（海底）・森羅の巨獣（森林）・砂塵の巨神（砂漠）。討伐しても世界から永久には消えない
+- 備考：前兆は5段階でニュースに流れる。目覚めた災厄は世界共通HPのワールドボス。焦土の眠龍（火山）・深海の巨鯨（海底）・森羅の巨獣（森林）・砂塵の巨神（砂漠）。討伐しても世界から永久には消えない
 
 ### 仮面の武闘祭（ev_masquerade）
 

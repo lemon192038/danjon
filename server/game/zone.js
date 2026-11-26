@@ -122,7 +122,8 @@ export class Zone {
       if (this.D.ai >= 3 && Math.random() < 0.4) { const s2 = makeMonster(fams[Math.floor(Math.random() * fams.length)].replace(/^(kraken|.*King)$/, 'golem'), this.lv, this.diff); s2.x = p.x + 14; s2.y = p.y + 8; s2.home = [s2.x, s2.y]; if (!this.blocked(s2.x, s2.y)) this.add(s2); }
     }
     if (this.map.boss) {
-      const b = makeBoss(band.boss, this.lv + 3, this.diff, this.floor); const p = this.tileCenter(this.map.bossAt); b.x = p.x; b.y = p.y; b.home = [p.x, p.y];
+      const b = makeBoss(band.boss, this.lv + 3, this.diff, this.floor); const p = this.tileCenter(this.map.bossAt); b.x = p.x; b.y = p.y; b.home = [p.x, p.y]; if (band.bossName) b.name = band.bossName;
+      if (this.dungeon.maxFloor && this.floor === this.dungeon.maxFloor) { b.maxHp *= 2; b.hp = b.maxHp; b.abilities = b.allAbilities.slice(); }
       if (this.floor === 100) { b.name = '【最終守護者】' + b.name; b.maxHp *= 2; b.hp = b.maxHp; b.abilities = b.allAbilities.slice(); }
       this.add(b); this.bossId = b.id;
     }
@@ -132,7 +133,7 @@ export class Zone {
     const [lo, hi] = this.lv; const t = this.id === 'field_green' ? s[0] / this.map.w : 1 - s[1] / this.map.h; const lv = Math.max(1, Math.round(lo + (hi - lo) * Math.pow(t, 1.6) + Math.random() * 2));
     const fl = WORLD[this.id]?.fams || [['slime']]; const fams = lv < 5 && fl.length > 1 ? fl[0] : fl[fl.length - 1];
     const m = makeMonster(fams[Math.floor(Math.random() * fams.length)], lv, 'NORMAL', { elite: lv > 6 && Math.random() < 0.04 });
-    const p = this.tileCenter(s); m.x = p.x; m.y = p.y; m.home = [p.x, p.y]; m.spawnCell = s; this.add(m);
+    const p = this.tileCenter(s); m.x = p.x; m.y = p.y; m.home = [p.x, p.y]; m.spawnCell = s; this.world.big?.empower(m); this.add(m);
   }
   spawnMinions(owner, n, fam) {
     const fams = fam ? [fam] : (this.map.band?.fam || ['skeleton']).filter(f => DATA.families.has(f));
@@ -171,6 +172,8 @@ export class Zone {
     else this.world.onFighterDied(this, t);
   }
   onBossKilled(b) {
+    if (b.calamity) return this.world.big.onCalamityKilled(this, b);
+    if (!this.map.stairs) return;
     this.map.stairsOpen = true; const [sx, sy] = this.map.stairs; this.map.tiles[sy * this.map.w + sx] = T.STAIRS;
     this.fx({ t: 'bossdown', n: b.name }); this.fx({ t: 'tiles', x: sx, y: sy, v: T.STAIRS });
     for (const m of this.actors.values()) if (m.kind === 'monster' && m.minion && !m.dead) this.kill(m, b, this.now);
@@ -188,7 +191,7 @@ export class Zone {
     for (const a of this.actors.values()) this.tickActor(a, now, dt);
     this.tickProjs(now, dt);
     if (this.kind === 'dungeon') this.tickHazards(now);
-    for (let i = this.respawns.length - 1; i >= 0; i--) if (this.respawns[i].at <= now) { this.spawnFieldMonster(this.respawns[i].cell); this.respawns.splice(i, 1); }
+    for (let i = this.respawns.length - 1; i >= 0; i--) if (this.respawns[i].at <= now) { if (!this.world.big?.shouldSkipSpawn(this)) this.spawnFieldMonster(this.respawns[i].cell); this.respawns.splice(i, 1); }
     if (this.drops.length) this.drops = this.drops.filter(d => d.chest || d.until > now);
   }
   // If an actor ever ends up inside a blocking tile, move it to the nearest free tile centre.

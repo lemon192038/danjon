@@ -115,7 +115,7 @@ export class Fighter extends Actor {
   }
   // ---- skills
   useSkill(id, zone, ctx = {}) {
-    const now = zone.now; const sk = DATA.skills.get(id);
+    const now = zone.now; let sk = DATA.skills.get(id); if (sk?.src === 'spell' && this.ch && zone.world?.spells) sk = zone.world.spells.custom(this.ch, sk); // improved lost spell
     if (!sk || sk.kind === 'passive' || !this.canAct(now) || this.statuses.silence) return 'ng';
     if (this.action && !['attack'].includes(this.action.type) && this.action.until > now) return 'busy';
     if ((this.cds[id] || 0) > now) return 'cd';

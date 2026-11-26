@@ -40,7 +40,7 @@ test('duels', async () => {
     out.length = 0; w.handle(s, { t: 'interact' }); assert.equal(last('open').service, 'masq');
     w.handle(s, { t: 'menu', op: 'masq', act: 'qualify' }); w.handle(s, { t: 'menu', op: 'masq', act: 'register' }); const mz = s.actor.zone; assert.ok(mz.masq && mz.bout);
     assert.equal(mz.describe(s.actor).name, '仮面の闘士'); assert.equal(mz.describe(mz.bout.foe).name, '仮面の闘士');
-    for (let round = 0; round < 6; round++) { mz.kill(mz.bout.foe, s.actor, mz.now); await sleep(round < 5 ? 3200 : 2700); }
+    for (let round = 0; round < 6; round++) { const foe = mz.bout.foe; mz.kill(foe, s.actor, mz.now); if (round < 5) { for (let k = 0; k < 80 && mz.bout.foe === foe; k++) await sleep(100); } else for (let k = 0; k < 80 && ch.progress.masq.titles < 1; k++) await sleep(100); } // wait for the next round (robust under CPU load)
     assert.equal(ch.progress.masq.titles, 1); assert.ok(ch.progress.titles.includes('仮面の武闘祭 優勝者'));
     w.enterZone(s, az2); s.actor.x = gp.x; s.actor.y = gp.y + 6; w.handle(s, { t: 'menu', op: 'masq', act: 'register' }); assert.ok(err().includes('今日'), 'once per day');
     // after three championships: the unmasked king → arena king job

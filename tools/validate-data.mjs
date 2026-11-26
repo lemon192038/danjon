@@ -33,6 +33,7 @@ for (const j of jobs) { chk(j.active, j.id); if (j.unlock.job && !jids.has(j.unl
 const sig = new Set(jobs.map(j => JSON.stringify([j.passive.mods, j.active.eff, j.stats])));
 if (sig.size !== jobs.length) errs.push(`jobs not mechanically distinct: ${sig.size}`);
 JSON.parse(fs.readFileSync('shared/gen/levelSkills.json')).forEach(s => chk(s, 'level'));
+const spells = JSON.parse(fs.readFileSync('shared/gen/spells.json')); spells.forEach(s => chk(s, 'spell')); if (spells.length !== 1001 || new Set(spells.map(s => s.name)).size !== 1001) errs.push('spells: 1,000 + 第零魔法, unique names'); if (spells.filter(s => s.key).length !== 7) errs.push('7 key spells');
 const c = JSON.parse(fs.readFileSync('shared/gen/content.json'));
 const fam = new Set(c.families.map(f => f[0])), boss = new Set(c.bosses.map(b => b[0]));
 for (const d of c.dungeons) { if (d.bands.length !== 10) errs.push(`${d.id} bands`); for (const b of d.bands) { if (!boss.has(b.boss)) errs.push(`${d.id} boss ${b.boss}`); for (const f of b.fam) if (!fam.has(f) && !boss.has(f)) errs.push(`${d.id} fam ${f}`); } }

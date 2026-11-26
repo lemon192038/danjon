@@ -23,6 +23,7 @@ export function meleeHit(zone, a, sh, opt, now, origin) {
 }
 
 export function spawnProj(zone, a, sh, opt, ang, now, from) {
+  if (zone.dungeon?.underwater && !sh.uw) sh = { ...sh, uw: 1, spd: (sh.spd || 8) * 0.75 }; // water resistance slows projectiles
   const n = sh.n || 1, sp = (sh.sp || 10) * Math.PI / 180;
   for (let i = 0; i < n; i++) {
     const aa = ang + (n > 1 ? (i - (n - 1) / 2) * sp : 0) + (sh.spiral ? i * Math.PI * 2 / n : 0);

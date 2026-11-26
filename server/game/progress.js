@@ -38,6 +38,7 @@ export function knownSkills(ch) {
   if (w) out.push(w.skill.id);
   for (const s of DATA.levelSkills) if (s.req.level <= ch.level) out.push(s.id);
   const j = DATA.jobs.get(ch.job); if (j) out.push(j.active.id);
+  for (const [id, v] of Object.entries(ch.spells || {})) if (v.stage >= 4) out.push(id); // learned lost spells
   return out;
 }
 export function validateSlots(ch) { const k = new Set(knownSkills(ch)); ch.skills.slots = ch.skills.slots.map(s => (s && k.has(s) && DATA.skills.get(s)?.kind !== 'passive') ? s : null); }
@@ -172,7 +173,7 @@ export function rollLoot({ floor, diff, boss, chest, mythChance = 0, luck = 0, p
   return items;
 }
 export function addItem(ch, it, notify) {
-  if (it.kind === 'mat' || it.kind === 'potion') { const ex = ch.inventory.find(i => i.kind === it.kind && i.ref === it.ref); if (ex) ex.n += it.n; else ch.inventory.push({ uid: uid(), ...it }); }
+  if (it.kind === 'mat' || it.kind === 'potion' || it.kind === 'sfrag') { const ex = ch.inventory.find(i => i.kind === it.kind && i.ref === it.ref); if (ex) ex.n += it.n; else ch.inventory.push({ uid: uid(), ...it }); }
   else { if (ch.inventory.filter(i => i.kind === 'weapon' || i.kind === 'armor').length >= 200) { notify?.({ t: 'msg', v: 'インベントリが満杯です' }); return false; } ch.inventory.push({ uid: uid(), ...it }); }
   if (it.kind === 'weapon' && !ch.progress.codex.includes(it.ref)) ch.progress.codex.push(it.ref);
   notify?.({ t: 'loot', it });
@@ -194,9 +195,9 @@ export function shopStock(town, kind) {
   const tier = { haven: 0, marina: 1, celestia: 2, vulcan: 2, arcanum: 2, lumina: 1 }[town] ?? (CITIES[town] ? (CITIES[town].continent === 'eldia' ? 1 : 2) : 0);
   if (kind === 'weapon') { const out = []; for (const list of DATA.wtWeapons.values()) for (const w of list) if (w.acq.src === 'shop' && w.acq.minFloor <= [15, 40, 100][tier] && w.acq.minFloor >= [0, 5, 20][tier]) out.push(w.id); return out; }
   if (kind === 'armor') return Array.from({ length: 4 }, (_, i) => Math.min(9, tier * 3 + i));
-  return ['hp', 'sp', 'ore'];
+  return CITIES[town]?.continent === 'asteria' ? ['hp', 'sp', 'ore', 'breath', 'divingGear'] : ['hp', 'sp', 'ore'];
 }
-export const ITEM_PRICES = { hp: 40, sp: 60, ore: 120 };
+export const ITEM_PRICES = { hp: 40, sp: 60, ore: 120, breath: 400, divingGear: 25000 };
 
 // ---- quests: generated per town per day, data-driven
 export function questBoard(town, day) {

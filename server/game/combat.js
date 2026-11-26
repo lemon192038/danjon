@@ -20,6 +20,7 @@ export function inShape(sh, o, t, rangeMul = 1) {
 }
 export const isTip = (sh, o, t) => sh.s === 'whip' && Math.hypot(t.x - o.x, t.y - o.y) > sh.l * 0.75;
 
+const UW_EL = { fire: 0.5, water: 1.25, thunder: 1.25 };
 export function elemMul(el, tgt) {
   if (!el || el === 'phys') return 1;
   let m = (tgt.el && ELEMENT_CHART[el]?.[tgt.el]) || 1;
@@ -44,6 +45,7 @@ export function applyStatus(zone, src, tgt, [st, chance, dur], now) {
 // Central damage function. o: { m, el, pen, critAdd, st, kb, status, ls, exec, vs, mark, consumeMark, ang, noCounter, tip, isSkill, fixed }
 export function dealDamage(zone, src, tgt, o, now) {
   if (!tgt || tgt.dead || tgt.team === src.team) return 0;
+  if (zone.dungeon?.underwater && o.m && UW_EL[o.el || src.weaponEl]) o = { ...o, m: o.m * UW_EL[o.el || src.weaponEl] }; // underwater: fire fizzles, water/thunder conduct
   if (tgt.invulnUntil > now || tgt.timeStopImmune) { zone.fx({ t: 'miss', x: tgt.x, y: tgt.y }); return 0; }
   const ang = o.ang ?? Math.atan2(tgt.y - src.y, tgt.x - src.x);
   // counter / parry / guard on the defender
