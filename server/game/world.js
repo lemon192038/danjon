@@ -30,6 +30,7 @@ import { BigEvents } from './bigevents.js';
 import { Library } from './library.js';
 import { CityEvents } from './cityevents.js';
 import { StoryNpcs } from './storynpc.js';
+import { Machina } from './machina.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
@@ -43,7 +44,7 @@ export class World {
     for (const id of Object.keys(WORLD)) { const z = new Zone(this, id, { kind: 'over' }); this.zones.set(id, z); if (z.kind === 'town') this.life.populate(id, z.map, interiorRoles); }
     this.life.step();
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
-    this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.big.decorate(this.zones);
+    this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.machina = new Machina(this); this.machina.decorate(this.zones); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
     this.story = new StoryNpcs(this);
     this.last = Date.now();
@@ -69,7 +70,7 @@ export class World {
     if (this.tick % 40 === 0) this.econ.hourly();
     if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
     if (this.tick % 200 === 0) { this.events.simulate(); this.story.daily(); }
-    if (this.tick % 20 === 0) { this.duels.sync(); this.big.observerSync(); this.big.calSync(); }
+    if (this.tick % 20 === 0) { this.duels.sync(); this.big.observerSync(); this.big.calSync(); this.machina.sync(); }
     if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); const wx = cid ? this.life.weatherOf(cid) : 'clear'; ss.send({ t: 'env', h: c.hour, m: c.minute, wx, city: cid || null, se: season(c.day).name, temp: cid ? temperature(cid, wx, c) : null }); } }
     if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (!s.actor.dead && s.actor.hp < s.actor.maxHp * 0.3) artTrigger(s.actor, 'lowhp'); this.big.underwater(s); if (!s.actor) continue; if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
   }
@@ -143,6 +144,7 @@ export class World {
       case 'fac': if (z.hideout === s.ch.id) return this.hideout.use(s, o.f); return false;
       case 'hstore': if (z.hideout === s.ch.id) return this.hideout.view(s); return false;
     }
+    if (o.k === 'machinecore') return this.machina.observe(s, o);
     return this.big.useObject(s, z, o);
   }
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
@@ -251,7 +253,7 @@ export class World {
       const floor = z.floor || Math.round((m.level || 1) * 0.8);
       const loot = z.kind === 'slum' ? [] : rollLoot({ floor, diff: z.diff || 'NORMAL', boss: false, luck: mods.drop ? mods.drop * 0.03 : 0, preferWt: f.wt.id });
       if (loot.length) z.dropLoot(f, m.x, m.y, loot);
-      this.questCheck(s, { kind: 'kill', fam: m.fam }); this.sev.onKill(s, m); this.guilds.event(s, { kind: 'kill', fam: m.fam, elite: !!m.elite }); this.econ.monsterMat(s, m); this.spells.dropFor(s, z, m); this.cev.onKill(s, m, f); if (this.big.bmActive() && Math.random() < 0.03) { addItem(ch, { kind: 'mat', ref: 'moonShard', n: 1 }); this.note(s, { t: 'msg', v: '月影の欠片を手に入れた' }); } this.econ.requestKill(s, m.fam); this.econ.storyEvent(s, { kind: 'kill', fam: m.fam });
+      this.questCheck(s, { kind: 'kill', fam: m.fam }); this.sev.onKill(s, m); this.guilds.event(s, { kind: 'kill', fam: m.fam, elite: !!m.elite }); this.econ.monsterMat(s, m); this.spells.dropFor(s, z, m); this.cev.onKill(s, m, f); this.machina.onKilled(s, m); if (this.big.bmActive() && Math.random() < 0.03) { addItem(ch, { kind: 'mat', ref: 'moonShard', n: 1 }); this.note(s, { t: 'msg', v: '月影の欠片を手に入れた' }); } this.econ.requestKill(s, m.fam); this.econ.storyEvent(s, { kind: 'kill', fam: m.fam });
     }
     if (z.duel) { if (m.duelBoss) { if (z.duel.cev) this.cev.onDuelKill(z); else this.sev.onDuelKill(z); } } else if (z.arena) this.econ.arenaKill(z);
     if (z.kind === 'slum') this.slum.onKill(z, m, killer?.kind === 'player' ? killer : [...z.players][0]);
@@ -564,6 +566,7 @@ export class World {
         if (m.flag) (ch.progress.flags ||= {})[m.flag] = true;
         if (m.key) addItem(ch, { kind: 'mat', ref: 'archiveKey', n: m.key | 0 });
         if (m.story) { const c = this.story.cits[m.story]; if (c && c.city === z.cityId) { this.life.sync(z); if (c.actor && c.actor.zone === z) { a.x = c.actor.x + 8; a.y = c.actor.y; } } }
+        if (m.machina != null) this.machina.bump(+m.machina);
         if (Array.isArray(m.tp)) { a.x = +m.tp[0] || a.x; a.y = +m.tp[1] || a.y; }
         if (m.day != null) setClockAt(m.day | 0, m.hour ?? 12);
         if (m.hour != null && m.day == null) setClockHour(m.hour | 0);

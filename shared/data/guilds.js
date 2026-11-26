@@ -91,5 +91,6 @@ export const ITEMS = {
   herb: { name: '薬草', price: 25, desc: '採集素材', mat: 1 }, hide: { name: '魔獣の皮', price: 45, desc: '狩猟素材', mat: 1 }, gem: { name: '原石', price: 150, desc: '採掘素材', mat: 1 }, crystal: { name: '魔晶片', price: 180, desc: '魔力素材', mat: 1 },
   traitTicket: { name: '特性変更チケット', price: 0, desc: '街の祭壇で武器の特性を1つ選び、ランダムな別の特性に変更する（HARD以上の50階以降のボスから2枚確定）', mat: 1, nosell: 1 },
   wood: { name: '霊木材', price: 40, desc: '木工素材', mat: 1 }, relic: { name: '遺物の欠片', price: 400, desc: '古代遺物', mat: 1 }, abyssShard: { name: '深淵の欠片', price: 2000, desc: '深淵の力', mat: 1 },
+  machinePart: { name: '神機部品', price: 300, desc: '古代神機の部品。神機工房で機械武器を組める', mat: 1 },
   archiveKey: { name: '禁書庫の鍵', price: 0, desc: '大図書館の受付で1本消費して禁書庫へ入る（取引・売却不可）', mat: 1, nosell: 1, notrade: 1 },
 };

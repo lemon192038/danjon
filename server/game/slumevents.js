@@ -71,7 +71,7 @@ export class SlumEvents {
     this.world.orgs.news(`【${EVENT_BY_ID[ev].name}】${s.ch.name}の選択：${o.effect}`); EV.grant(s, ev, 'choice:' + o.id, this.rew(s, o.reward || {}));
     this.finish(s, ev, o.label);
   }
-  finish(s, ev, outcome) { const E = SLUM_EVENTS[ev], EV = this.world.events; EV.complete(s, ev, outcome); EV.grant(s, ev, 'clear', this.rew(s, E.reward)); this.world.sendSelf(s); this.open(s, ev); }
+  finish(s, ev, outcome) { const E = SLUM_EVENTS[ev], EV = this.world.events; if (ev === 'sl_facility') this.world.machina?.bump(40); EV.complete(s, ev, outcome); EV.grant(s, ev, 'clear', this.rew(s, E.reward)); this.world.sendSelf(s); this.open(s, ev); }
   rew(s, r) { const out = { gold: r.gold, xp: r.xp, title: r.title }; for (const [org, v] of Object.entries(r.orgRep || {})) this.world.orgs.addRep(s.ch, org, v); if (r.flag) (s.ch.progress.flags ||= {})[r.flag] = true; return out; }
   // hooks from the rest of the game
   onKill(s, m) { for (const [ev, E] of Object.entries(SLUM_EVENTS)) { const P = this.world.events.prog(s.ch, ev); if (!P || P.done) continue; const st = E.steps[P.stage]; if (st.k !== 'kill') continue;

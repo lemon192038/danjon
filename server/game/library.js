@@ -51,6 +51,7 @@ export class Library {
     if (page === b.pages.length) this.finished(s, b); }
   finished(s, b) { const ch = s.ch, E = this.world.events; E.log(ch, 'lib_forbidden', `${b.title}を読み終えた`);
     if (b.flag) (ch.progress.flags ||= {})[b.flag] = true;
+    if (b.cat === 'lost') this.world.machina?.bump(15); // god-machine records stir the ruins
     if (b.moon) { const F = E.w.flags; F.moon.p = Math.min(140, F.moon.p + b.moon); }
     if (b.sin) { const P = E.prog(ch, 'lib_forbidden'); if (P && !P.done) { if (P.stage < 2) E.advance(s, 'lib_forbidden', 2); E.complete(s, 'lib_forbidden'); } if (ch.level < 60) s.send({ t: 'toast', v: '異端の知識が刻まれた（Lv60で「異端者」に転職できる）' }); }
     checkJobUnlocks(ch, n => this.world.note(s, n)); this.world.sendSelf(s); }

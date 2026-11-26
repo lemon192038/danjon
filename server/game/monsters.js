@@ -110,6 +110,7 @@ function pickTarget(zone, m, now) {
 
 export function monsterTick(zone, m, now, dt) {
   if (!m.canAct(now)) { m.vx = m.vy = 0; return; }
+  if (m.machina && !m.machina.hostile) return zone.world.machina?.passive(zone, m, now);
   if (m.action && m.action.until > now) { if (m.action.lockMove) { m.vx = m.vy = 0; } return; }
   m.action = null;
   // boss phases

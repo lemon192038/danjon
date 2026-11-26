@@ -98,6 +98,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   tgt.threat ||= {}; tgt.threat[src.ownerId || src.id] = (tgt.threat[src.ownerId || src.id] || 0) + dmg * (src.tauntUntil > now ? 3 : 1);
   zone.fx({ t: 'dmg', x: Math.round(tgt.x), y: Math.round(tgt.y - 10), v: dmg, c: crit ? 1 : 0, e: el || 'phys', a: tgt.team !== 'enemy' ? 1 : 0 });
   if (tgt.faction && !tgt.provoked && zone.kind === 'slum') zone.world.slum.provoked(zone, tgt, src);
+  if (tgt.machina && !tgt.machina.hostile) zone.world.machina?.provoked(zone, tgt, src);
   // lifesteal
   const ls = (o.ls || 0) + (sm.ls || 0) + (bm.ls || 0);
   if (ls > 0 && !o.dot) src.heal?.(dmg * ls, zone);
