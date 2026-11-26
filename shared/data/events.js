@@ -7,7 +7,7 @@
 const LIVE = { lg_unnamed_arms: { status: 'live', kinds: ['world', 'title'], scope: 'personal', trigger: '武器を装備して戦い続ける（武器の個体ごとに記録）', stages: ['武器を使い込む', '二つ名が刻まれる'], rewards: ['二つ名（300撃破〜）と攻撃補正', '称号「武器に刻む者」'], repeat: 'rechallenge', links: ['ct_hundred_arms', 'sl_blackforge'] } };
 const E = (id, name, en, group, o) => ({ id, name, en, group, kinds: [], loc: [], scope: 'both', trigger: '', prereq: [], stages: [], outcomes: [], rewards: [], unlocks: [], links: [], repeat: 'none', detail: 'spec', status: 'planned', ...o });
 export const EVENT_KINDS = { permanent: '常設', conditional: '条件発生型', timed: '時間限定', world: '世界規模', regional: '地域', city: '都市', slum: 'スラム', hidden: '隠し', title: '称号', job: '職業解放', npc: 'NPC遭遇', dungeon: 'ダンジョン' };
-export const EVENT_GROUPS = { major: '大型イベント（8章）', slum: 'スラム起点（9章）', city: '都市起点（10章）', large: 'その他の大型イベント候補（11章）', library: '禁書庫・大罪（12〜14章）', existing: '既存実装（統合対象）' };
+export const EVENT_GROUPS = { major: '大型イベント（8章）', slum: 'スラム起点（9章）', city: '都市起点（10章）', large: 'その他の大型イベント候補（11章）', library: '禁書庫・大罪（12〜14章）', nx: '追加30イベント（新指示書）', existing: '既存実装（統合対象）' };
 export const EVENTS = [
   // ── 8. major events
   E('ev_swordmaster', '放浪する最強の剣士', 'THE WANDERING SWORDMASTER', 'major', { kinds: ['npc', 'world', 'hidden', 'title', 'job'], loc: ['eldia', 'nordia', 'shengar', 'saharia', 'valgran', 'asteria'], scope: 'both',
@@ -86,6 +86,23 @@ export const EVENTS = [
   E('lib_succession', '大罪司教の継承決闘', 'SUCCESSION DUEL', 'library', { kinds: ['world', 'npc'], loc: ['arcelia'], scope: 'world', trigger: '現職の大罪司教（プレイヤーまたはNPC）に継承決闘を申請。NPCは必ず受諾', prereq: ['lib_sins'],
     stages: ['申請', '決闘', '継承または防衛'], outcomes: ['挑戦者が継承（敗者は元大罪司教として残る）', '現職が防衛'], links: ['lib_sins'], repeat: 'rechallenge', status: 'live', notes: '継承履歴（現職・歴代・日時・勝敗・職業・武器種）を世界状態に記録。座の継承だけで試練報酬は自動解放しない' }),
 ];
+// ── NEW WORLD EVENTS — 30 EVENT EXPANSION (registered up front; each becomes live in its implementation phase)
+EVENTS.push(...[['nx01', '天空に現れた城', 'THE CASTLE ABOVE', ['astralheim'], ['world', 'dungeon'], ['lg_fall_heavens']], ['nx02', '存在しない住民', 'THE UNRECORDED PEOPLE', ['world'], ['city', 'hidden', 'npc'], ['lg_other_side', 'ct_stranger']],
+  ['nx03', '世界を囲う巨蛇', 'THE WORLD SERPENT', ['world'], ['world', 'regional'], ['ev_calamity']], ['nx04', '境界崩壊', 'COLLAPSE OF THE BOUNDARIES', ['world'], ['world', 'conditional'], ['lib_forbidden']],
+  ['nx05', '神機の目覚め', 'AWAKENING OF THE MACHINE GOD', ['world'], ['world', 'dungeon'], ['lg_deus_machina', 'sl_facility']], ['nx06', '海底から伸びる塔', 'THE TOWER FROM BELOW', ['asteria'], ['world', 'dungeon'], ['ev_sunken']],
+  ['nx07', '引退した英雄', 'THE RETIRED HERO', ['elmgard'], ['npc', 'city'], ['lg_forgotten_hero', 'ev_calamity']], ['nx08', '旅を続ける商人', 'THE ETERNAL TRADER', ['world'], ['npc', 'world'], ['lg_wandering_merchant']],
+  ['nx09', '約束を待つ老人', 'THE PROMISE', ['marinelia'], ['npc', 'city'], ['ev_sunken']], ['nx10', '名前を失った音楽家', 'THE NAMELESS MUSICIAN', ['world'], ['npc', 'hidden'], ['lg_vanished_city', 'lg_other_side']],
+  ['nx11', '師匠を探す弟子', 'THE SEARCH FOR A MASTER', ['world'], ['npc'], ['lg_forgotten_hero']], ['nx12', '身分を隠した王族', 'THE HIDDEN HEIR', ['arcelia'], ['npc', 'city'], ['ct_succession']],
+  ['nx13', '地図にない図書館', 'THE LIBRARY WITHOUT A MAP', ['world'], ['hidden'], ['lib_forbidden']], ['nx14', '地下に広がるもう一つの世界', 'THE WORLD BENEATH', ['underrealm'], ['regional', 'dungeon'], ['lg_kingdom_below', 'ct_undercity']],
+  ['nx15', '幻の列車', 'THE PHANTOM TRAIN', ['world'], ['hidden', 'conditional'], []], ['nx16', '枯れない枯れ木', 'THE TREE THAT NEVER DIES', ['shengar'], ['regional'], ['lg_worldtree_dream']],
+  ['nx17', '動き出す石像群', 'THE AWAKENING STATUES', ['world'], ['hidden'], []], ['nx18', '湖に映らない月', 'THE MOONLESS REFLECTION', ['world'], ['hidden', 'conditional'], ['ev_blackmoon']],
+  ['nx19', '名もなき村の発展', 'THE RISE OF A VILLAGE', ['eldia'], ['world', 'regional'], ['lg_rebuild']], ['nx20', '消えた交易路', 'THE LOST TRADE ROUTE', ['world'], ['regional', 'world'], ['ct_merchants_war']],
+  ['nx21', '国境線の変動', 'SHIFTING BORDERS', ['world'], ['world'], ['lg_civil_war', 'ct_succession']], ['nx22', '世界規模の商業祭', 'THE GRAND MERCHANT FESTIVAL', ['world'], ['world', 'timed'], ['ct_festival']],
+  ['nx23', '災害後の復興', 'AFTER THE CALAMITY', ['world'], ['regional'], ['ct_great_fire', 'ev_calamity']], ['nx24', '冒険者ギルドの分裂', 'THE FRACTURED GUILD', ['world'], ['world', 'city'], ['ct_promotion']],
+  ['nx25', '百の試練', 'THE HUNDRED TRIALS', ['world'], ['permanent', 'title'], []], ['nx26', '未確認生物調査局', 'THE UNKNOWN SPECIES BUREAU', ['world'], ['permanent'], ['ev_calamity']],
+  ['nx27', '伝説武器の目録', 'THE LEGENDARY ARMAMENT CATALOG', ['world'], ['permanent', 'title'], ['lg_collector', 'ev_swordmaster']], ['nx28', '大陸横断レース', 'THE CONTINENTAL RALLY', ['world'], ['timed'], []],
+  ['nx29', '至高の職人', 'THE ULTIMATE ARTISAN', ['world'], ['timed'], []], ['nx30', '星を読む者たち', 'THE STAR READERS', ['world'], ['permanent', 'hidden'], ['lg_last_observer', 'ev_blackmoon']]]
+  .map(([id, n, en, loc, kinds, links]) => E(id, n, en, 'nx', { loc, kinds, links, detail: 'spec', notes: '新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md' })));
 // already-implemented content that the event engine adopts (kept as-is; see docs/ABYSS_CONFLICT_REPORT.md)
 EVENTS.push(
   ...[['celestia', '王位継承の陰謀', 'ct_succession'], ['marina', '灯台の消えた夜', ''], ['vulcan', '深層採掘の是非', ''], ['arcanum', '終焉の鍵の欠片', ''], ['lumina', '夜明けの灯', '']]
@@ -95,3 +112,5 @@ EVENTS.push(
   E('ex_dungeons', '12ダンジョン×100階層', 'DUNGEONS', 'existing', { kinds: ['dungeon', 'permanent'], loc: ['world'], trigger: 'ダンジョンゲート', stages: ['EASY〜ABYSS'], links: ['lg_abyss_walker'], repeat: 'rechallenge', status: 'live' }),
 );
 export const EVENT_BY_ID = Object.fromEntries(EVENTS.map(e => [e.id, e]));
+// 名もなき商人（第11章）は新規イベント07〜12の「旅を続ける商人」(nx08) と同じ題材のため統合（二重実装しない）
+Object.assign(EVENT_BY_ID.lg_wandering_merchant, { status: 'live', notes: '新規イベント「旅を続ける商人」(nx08) として統合実装', links: ['nx08'] });

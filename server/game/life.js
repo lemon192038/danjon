@@ -62,6 +62,7 @@ export class Life {
   }
   places(map) { const by = t => map.doors.filter(d => !d.home && d.t === t).map(d => d.id); return { tavern: by('tavern'), market: map.doors.filter(d => d.t === 'shop').map(d => d.id), leisure: [...by('museum'), ...by('theater'), ...by('hotel'), ...by('casino'), ...by('bathhouse')], dark: [...by('blackmarket'), ...by('tavern')], labor: [...by('warehouse'), ...by('station'), ...by('smithy'), ...by('workshop')], church: by('church') }; }
   desired(c, h, wx) {
+    if (c.story) { const st = this.world.story?.planLoc(c, h, wx); if (st) return st; }
     const P = this.byCity[c.city].places; const pick = (arr, alt) => arr?.length ? arr[hash32(c.id + Math.floor(Date.now() / 3600000)) % arr.length] : alt; const home = c.home ? 'b:' + c.home : `p:${c.district}`;
     const wet = wx === 'rain' || wx === 'storm' || wx === 'snow';
     const work = c.work ? 'b:' + c.work : null;
@@ -99,7 +100,7 @@ export class Life {
     const inside = zone.kind === 'interior' ? zone.bldgId : null;
     for (const c of pack.list) {
       let a = c.actor && c.actorZone === zone ? c.actor : null;
-      const here = inside ? (c.loc === 'b:' + inside && !c.moving) || (c.moving && c.moving.from === 'b:' + inside) : (c.loc?.startsWith('p:') && !c.moving) || !!c.moving;
+      const here = inside ? (c.loc === 'b:' + inside && !c.moving) || (c.moving && c.moving.from === 'b:' + inside) : (/^[pg]:/.test(c.loc || '') && !c.moving) || !!c.moving;
       if (!here) { if (a) { zone.remove(a); c.actor = null; } continue; }
       if (!a) a = this.spawn(zone, c, inside);
       if (!a) continue;
@@ -107,7 +108,7 @@ export class Life {
       else if (!inside && c.moving) { a.goal = this.placePos(zone, c.moving.to); a.arriveTo = c.moving.to; }
     }
   }
-  placePos(zone, loc) { if (!loc) return null; const [k, id] = loc.split(':'); if (k === 'b') { const d = zone.map.doors?.find(x => x.id === id); if (d) return zone.tileCenter([d.x, d.y + 1]); } else { const p = zone.map.plazas?.find(x => x.district === id); if (p) return zone.tileCenter([p.x + (Math.random() * 6 - 3 | 0), p.y + (Math.random() * 4 - 2 | 0)]); } return null; }
+  placePos(zone, loc) { if (!loc) return null; const [k, id] = loc.split(':'); if (k === 'g') return zone.kind === 'interior' ? null : zone.tileCenter([zone.map.start[0] + 2, zone.map.start[1] - 1]); if (k === 'b') { const d = zone.map.doors?.find(x => x.id === id); if (d) return zone.tileCenter([d.x, d.y + 1]); } else { const p = zone.map.plazas?.find(x => x.district === id); if (p) return zone.tileCenter([p.x + (Math.random() * 6 - 3 | 0), p.y + (Math.random() * 4 - 2 | 0)]); } return null; }
   spawn(zone, c, inside) {
     let pos;
     if (inside) { const spots = zone.map.spots || []; const s = c.fixed && c.work === inside ? spots.find(x => x.fixed) : spots[Math.floor(Math.random() * spots.length)]; if (!s) return null; pos = zone.tileCenter([s.x, s.y]); }

@@ -80,7 +80,7 @@ net.on('zone', m => {
 net.on('env', m => { state.env = { h: m.h, m: m.m, wx: m.wx, city: m.city, se: m.se, temp: m.temp }; ui?.onEnv?.(state.env); });
 net.on('loading', m => { ui?.loading(m.v, m.ms || 600, m.mode); });
 net.on('homeRefresh', m => { if (!state.zone) return; state.zone.props = m.props; state.zone.tiles = Uint8Array.from(atob(m.tiles), c => c.charCodeAt(0)); renderer.rerender(); });
-net.on('self', m => { state.self = m; const w = m.ch.inventory.find(i => i.uid === m.ch.equip.weapon); const wts = new Set(m.ch.inventory.filter(i => i.kind === 'weapon').map(i => +i.ref.split('_')[0])); wts.add(m.d.wt); Promise.all([...wts].map(loadType)).then(() => ui.onSelf(m)); ui.onSelf(m); });
+net.on('self', m => { state.self = m; if (D.spells) { D.spellBase ||= new Map(D.spells.map(x => [x.id, x])); for (const id of Object.keys(m.ch.spells || {})) D.skills.set(id, m.cs?.[id] || D.spellBase.get(id)); } const w = m.ch.inventory.find(i => i.uid === m.ch.equip.weapon); const wts = new Set(m.ch.inventory.filter(i => i.kind === 'weapon').map(i => +i.ref.split('_')[0])); wts.add(m.d.wt); Promise.all([...wts].map(loadType)).then(() => ui.onSelf(m)); ui.onSelf(m); });
 net.on('s', m => {
   state.lastSnap = performance.now(); state.myId = m.me.id;
   for (const f of m.full) { const e = state.ents.get(f.id); if (e) e.d = f; else state.ents.set(f.id, { d: f, x: 0, y: 0, tx: 0, ty: 0, seen: false, fresh: true }); }

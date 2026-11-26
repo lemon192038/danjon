@@ -38,6 +38,7 @@ test('big events', async () => {
     // improvement is a trade-off: over budget is refused; the custom copy changes cost/speed
     menu({ op: 'spells', act: 'improve', id: sp.id, mods: { range: 3, speed: 3 } }); assert.match(err(), /合計4点/);
     menu({ op: 'spells', act: 'improve', id: sp.id, mods: { cost: 2, speed: 2 } }); const cu = w.spells.custom(ch, sp); assert.ok(cu.cost < sp.cost && cu !== sp);
+    { const v = w.spells.view(s).list.find(x => x.id === sp.id); assert.ok(v.now && v.now.cost < v.props.cost, 'research view shows the improved numbers'); w.sendSelf(s); const self = [...out].reverse().find(m => m.t === 'self'); assert.equal(self.cs[sp.id].cost, cu.cost, 'client receives the improved spell'); }
     // 第零魔法 needs all 7 key spells AND the forbidden book
     menu({ op: 'spells', act: 'zero' }); assert.match(err(), /七つ/);
     for (const k of DATA.spells.filter(x => x.key)) ch.spells[k.id] = { stage: 4 }; menu({ op: 'spells', act: 'zero' }); assert.match(err(), /魔力の存在証明/);

@@ -11,7 +11,7 @@
 
 ## 集計
 
-総数 **71** ／ 実装済み 21 ／ 未実装 50
+総数 **101** ／ 実装済み 22 ／ 未実装 79
 
 ## 大型イベント（8章）（6）
 
@@ -240,7 +240,7 @@
 | lg_deus_machina | 神機降臨<br><small>DEUS MACHINA</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
 | lg_forgotten_hero | 忘却された英雄<br><small>THE FORGOTTEN HERO</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
 | lg_unnamed_arms | 名もなき武器<br><small>THE UNNAMED ARMAMENT</small> | 世界規模・称号 | 世界各地 | personal | 実装済み | outline |
-| lg_wandering_merchant | 名もなき商人<br><small>THE WANDERING MERCHANT</small> | 世界規模 | 世界各地 | both | 未実装 | outline |
+| lg_wandering_merchant | 名もなき商人<br><small>THE WANDERING MERCHANT</small> | 世界規模 | 世界各地 | both | 実装済み | outline |
 | lg_rebuild | 滅びた村の再建<br><small>REBUILD THE LOST</small> | 世界規模 | 中央大陸エルディア | both | 未実装 | outline |
 | lg_civil_war | 王国の内乱<br><small>CIVIL WAR</small> | 世界規模 | 中央大陸エルディア | both | 未実装 | outline |
 | lg_territory | 古龍の縄張り争い<br><small>TERRITORIAL DOMINION</small> | 世界規模 | 西方大陸ヴァルグラン | both | 未実装 | outline |
@@ -311,6 +311,216 @@
 - 関連：lib_sins
 - 再挑戦：再挑戦可
 - 備考：継承履歴（現職・歴代・日時・勝敗・職業・武器種）を世界状態に記録。座の継承だけで試練報酬は自動解放しない
+
+## 追加30イベント（新指示書）（30）
+
+| ID | 名称 | 分類 | 地域 | 共有 | 状態 | 詳細度 |
+|---|---|---|---|---|---|---|
+| nx01 | 天空に現れた城<br><small>THE CASTLE ABOVE</small> | 世界規模・ダンジョン | 天空領域アストラルヘイム | both | 未実装 | spec |
+| nx02 | 存在しない住民<br><small>THE UNRECORDED PEOPLE</small> | 都市・隠し・NPC遭遇 | 世界各地 | both | 未実装 | spec |
+| nx03 | 世界を囲う巨蛇<br><small>THE WORLD SERPENT</small> | 世界規模・地域 | 世界各地 | both | 未実装 | spec |
+| nx04 | 境界崩壊<br><small>COLLAPSE OF THE BOUNDARIES</small> | 世界規模・条件発生型 | 世界各地 | both | 未実装 | spec |
+| nx05 | 神機の目覚め<br><small>AWAKENING OF THE MACHINE GOD</small> | 世界規模・ダンジョン | 世界各地 | both | 未実装 | spec |
+| nx06 | 海底から伸びる塔<br><small>THE TOWER FROM BELOW</small> | 世界規模・ダンジョン | 外洋諸島アステリア | both | 未実装 | spec |
+| nx07 | 引退した英雄<br><small>THE RETIRED HERO</small> | NPC遭遇・都市 | 辺境都市エルムガルド | both | 未実装 | spec |
+| nx08 | 旅を続ける商人<br><small>THE ETERNAL TRADER</small> | NPC遭遇・世界規模 | 世界各地 | both | 未実装 | spec |
+| nx09 | 約束を待つ老人<br><small>THE PROMISE</small> | NPC遭遇・都市 | 港湾都市マリネリア | both | 未実装 | spec |
+| nx10 | 名前を失った音楽家<br><small>THE NAMELESS MUSICIAN</small> | NPC遭遇・隠し | 世界各地 | both | 未実装 | spec |
+| nx11 | 師匠を探す弟子<br><small>THE SEARCH FOR A MASTER</small> | NPC遭遇 | 世界各地 | both | 未実装 | spec |
+| nx12 | 身分を隠した王族<br><small>THE HIDDEN HEIR</small> | NPC遭遇・都市 | 王都アルセリア | both | 未実装 | spec |
+| nx13 | 地図にない図書館<br><small>THE LIBRARY WITHOUT A MAP</small> | 隠し | 世界各地 | both | 未実装 | spec |
+| nx14 | 地下に広がるもう一つの世界<br><small>THE WORLD BENEATH</small> | 地域・ダンジョン | 地底世界アンダーレルム | both | 未実装 | spec |
+| nx15 | 幻の列車<br><small>THE PHANTOM TRAIN</small> | 隠し・条件発生型 | 世界各地 | both | 未実装 | spec |
+| nx16 | 枯れない枯れ木<br><small>THE TREE THAT NEVER DIES</small> | 地域 | 東方大陸シェンガル | both | 未実装 | spec |
+| nx17 | 動き出す石像群<br><small>THE AWAKENING STATUES</small> | 隠し | 世界各地 | both | 未実装 | spec |
+| nx18 | 湖に映らない月<br><small>THE MOONLESS REFLECTION</small> | 隠し・条件発生型 | 世界各地 | both | 未実装 | spec |
+| nx19 | 名もなき村の発展<br><small>THE RISE OF A VILLAGE</small> | 世界規模・地域 | 中央大陸エルディア | both | 未実装 | spec |
+| nx20 | 消えた交易路<br><small>THE LOST TRADE ROUTE</small> | 地域・世界規模 | 世界各地 | both | 未実装 | spec |
+| nx21 | 国境線の変動<br><small>SHIFTING BORDERS</small> | 世界規模 | 世界各地 | both | 未実装 | spec |
+| nx22 | 世界規模の商業祭<br><small>THE GRAND MERCHANT FESTIVAL</small> | 世界規模・時間限定 | 世界各地 | both | 未実装 | spec |
+| nx23 | 災害後の復興<br><small>AFTER THE CALAMITY</small> | 地域 | 世界各地 | both | 未実装 | spec |
+| nx24 | 冒険者ギルドの分裂<br><small>THE FRACTURED GUILD</small> | 世界規模・都市 | 世界各地 | both | 未実装 | spec |
+| nx25 | 百の試練<br><small>THE HUNDRED TRIALS</small> | 常設・称号 | 世界各地 | both | 未実装 | spec |
+| nx26 | 未確認生物調査局<br><small>THE UNKNOWN SPECIES BUREAU</small> | 常設 | 世界各地 | both | 未実装 | spec |
+| nx27 | 伝説武器の目録<br><small>THE LEGENDARY ARMAMENT CATALOG</small> | 常設・称号 | 世界各地 | both | 未実装 | spec |
+| nx28 | 大陸横断レース<br><small>THE CONTINENTAL RALLY</small> | 時間限定 | 世界各地 | both | 未実装 | spec |
+| nx29 | 至高の職人<br><small>THE ULTIMATE ARTISAN</small> | 時間限定 | 世界各地 | both | 未実装 | spec |
+| nx30 | 星を読む者たち<br><small>THE STAR READERS</small> | 常設・隠し | 世界各地 | both | 未実装 | spec |
+
+### 天空に現れた城（nx01）
+
+- 関連：lg_fall_heavens
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 存在しない住民（nx02）
+
+- 関連：lg_other_side, ct_stranger
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 世界を囲う巨蛇（nx03）
+
+- 関連：ev_calamity
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 境界崩壊（nx04）
+
+- 関連：lib_forbidden
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 神機の目覚め（nx05）
+
+- 関連：lg_deus_machina, sl_facility
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 海底から伸びる塔（nx06）
+
+- 関連：ev_sunken
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 引退した英雄（nx07）
+
+- 関連：lg_forgotten_hero, ev_calamity
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 旅を続ける商人（nx08）
+
+- 関連：lg_wandering_merchant
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 約束を待つ老人（nx09）
+
+- 関連：ev_sunken
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 名前を失った音楽家（nx10）
+
+- 関連：lg_vanished_city, lg_other_side
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 師匠を探す弟子（nx11）
+
+- 関連：lg_forgotten_hero
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 身分を隠した王族（nx12）
+
+- 関連：ct_succession
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 地図にない図書館（nx13）
+
+- 関連：lib_forbidden
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 地下に広がるもう一つの世界（nx14）
+
+- 関連：lg_kingdom_below, ct_undercity
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 幻の列車（nx15）
+
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 枯れない枯れ木（nx16）
+
+- 関連：lg_worldtree_dream
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 動き出す石像群（nx17）
+
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 湖に映らない月（nx18）
+
+- 関連：ev_blackmoon
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 名もなき村の発展（nx19）
+
+- 関連：lg_rebuild
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 消えた交易路（nx20）
+
+- 関連：ct_merchants_war
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 国境線の変動（nx21）
+
+- 関連：lg_civil_war, ct_succession
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 世界規模の商業祭（nx22）
+
+- 関連：ct_festival
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 災害後の復興（nx23）
+
+- 関連：ct_great_fire, ev_calamity
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 冒険者ギルドの分裂（nx24）
+
+- 関連：ct_promotion
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 百の試練（nx25）
+
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 未確認生物調査局（nx26）
+
+- 関連：ev_calamity
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 伝説武器の目録（nx27）
+
+- 関連：lg_collector, ev_swordmaster
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 大陸横断レース（nx28）
+
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 至高の職人（nx29）
+
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
+
+### 星を読む者たち（nx30）
+
+- 関連：lg_last_observer, ev_blackmoon
+- 再挑戦：なし（一度きり）
+- 備考：新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md
 
 ## 既存実装（統合対象）（8）
 
@@ -398,10 +608,36 @@ sl_capital_shadow -> sl_false_hero, ct_succession
 sl_blackforge -> ct_hundred_arms, lg_unnamed_arms
 sl_last_resident -> lib_forbidden, lg_other_side
 lg_unnamed_arms -> ct_hundred_arms, sl_blackforge
+lg_wandering_merchant -> nx08
 lib_sealed_abyss -> lib_forbidden
 lib_forbidden -> lib_sins, ev_thousand_spells, sl_carriers, lg_other_side
 lib_sins -> lib_succession
 lib_succession -> lib_sins
+nx01 -> lg_fall_heavens
+nx02 -> lg_other_side, ct_stranger
+nx03 -> ev_calamity
+nx04 -> lib_forbidden
+nx05 -> lg_deus_machina, sl_facility
+nx06 -> ev_sunken
+nx07 -> lg_forgotten_hero, ev_calamity
+nx08 -> lg_wandering_merchant
+nx09 -> ev_sunken
+nx10 -> lg_vanished_city, lg_other_side
+nx11 -> lg_forgotten_hero
+nx12 -> ct_succession
+nx13 -> lib_forbidden
+nx14 -> lg_kingdom_below, ct_undercity
+nx16 -> lg_worldtree_dream
+nx18 -> ev_blackmoon
+nx19 -> lg_rebuild
+nx20 -> ct_merchants_war
+nx21 -> lg_civil_war, ct_succession
+nx22 -> ct_festival
+nx23 -> ct_great_fire, ev_calamity
+nx24 -> ct_promotion
+nx26 -> ev_calamity
+nx27 -> lg_collector, ev_swordmaster
+nx30 -> lg_last_observer, ev_blackmoon
 st_celestia -> ct_succession
 ex_slum_raid -> sl_graymarket
 ex_arena -> sl_colosseum

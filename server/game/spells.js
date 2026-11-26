@@ -25,9 +25,11 @@ export class Spells {
   atLab(s) { const z = s.actor.zone; if (z.kind !== 'interior') return false; const t = z.opts?.bldg?.t; return RESEARCH_PLACES.has(t) || !!z.hideout && s.ch.hideout?.fac?.lab; }
   learned(ch) { return Object.entries(ch.spells || {}).filter(([, v]) => v.stage >= 4).map(([k]) => k); }
   stageUp(s, n) { const E = this.world.events; const P = E.prog(s.ch, 'ev_thousand_spells') || (E.start(s, 'ev_thousand_spells', { silent: true }), E.prog(s.ch, 'ev_thousand_spells')); if (!P.done && P.stage < n) E.advance(s, 'ev_thousand_spells', n, { silent: true }); }
-  view(s) { const ch = s.ch; const list = Object.entries(ch.spells || {}).map(([id, v]) => { const sp = DATA.skills.get(id); return { id, stage: v.stage, frags: this.frags(ch, id), need: sp.frags, name: v.stage >= 1 ? sp.name : `未解析の${sp.catName}`, cat: sp.catName, tier: sp.tier, key: v.stage >= 1 && sp.key, mods: v.mods || {}, el: v.stage >= 1 ? sp.el : null, props: v.stage >= 1 ? { cost: sp.cost, cd: sp.cd, cast: sp.cast } : null }; });
+  view(s) { const ch = s.ch; const list = Object.entries(ch.spells || {}).map(([id, v]) => { const sp = DATA.skills.get(id); return { id, stage: v.stage, frags: this.frags(ch, id), need: sp.frags, name: v.stage >= 1 ? sp.name : `未解析の${sp.catName}`, cat: sp.catName, tier: sp.tier, key: v.stage >= 1 && sp.key, mods: v.mods || {}, el: v.stage >= 1 ? sp.el : null, props: v.stage >= 1 ? { cost: sp.cost, cd: sp.cd, cast: sp.cast, rng: this.reach(sp) } : null, now: v.stage >= 4 && v.mods && Object.keys(v.mods).length ? (c => ({ cost: c.cost, cd: c.cd, cast: c.cast, rng: this.reach(c), compound: !!v.mods.compound }))(this.custom(ch, sp)) : null }; });
     const keys = DATA.spells.filter(x => x.key).map(x => ({ id: x.id, name: x.name, cat: x.catName, have: this.st(ch, x.id)?.stage >= 4 }));
     return { list: list.sort((a, b) => b.stage - a.stage || b.tier - a.tier), learned: this.learned(ch).length, total: DATA.spells.length - 1, keys, book: !!ch.progress.flags?.proofOfMana, atLab: this.atLab(s), zero: this.st(ch, 'sp_zero')?.stage >= 4, labPlus: !!ch.progress.flags?.labPlus, budget: BUDGET, improve: IMPROVE }; }
+  reach(sk) { let r = 0; for (const e of sk.eff) r = Math.max(r, e.r || 0, e.shape?.r || 0, e.shape?.rng || 0, e.shape?.l || 0); return Math.round(r); }
+  customOf(ch) { const o = {}; for (const [id, v] of Object.entries(ch.spells || {})) if (v.stage >= 4 && v.mods && Object.keys(v.mods).length) { const b = DATA.skills.get(id); if (b) o[id] = this.custom(ch, b); } return o; }
   open(s) { s.send({ t: 'open', service: 'spells', data: this.view(s) }); }
   act(s, m) {
     const ch = s.ch, err = v => s.send({ t: 'err', v }); const sp = DATA.skills.get(m.id); const st = sp && this.st(ch, m.id); const cost = n => Math.round(n * (ch.progress.flags?.labPlus ? 0.7 : 1));
@@ -49,7 +51,7 @@ export class Spells {
   // per-character improved spell (used when casting); cached
   custom(ch, sk) { const mods = this.st(ch, sk.id)?.mods; if (!mods || !Object.keys(mods).length) return sk; const key = ch.id + sk.id; if (this.cache.has(key)) return this.cache.get(key);
     const c = JSON.parse(JSON.stringify(sk)); const R = 1 + 0.2 * (mods.range || 0), D = 1 + 0.25 * (mods.duration || 0);
-    for (const e of c.eff) { if (e.r) e.r = Math.round(e.r * R); if (e.shape?.r) e.shape.r = Math.round(e.shape.r * R); if (e.shape?.rng) e.shape.rng = Math.round(e.shape.rng * R); if (e.shape?.l) e.shape.l = Math.round(e.shape.l * R); if (e.dur) e.dur = Math.round(e.dur * D); }
+    for (const e of c.eff) { if (e.r) e.r = Math.round(e.r * R); if (e.shape?.r) e.shape.r = Math.round(e.shape.r * R); if (e.shape?.rng) e.shape.rng = Math.round(e.shape.rng * R); if (e.shape?.l) e.shape.l = Math.round(e.shape.l * R); if (e.shape?.aoe) e.shape.aoe = Math.round(e.shape.aoe * R); if (e.shape?.spd) e.shape.spd = Math.round(e.shape.spd * (1 + 0.15 * (mods.speed || 0)) * 10) / 10; if (e.dur) e.dur = Math.round(e.dur * D); }
     c.cast = Math.round((c.cast || 0) * (1 - 0.25 * (mods.speed || 0))); c.cd = Math.round(c.cd * (1 - 0.1 * (mods.speed || 0))); c.cost = Math.max(1, Math.round(c.cost * (1 - 0.12 * (mods.cost || 0))));
     if (mods.compound) c.eff.push({ t: 'hit', shape: { s: 'circle', r: 60 }, m: 0.6, el: c.el === 'void' ? 'holy' : 'void', delay: 300 });
     this.cache.set(key, c); return c; }

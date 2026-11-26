@@ -29,6 +29,8 @@ import { Spells } from './spells.js';
 import { BigEvents } from './bigevents.js';
 import { Library } from './library.js';
 import { CityEvents } from './cityevents.js';
+import { StoryNpcs } from './storynpc.js';
+import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
 export const isTown = z => z.kind === 'town' || z.kind === 'interior';
@@ -43,6 +45,7 @@ export class World {
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
+    this.story = new StoryNpcs(this);
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
     setInterval(() => this.npcs.abstractTick(), 1000);
@@ -65,7 +68,7 @@ export class World {
     if (this.tick % 20 === 0) this.life.step();
     if (this.tick % 40 === 0) this.econ.hourly();
     if (this.tick % 20 === 0) { this.market.step(); this.slum.cleanup(); }
-    if (this.tick % 200 === 0) this.events.simulate();
+    if (this.tick % 200 === 0) { this.events.simulate(); this.story.daily(); }
     if (this.tick % 20 === 0) { this.duels.sync(); this.big.observerSync(); this.big.calSync(); }
     if (this.tick % 40 === 0) { const c = clock(); for (const ss of this.sessions.values()) { const cid = ss.actor?.zone.cityId || this.cityNear(ss.actor?.zone); const wx = cid ? this.life.weatherOf(cid) : 'clear'; ss.send({ t: 'env', h: c.hour, m: c.minute, wx, city: cid || null, se: season(c.day).name, temp: cid ? temperature(cid, wx, c) : null }); } }
     if (this.tick % 10 === 0) for (const s of this.sessions.values()) if (s.actor) { this.checkTiles(s); if (s.ch.raid) { this.slum.tickSession(s); if (!s.actor) continue; } if (!s.actor.dead && s.actor.hp < s.actor.maxHp * 0.3) artTrigger(s.actor, 'lowhp'); this.big.underwater(s); if (!s.actor) continue; if (s.dirty) { s.dirty = false; this.sendSelf(s); } }
@@ -166,10 +169,14 @@ export class World {
     this.cev.onEnterZone(s, z);
     if (z.kind === 'field') this.big.onEnterField(s, z);
   }
+  // story NPCs: their own event panel, or the event whose current step needs them, or a plain talk with their current line
+  storyTalk(s, c) { const id = c.story, S = STORY_NPCS[id]; if (S.ev) return this.cev.open(s, S.ev);
+    for (const [ev, P] of Object.entries(s.ch.events?.prog || {})) { if (P.done) continue; const st = this.cev.stepOf?.(ev, P.stage); if ((st?.k === 'meet' && st.npc === id) || st?.at === id) return this.cev.open(s, ev); }
+    s.send({ t: 'open', service: 'resident', data: { id: c.id, name: c.name, job: c.job, pers: '—', line: this.story.line(id, s.ch), guild: null, family: null } }); }
   sendSelf(s) {
     const a = s.actor; validateSlots(s.ch); a?.refreshStats();
     const st = a.stats;
-    s.send({ t: 'self', ch: s.ch, d: { atk: st.atk, matk: st.matk, def: st.def, maxHp: st.maxHp, maxSp: st.maxSp, crit: st.crit, critDmg: st.critDmg, aspd: st.aspd, move: st.move, dr: st.dr, cdr: st.cdr, st: st.st, wt: st.wt, affinity: st.affinity, mods: st.mods }, known: knownSkills(s.ch), party: this.partyView(s.ch.id) });
+    s.send({ t: 'self', ch: s.ch, d: { atk: st.atk, matk: st.matk, def: st.def, maxHp: st.maxHp, maxSp: st.maxSp, crit: st.crit, critDmg: st.critDmg, aspd: st.aspd, move: st.move, dr: st.dr, cdr: st.cdr, st: st.st, wt: st.wt, affinity: st.affinity, mods: st.mods }, known: knownSkills(s.ch), party: this.partyView(s.ch.id), cs: this.spells?.customOf(s.ch) || null });
   }
   note(s, n) { s.send({ ...n, k: n.t, t: 'note' }); s.dirty = true; }
   // ---------- per-tick interaction checks (tiles)
@@ -433,7 +440,8 @@ export class World {
     for (const st of z.map.stops || []) { const p = z.tileCenter([st.x, st.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 26) return s.send({ t: 'open', service: 'stops', data: { here: st.district, stops: z.map.stops.map(x => ({ district: x.district, name: x.name })), fee: 10 } }); }
     const near = (z.map.objects || []).map(o => { const p = z.tileCenter([o.x, o.y]); return [Math.hypot(p.x - a.x, p.y - a.y), o]; }).filter(x => x[0] < 24).sort((x, y) => x[0] - y[0]);
     for (const [, o] of near) { const r = this.useObject(s, z, o); if (r !== false) return; }
-    for (const o of z.actors.values()) if (o.kind === 'resident' && Math.hypot(o.x - a.x, o.y - a.y) < 26) { const c = o.cit; o.facing = Math.atan2(a.y - o.y, a.x - o.x); return s.send({ t: 'open', service: 'resident', data: { id: c.id, name: c.name, job: c.job, pers: c.pers, line: this.life.talk(c, s.ch, c.city), guild: c.guild, family: c.family || null, req: this.econ?.residentRequest?.(s, c) || null } }); }
+    { let best = null, bd = 26; for (const o of z.actors.values()) if (o.kind === 'resident') { const d = Math.hypot(o.x - a.x, o.y - a.y) - (o.cit?.story ? 20 : 0); if (d < bd) { bd = d; best = o; } } if (best) var nearRes = best; }
+    for (const o of nearRes ? [nearRes] : []) { const c = o.cit; o.facing = Math.atan2(a.y - o.y, a.x - o.x); if (c.story) return this.storyTalk(s, c); this.cev.onResidentTalk(s, c); return s.send({ t: 'open', service: 'resident', data: { id: c.id, name: c.name, job: c.job, pers: c.pers, line: this.life.talk(c, s.ch, c.city), guild: c.guild, family: c.family || null, req: this.econ?.residentRequest?.(s, c) || null } }); }
     if (z.kind === 'dungeon' && z.map.exit) { const p = z.tileCenter(z.map.exit); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return s.send({ t: 'open', service: 'exit', data: { name: z.dungeon.name, floor: z.floor } }); }
     for (const g of z.map.gates || []) { const p = z.tileCenter([g.x, g.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 30) return this.openService(s, 'gate', g.dungeon); }
     for (const d of z.drops) if (d.chest && Math.hypot(d.x - a.x, d.y - a.y) < 26) { d.chest = false; d.until = 0; const loot = rollLoot({ floor: z.floor || 1, diff: z.diff || 'NORMAL', chest: true, preferWt: a.wt.id }); for (const it of loot) addItem(s.ch, it, n => this.note(s, n)); if (Math.random() < 0.1) this.spells.chestFrag(s, z); z.fx({ t: 'boom', x: Math.round(d.x), y: Math.round(d.y), r: 14, e: 'holy' }); this.sendSelf(s); return; }
@@ -555,6 +563,8 @@ export class World {
         if (m.spfrag) { const sp = DATA.skills.get(m.spfrag); if (sp?.src === 'spell') for (let i = 0; i < (m.n | 0 || 1); i++) this.spells.giveFrag(s, sp); }
         if (m.flag) (ch.progress.flags ||= {})[m.flag] = true;
         if (m.key) addItem(ch, { kind: 'mat', ref: 'archiveKey', n: m.key | 0 });
+        if (m.story) { const c = this.story.cits[m.story]; if (c && c.city === z.cityId) { this.life.sync(z); if (c.actor && c.actor.zone === z) { a.x = c.actor.x + 8; a.y = c.actor.y; } } }
+        if (Array.isArray(m.tp)) { a.x = +m.tp[0] || a.x; a.y = +m.tp[1] || a.y; }
         if (m.day != null) setClockAt(m.day | 0, m.hour ?? 12);
         if (m.hour != null && m.day == null) setClockHour(m.hour | 0);
         if (m.raven) { ch.level = Math.max(ch.level, m.level | 0); this.enterZone(s, this.zones.get(this.duels.ravenZone())); this.duels.sync(); const r = [...s.actor.zone.actors.values()].find(x => x.role === 'raven'); if (r) { s.actor.x = r.x + 12; s.actor.y = r.y; } return this.sendSelf(s); }

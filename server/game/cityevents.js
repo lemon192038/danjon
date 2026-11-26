@@ -6,7 +6,11 @@ import { CITY_EVENTS as CITY_ONLY, CITY_DUNGEONS, RANK_TESTS, ADV_RANKS, DUELIST
 import { REALM_EVENTS, REALM_LINK, REALM_DUNGEONS } from '../../shared/data/realms.js';
 import { BOOKS } from '../../shared/data/library.js';
 import { PLACE } from '../../shared/data/world.js';
-const CITY_EVENTS = { ...CITY_ONLY, ...REALM_EVENTS }; // PHASE 9: realm discovery events run on the same engine
+import { SAGA_EVENTS, STORY_NPCS, RIO_PATHS, DIPLOMACY } from '../../shared/data/sagas.js';
+import { equipBest, fillSlots } from './npc.js';
+import { newCharacter } from './progress.js';
+const CITY_EVENTS = { ...CITY_ONLY, ...REALM_EVENTS, ...SAGA_EVENTS };
+const hostName = E => E.host?.name || STORY_NPCS[E.npc]?.name || '？'; // PHASE 9: realm discovery events run on the same engine
 import { EVENT_BY_ID } from '../../shared/data/events.js';
 import { ITEMS } from '../../shared/data/guilds.js';
 import { WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
@@ -20,7 +24,7 @@ import { addItem } from './progress.js';
 import { hash32, rng } from '../../shared/util.js';
 
 const night = () => { const h = clock().hour; return h >= 20 || h < 5; };
-const STEP_NAME = { level: '力', books: '読書', event: '前提', talk: '会話', night: '夜の会話', midnight: '真夜中', fund: '資金', gather: '納品', kill: '討伐', arms: '武器種', duel: '決闘', floor: '探索', visit: '調査', quiz: '知識', spells: '魔法', rank: '昇格試験', choice: '決断' };
+const STEP_NAME = { gossip: '聞き込み', days: '交流', meet: '面会', listen: '演奏', trade: '取引', escort: '同行', level: '力', books: '読書', event: '前提', talk: '会話', night: '夜の会話', midnight: '真夜中', fund: '資金', gather: '納品', kill: '討伐', arms: '武器種', duel: '決闘', floor: '探索', visit: '調査', quiz: '知識', spells: '魔法', rank: '昇格試験', choice: '決断' };
 for (const [id, E] of Object.entries(CITY_EVENTS)) { const d = EVENT_BY_ID[id]; d.stages = E.steps.map(st => st.k === 'choice' ? '決断' : st.k === 'talk' ? '話を聞く' : (st.label || st.text || STEP_NAME[st.k]).replace(/[「」].*$/, '').slice(0, 30));
   d.outcomes = E.steps.flatMap(st => st.k === 'choice' ? st.options.map(o => o.label) : []); d.status = 'live'; d.repeat = E.repeat || 'none'; if (E.sched) d.notes = `${d.notes ? d.notes + '。' : ''}開催：${E.sched.label}`; }
 const MIDNIGHT = [{ ref: 'elixir', price: 700, max: 3 }, { ref: 'luckCharm', price: 900, max: 2 }, { ref: 'xpScroll', price: 1200, max: 2 }, { ref: 'returnWing', price: 200, max: 5 }, { ref: 'traitTicket', price: 30000, max: 1 }];
@@ -33,10 +37,10 @@ export class CityEvents {
       if (w.state === 'active' && world.econ) for (const g of Object.keys(world.econ.supply.arcelia || {})) world.econ.supply.arcelia[g] = Math.max(0.35, world.econ.supply.arcelia[g] - 0.02 * h); });
   }
   place(zones) {
-    for (const [ev, E] of Object.entries(CITY_EVENTS)) for (const h of E.hosts || [E.host]) { const z = zones.get(h.city); if (!z) continue; const m = z.map; m.npcs ||= []; const d = m.doors.find(x => x.id === h.near); if (!d) continue; let pos = null;
+    for (const [ev, E] of Object.entries(CITY_EVENTS)) for (const h of E.hosts || (E.host ? [E.host] : [])) { const z = zones.get(h.city); if (!z) continue; const m = z.map; m.npcs ||= []; const d = m.doors.find(x => x.id === h.near); if (!d) continue; let pos = null;
       const clear = (x, y) => !z.blocked(x * 16 + 8, y * 16 + 8) && !z.blocked(x * 16 + 8, y * 16 + 24) && m.doors.every(o => Math.hypot(o.x - x, o.y - y) >= 3) && !m.npcs.some(n => Math.hypot(n.x - x, n.y - y) < 2);
       for (let r = 3; r < 10 && !pos; r++) for (const [dx, dy] of [[r, 2], [-r, 2], [0, r], [r, 3], [-r, 3], [r, r], [-r, r]]) { const x = d.x + dx, y = d.y + dy; if (clear(x, y)) { pos = [x, y]; break; } }
-      if (pos) m.npcs.push({ service: 'cev', ev, name: E.host.name, x: pos[0], y: pos[1] }); }
+      if (pos) m.npcs.push({ service: 'cev', ev, name: hostName(E), x: pos[0], y: pos[1] }); }
   }
   // ── availability
   period(E) { const d = clock().day; return E.sched ? Math.floor((d - E.sched.on) / E.sched.every) : E.roam ? d : 0; }
@@ -50,17 +54,17 @@ export class CityEvents {
   // ── view
   view(s, ev) { const ch = s.ch, E = CITY_EVENTS[ev], EV = this.world.events, P = EV.prog(ch, ev); const st = P && !P.done ? E.steps[P.stage] : null; const z = s.actor.zone;
     const rank = E.rank ? this.rankView(ch, P) : null; const w = EV.w.ev[ev];
-    return { ev, name: EVENT_BY_ID[ev].name, en: EVENT_BY_ID[ev].en, host: E.host.name, closed: this.avail(ev, z.cityId || z.id), sched: E.sched?.label || null, roamCity: E.roam ? CITIES[this.hereCity(E)]?.name : null,
+    return { ev, name: EVENT_BY_ID[ev].name, en: EVENT_BY_ID[ev].en, host: hostName(E), line: E.npc ? this.world.story.line(E.npc, ch) : null, where: E.npc ? CITIES[this.world.story.cityOf(E.npc)]?.name : null, closed: this.avail(ev, z.cityId || z.id), sched: E.sched?.label || null, roamCity: E.roam ? CITIES[this.hereCity(E)]?.name : null,
       started: !!P, done: !!P?.done, clears: P?.clears || 0, outcome: P?.outcome || null, repeat: E.repeat || 'none', again: !!P?.done && E.repeat && E.repeat !== 'none' && (ch.progress.cevPeriod?.[ev] ?? -1) !== this.period(E),
       steps: E.steps.map((x, i) => ({ k: x.k, text: x.text || x.label, done: P ? P.done || i < P.stage : false, cur: P && !P.done && i === P.stage })),
-      cur: st ? { k: st.k, text: st.text, n: st.n, prog: P.data.prog || 0, q: st.q, qopts: st.options && st.k === 'quiz' ? st.options : null, visited: P.data.visited || [], zones: st.zones?.length || 0, options: st.k === 'choice' ? st.options.map(o => ({ id: o.id, label: o.label })) : null, night: night(), midnight: clock().hour === 0 } : null,
+      cur: st ? { k: st.k, text: st.text, n: st.n, prog: st.k === 'days' ? (P.data.days || []).length : st.k === 'listen' ? (P.data.heard || []).length : st.k === 'gossip' ? (P.data.talked || []).length : P.data.prog || 0, performing: E.npc ? this.world.story.performing(E.npc) : true, q: st.q, qopts: st.options && st.k === 'quiz' ? st.options : null, visited: P.data.visited || [], zones: st.zones?.length || 0, options: st.k === 'choice' ? st.options.map(o => ({ id: o.id, label: o.label })) : null, night: night(), midnight: clock().hour === 0 } : null,
       world: w ? { state: w.state, outcome: w.outcome } : null, reward: E.reward, rank, realm: E.realm ? { name: PLACE[E.realm]?.name, open: !!ch.progress.realms?.[E.realm] } : null, gate: E.gate && P && (P.done || P.stage >= E.steps.findIndex(x => x.k === 'floor')) ? E.gate : null, service: this.serviceView(s, ev) }; }
   open(s, ev) { s.send({ t: 'open', service: 'cev', data: this.view(s, ev) }); }
-  near(s, ev) { const z = s.actor.zone; return z.map.npcs?.some(n => n.service === 'cev' && n.ev === ev && Math.hypot(n.x * 16 + 8 - s.actor.x, n.y * 16 + 8 - s.actor.y) < 70); }
+  near(s, ev) { const E = CITY_EVENTS[ev]; if (E.npc && this.world.story.near(s, E.npc)) return true; const P = this.world.events.prog(s.ch, ev); const st = P && !P.done ? E.steps[P.stage] : null; if ((st?.k === 'meet' || st?.at) && this.world.story.near(s, st.npc || st.at)) return true; const z = s.actor.zone; return z.map.npcs?.some(n => n.service === 'cev' && n.ev === ev && Math.hypot(n.x * 16 + 8 - s.actor.x, n.y * 16 + 8 - s.actor.y) < 70); }
   // ── actions
   act(s, m) {
     const ch = s.ch, ev = m.ev, E = CITY_EVENTS[ev]; if (!E) return; const err = v => s.send({ t: 'err', v }); const EV = this.world.events; const z = s.actor.zone;
-    if (!this.near(s, ev)) return err(`${E.host.name}のそばで話してください`);
+    if (!this.near(s, ev)) return err(`${hostName(E)}のそばで話してください`);
     const closed = this.avail(ev, z.cityId || z.id); if (closed) return err(closed);
     if (m.act === 'svc') return this.service(s, ev, m);
     if (m.act === 'gate' && E.realm) { if (!ch.progress.realms?.[E.realm]) return err('まだ道は開いていない'); return this.toRealm(s, E.realm); }
@@ -68,7 +72,7 @@ export class CityEvents {
     let P = EV.prog(ch, ev);
     if (m.act === 'start') { if (P && !P.done) return this.open(s, ev); if (P?.done && (!E.repeat || E.repeat === 'none')) return err('このイベントは達成済み');
       if (P?.done && (ch.progress.cevPeriod?.[ev] ?? -1) === this.period(E)) return err(E.sched ? '今回の開催ではもう参加した（次回の開催で）' : '今日はもう参加した');
-      const r = EV.start(s, ev); if (r.error) return err(r.error); P = EV.prog(ch, ev); P.data = {}; return this.open(s, ev); }
+      const r = EV.start(s, ev); if (r.error) return err(r.error); P = EV.prog(ch, ev); P.data = {}; if (ev === 'nx11') this.rio(); return this.open(s, ev); }
     if (!P || P.done) return this.open(s, ev); const st = E.steps[P.stage];
     switch (st.k) {
       case 'talk': return this.next(s, ev);
@@ -77,6 +81,11 @@ export class CityEvents {
       case 'fund': if (ch.gold < st.gold) return err(`${st.gold.toLocaleString()}G必要`); ch.gold -= st.gold; return this.next(s, ev);
       case 'gather': { if (!this.take(ch, st.ref, st.n)) return err(`${ITEMS[st.ref]?.name || st.ref}×${st.n}が必要`); return this.next(s, ev); }
       case 'quiz': { if ((m.choice | 0) !== st.a) { P.data.miss = (P.data.miss || 0) + 1; return err('……違うようだ。もう一度考えてみよう'); } return this.next(s, ev); }
+      case 'days': { const d = clock().day; P.data.days ||= []; if (P.data.days.includes(d)) return err('今日はもう十分話した。また明日'); P.data.days.push(d); s.send({ t: 'toast', v: `${hostName(E)}と過ごした（${P.data.days.length}/${st.n}日）` }); if (P.data.days.length >= st.n) return this.next(s, ev); return this.open(s, ev); }
+      case 'meet': if (!this.world.story.near(s, st.npc)) return err(`${STORY_NPCS[st.npc].name}のそばで`); return this.next(s, ev);
+      case 'listen': { if (!this.world.story.near(s, E.npc)) return err('演奏しているところへ行こう'); if (!this.world.story.performing(E.npc)) return err('演奏は夕方（18〜22時）'); const city = this.world.story.cityOf(E.npc); P.data.heard ||= [];
+        if (st.distinct ? P.data.heard.includes(city) : P.data.heard.length && P.data.heardDay === clock().day) return err(st.distinct ? 'この街の曲はもう記録した。楽士は明日別の街へ行く' : 'また後で');
+        P.data.heard.push(city); P.data.heardDay = clock().day; (ch.progress.songs ||= {})[city] = 1; s.send({ t: 'toast', v: `旋律を記録した（${P.data.heard.length}/${st.n}）：${CITIES[city]?.name}の曲` }); if (P.data.heard.length >= st.n) return this.next(s, ev); return this.open(s, ev); }
       case 'level': if (ch.level < st.n) return err(`Lv${st.n}が必要（現在Lv${ch.level}）`); return this.next(s, ev);
       case 'books': { const n = BOOKS.filter(b => b.cat === st.cat && (ch.progress.books?.[b.id] || 0) >= b.pages.length).length; if (n < st.n) return err(`禁書庫の書を読み終える必要がある（${n}/${st.n}）`); return this.next(s, ev); }
       case 'event': if (!EV.isDone(ch, st.id)) return err(`イベント「${EVENT_BY_ID[st.id].name}」を達成してから`); return this.next(s, ev);
@@ -93,6 +102,9 @@ export class CityEvents {
   choose(s, ev, o) { const W = o.world || {}, EV = this.world.events, econ = this.world.econ;
     if (W.supply && econ.supply[W.supply.city]) for (const g of Object.keys(econ.supply[W.supply.city])) econ.supply[W.supply.city][g] = Math.max(0.35, Math.min(2.5, econ.supply[W.supply.city][g] + W.supply.v));
     if (W.flag) { const [k, v] = W.flag.split(':'); EV.flag('ct:' + k, v); }
+    if (W.move) this.world.story.move(W.move.npc, W.move.city);
+    const P0 = EV.prog(s.ch, ev); if (P0) P0.data.choice = o.id;
+    if (o.next) { if (ev === 'nx11') this.teachRio(s, o.id); econ.addNews(`【${EVENT_BY_ID[ev].name}】${o.effect}`); return this.next(s, ev); }
     if (W.state) EV.setWorld(ev, W.state, { outcome: o.label, note: `${s.ch.name}の働きで「${EVENT_BY_ID[ev].name}」が収まった：${o.effect}` });
     econ.addNews(`【${EVENT_BY_ID[ev].name}】${s.ch.name}の選択：${o.effect}`); EV.grant(s, ev, 'choice:' + o.id, this.rew(s, o.reward || {})); this.finish(s, ev, o.label); }
   finish(s, ev, outcome) { const E = CITY_EVENTS[ev], EV = this.world.events, ch = s.ch; EV.complete(s, ev, outcome); (ch.progress.cevPeriod ||= {})[ev] = this.period(E);
@@ -107,11 +119,12 @@ export class CityEvents {
   onKill(s, m, f) { this.each(s, (ev, E, P, st) => {
     if (st.k === 'kill' && (!st.fam || m.fam === st.fam)) { P.data.prog = (P.data.prog || 0) + 1; if (P.data.prog >= st.n) this.next(s, ev); }
     if (st.k === 'arms' && f?.wt) { P.data.wts ||= []; if (!P.data.wts.includes(f.wt.id)) { P.data.wts.push(f.wt.id); P.data.prog = P.data.wts.length; s.send({ t: 'toast', v: `五種の型：${f.wt.name}（${P.data.prog}/${st.n}）` }); } if (P.data.prog >= st.n) this.next(s, ev); }
-    if (st.k === 'rank') { P.data.r ||= {}; P.data.r.kill = (P.data.r.kill || 0) + 1; } }); }
+    if (st.k === 'rank') { P.data.r ||= {}; P.data.r.kill = (P.data.r.kill || 0) + 1; }
+    if (st.k === 'escort') { const p = this.world.partyOf(s.ch.id); if (p?.npcs.includes('npc_' + st.npc)) { P.data.prog = (P.data.prog || 0) + 1; if (P.data.prog % 5 === 0) { const n = this.world.npcs.byId.get('npc_' + st.npc); if (n) { n.ch.level += 1; this.world.npcs.log(n, `${s.ch.name}と戦って成長した`); } } if (P.data.prog >= st.n) this.next(s, ev); } } }); }
   onFloor(s, z, boss) { this.each(s, (ev, E, P, st) => {
     if (st.k === 'floor' && (!st.dungeon || z.dungeon?.id === st.dungeon) && (boss ? z.floor >= st.floor : z.floor > st.floor)) this.next(s, ev);
     if (st.k === 'rank') { P.data.r ||= {}; P.data.r.floor = Math.max(P.data.r.floor || 0, boss ? z.floor : z.floor - 1); } }); }
-  onEnterZone(s, z) { this.each(s, (ev, E, P, st) => { if (st.k !== 'visit' || !st.zones.includes(z.id)) return; P.data.visited ||= []; if (P.data.visited.includes(z.id)) return; P.data.visited.push(z.id);
+  onEnterZone(s, z) { this.onEnterDiplo(s, z); this.each(s, (ev, E, P, st) => { if (st.k !== 'visit' || !st.zones.includes(z.id)) return; P.data.visited ||= []; if (P.data.visited.includes(z.id)) return; P.data.visited.push(z.id);
     s.send({ t: 'toast', v: `【${EVENT_BY_ID[ev].name}】手がかりを見つけた（${P.data.visited.length}/${st.zones.length}）` }); if (P.data.visited.length >= st.zones.length) this.next(s, ev); }); }
   // ── monster duel in a private arena
   duel(s, ev, spec) { const z = s.actor.zone; const city = z.cityId || CITY_EVENTS[ev].host.city || 'arcelia'; const key = `duel:${s.ch.id}`; const lv = Math.max(5, s.ch.level + (spec.lv || 0));
@@ -136,6 +149,10 @@ export class CityEvents {
       case 'midnight': return { kind: 'shop', title: '夜鳴き商人の品（1日の数量限定）', items: MIDNIGHT.map(x => ({ ...x, name: ITEMS[x.ref].name, left: x.max - (bought[ev + x.ref] || 0) })) };
       case 'auction': return { kind: 'auction', title: '本日の出品目録', ok: okP, lots: this.lots().map(({ npc, ...l }) => ({ ...l, state: this.world.events.w.flags.cevAuction[l.id]?.[ch.id] || null })) };
       case 'arms': return { kind: 'arms', title: '正式86武器種の展示・試用・製作', tried: Object.keys(ch.progress.armsTried || {}).map(Number), types: WEAPON_TYPES.map(w => ({ id: w.id, name: w.name, cat: w.cat || '', myth: !!w.myth })) };
+      case 'hero': { const P2 = this.world.events.prog(ch, 'nx07'); if (!P2?.done) return null; return { kind: 'hero', trained: !!this.world.events.hasReward(ch, 'nx07', 'tech'), crafted: !!this.world.events.hasReward(ch, 'nx07', 'recipe') }; }
+      case 'trader': return { kind: 'trader', where: CITIES[this.world.story.cityOf('noah')]?.name, trades: ch.progress.noahTrades || 0, stock: this.traderStock(ch) };
+      case 'apprentice': { const n = this.world.npcs.byId.get('npc_rio'); return n ? { kind: 'apprentice', lv: n.ch.level, path: this.world.events.w.flags.rioPath || null, bond: n.bond[ch.id] || 0, state: n.state, inParty: n.partyWith === ch.id } : null; }
+      case 'diplomacy': { const P2 = this.world.events.prog(ch, 'nx12'); if (!P2?.done) return null; const d = ch.progress.diplo; return { kind: 'diplomacy', task: d && !d.done ? { to: CITIES[d.to]?.name, picked: !!d.picked } : null, count: ch.progress.diploCount || 0 }; }
       case 'duelists': { const F = this.world.events.w.flags.duelists; const today = DUELISTS[day % DUELISTS.length].id; return { kind: 'duelists', today, list: DUELISTS.map(d => { const g = F[d.id] || { w: 0, l: 0, rep: d.rep }; const me = ch.progress.duelRec?.[d.id] || { w: 0, l: 0 }; return { id: d.id, name: d.name, wt: DATA.weapons && WEAPON_TYPES.find(w => w.id === d.wt)?.name, pers: d.pers, rep: Math.round(g.rep ?? d.rep), rec: `${g.w}勝${g.l}敗`, me: `${me.w}勝${me.l}敗` }; }) }; }
     } return null; }
   service(s, ev, m) { const E = CITY_EVENTS[ev], ch = s.ch, err = v => s.send({ t: 'err', v }); const day = clock().day;
@@ -147,6 +164,10 @@ export class CityEvents {
       if (m.mode === 'try') { ch.progress.armsTried ||= {}; if (ch.progress.armsTried[wt.id]) return err('この武器種は試用済み'); ch.progress.armsTried[wt.id] = 1; addItem(ch, { kind: 'weapon', ref: pool[0].id, plus: 0 }); s.send({ t: 'toast', v: `試用品「${pool[0].name}」を受け取った（${wt.name}）` }); }
       else if (m.mode === 'craft') { if (ch.gold < 3000 || !this.take(ch, 'ore', 3)) return err('製作には強化鉱石×3と3,000G'); ch.gold -= 3000; const cand = pool.filter(w => w.rar <= 3); const w = cand[Math.floor(Math.random() * cand.length)] || pool[0]; addItem(ch, { kind: 'weapon', ref: w.id, plus: 0 }); s.send({ t: 'toast', v: `「${w.name}」を製作した` }); } }
     else if (E.service === 'duelists') return this.duelist(s, ev, m.id);
+    else if (E.service === 'hero') return this.heroSvc(s, m);
+    else if (E.service === 'trader') return this.traderBuy(s, m);
+    else if (E.service === 'apprentice') return this.rioSvc(s, m);
+    else if (E.service === 'diplomacy') return this.diploSvc(s, m);
     this.world.sendSelf(s); this.open(s, ev); }
   lots() { const d = clock().day; const r = rng(hash32('royal:' + d)); const ws = [...DATA.weapons.values()].filter(w => w.rar === 5 && !w.myth); const w = ws[Math.floor(r() * ws.length)];
     return [{ id: `r${d}_w`, kind: 'weapon', ref: w.id, name: w.name, value: Math.round(w.price * 1.5) }, { id: `r${d}_m`, kind: 'mat', ref: 'abyssShard', n: 2, name: '深淵の欠片×2', value: 6000 },
@@ -180,6 +201,38 @@ export class CityEvents {
     if (m.to === 'back') { const c = REALM_EVENTS[L.ev].host.city; s.send({ t: 'loading', v: CITIES[c].name }); return this.world.enterZone(s, this.world.zones.get(c)); }
     if (m.to === 'other' && L.hub2) return this.world.enterZone(s, this.world.zones.get(z.cityId === L.hub ? L.hub2 : L.hub));
     if (m.to === 'dungeon') return s.send({ t: 'open', service: 'gate', data: { dungeons: [L.dungeon], special: true } }); }
+  stepOf(ev, i) { return CITY_EVENTS[ev]?.steps[i] || null; }
+  // ── NEW EVENTS PHASE C services
+  onResidentTalk(s, c) { if (c.story) return; this.each(s, (ev, E, P, st) => { if (st.k !== 'gossip' || c.city !== st.city) return; P.data.talked ||= []; if (P.data.talked.includes(c.id)) return; P.data.talked.push(c.id);
+    s.send({ t: 'toast', v: `【${EVENT_BY_ID[ev].name}】噂を聞いた（${P.data.talked.length}/${st.n}）` }); if (P.data.talked.length >= st.n) this.next(s, ev); }); }
+  heroSvc(s, m) { const ch = s.ch, EV = this.world.events, err = v => s.send({ t: 'err', v });
+    if (m.mode === 'train') { if (EV.hasReward(ch, 'nx07', 'tech')) return err('もう教えることはない'); EV.grant(s, 'nx07', 'tech', { title: '英雄の型を継ぐ者' }); ch.inventory.push({ uid: 'art_' + Date.now().toString(36), kind: 'artifact', ref: 'artifact', name: '英雄の型', cond: 'parry', eff: 'atk', val: 0.4, dur: 10, stack: 1, from: ['アーヴェル・クロード'] }); this.world.note(s, { t: 'msg', v: '特殊な戦闘技術「英雄の型」（パリィ成功で攻撃力上昇）を授かった' }); }
+    else if (m.mode === 'recipe') { if (EV.hasReward(ch, 'nx07', 'recipe')) return err('古い剣はもう打ち直した'); if (ch.gold < 20000 || !this.take(ch, 'ore', 5)) return err('強化鉱石×5と20,000Gが必要'); ch.gold -= 20000; EV.grant(s, 'nx07', 'recipe', {}); const wt = s.actor.wt.id; const pool = (DATA.wtWeapons.get(wt) || []).filter(w => w.rar === 4 && !w.myth); const w = pool[0] || [...DATA.weapons.values()].find(x => x.rar === 4); addItem(ch, { kind: 'weapon', ref: w.id, plus: 3 }); this.world.note(s, { t: 'msg', v: `古い武器のレシピから「${w.name}+3」を打ち直した` }); }
+    this.world.sendSelf(s); this.open(s, 'nx07'); }
+  // the trader's stock: local goods priced by the city's supply, rarity, and the player's past trades
+  traderStock(ch) { const city = this.world.story.cityOf('noah'); const sup = this.world.econ.supply[city] || {}; const avg = Object.values(sup).reduce((t, v) => t + v, 0) / Math.max(1, Object.values(sup).length);
+    const t = ch.progress.noahTrades || 0, friend = !!ch.progress.flags?.noahFriend; const comp = this.world.events.flag('ct:noah') === 'competitive' ? 0.9 : 1; const disc = Math.max(0.7, 1 - t * 0.02) * comp;
+    const day = clock().day; const r = rng(hash32('noah:' + city + day)); const base = [['elixir', 900], ['luckCharm', 1300], ['xpScroll', 1600], ['crystal', 260], ['gem', 220], ['relic', 600]]; const pick = base.filter(() => r() < 0.7);
+    if (t >= 5 || friend) pick.push(['abyssShard', 3200]); if (friend) pick.push(['traitTicket', 24000]);
+    const bought = ch.progress.noahBought?.day === day ? ch.progress.noahBought.n : {};
+    return pick.map(([ref, p]) => ({ ref, name: ITEMS[ref]?.name || ref, price: Math.round(p * (2 - Math.min(1.5, avg)) * disc), left: (ref === 'traitTicket' ? 1 : 3) - (bought[ref] || 0) })); }
+  traderBuy(s, m) { const ch = s.ch, err = v => s.send({ t: 'err', v }); if (!this.world.story.near(s, 'noah')) return err('ノアのそばで'); const it = this.traderStock(ch).find(x => x.ref === m.ref); if (!it) return err('今日はその品がない'); if (it.left <= 0) return err('売り切れ'); if (ch.gold < it.price) return err('ゴールドが足りない');
+    ch.gold -= it.price; const day = clock().day; ch.progress.noahBought = ch.progress.noahBought?.day === day ? ch.progress.noahBought : { day, n: {} }; ch.progress.noahBought.n[it.ref] = (ch.progress.noahBought.n[it.ref] || 0) + 1; ch.progress.noahTrades = (ch.progress.noahTrades || 0) + 1;
+    addItem(ch, { kind: ITEMS[it.ref]?.use ? 'potion' : 'mat', ref: it.ref, n: 1 }); this.world.events.log(ch, 'nx08', `ノアから${it.name}を${it.price}Gで購入（${CITIES[this.world.story.cityOf('noah')]?.name}）`);
+    this.each(s, (ev, E, P, st) => { if (st.k !== 'trade') return; P.data.prog = (P.data.prog || 0) + 1; if (P.data.prog >= st.n) this.next(s, ev); }); this.world.sendSelf(s); this.open(s, 'nx08'); }
+  // the apprentice is one world NPC adventurer: he fights beside the player, grows, and keeps living after the event
+  rio() { let n = this.world.npcs.byId.get('npc_rio'); if (n) return n; const ch = newCharacter('npc_rio', 'リオ', 1, { body: 0, skin: 1, hair: 2, hairColor: 3, outfit: 0 }); ch.level = 5; equipBest(ch, 1); const job = DATA.jobList.find(j => j.tier === 0); ch.job = job.id; ch.jobs[job.id] = { rank: 0, xp: 0 }; fillSlots(ch);
+    n = { id: 'npc_rio', ch, pers: 'social', home: 'haven', state: 'rest', zone: 'haven', timer: 9999, gold: 300, friends: [], rival: null, log: [], best: {}, bond: {}, story: true }; this.world.npcs.list.push(n); this.world.npcs.byId.set(n.id, n); return n; }
+  teachRio(s, path) { const n = this.rio(); const P = RIO_PATHS[path]; this.world.events.w.flags.rioPath = path; n.ch.inventory = n.ch.inventory.filter(i => i.kind !== 'weapon'); equipBest(n.ch, P.wt); n.ch.mastery[P.wt] = { lv: Math.max(10, n.ch.level), xp: 0 }; fillSlots(n.ch); this.world.npcs.log(n, `${s.ch.name}の教えで${P.name}として鍛え始めた`); this.world.npcs.refreshActor(n); }
+  rioSvc(s, m) { const ch = s.ch, err = v => s.send({ t: 'err', v }); const n = this.rio(); const z = s.actor.zone;
+    if (m.mode === 'join') { if (n.state === 'party') return err(n.partyWith === ch.id ? 'もう一緒にいる' : 'リオは今ほかの冒険者と旅をしている'); const p = this.world.ensureParty(ch.id); if (p.leader !== ch.id) return err('リーダーのみ'); if (p.members.length + p.npcs.length >= 6) return err('パーティーは6人まで');
+      n.state = 'party'; n.partyWith = ch.id; n.bond[ch.id] = (n.bond[ch.id] || 0) + 5; p.npcs.push(n.id); this.world.npcs.despawn(n); this.world.npcs.spawn(n, z, { x: s.actor.x + 12, y: s.actor.y + 10 }); this.world.pushParty(ch.id); s.send({ t: 'toast', v: '「よろしくお願いします！」リオがパーティーに加わった' }); }
+    this.open(s, 'nx11'); }
+  diploSvc(s, m) { const ch = s.ch, err = v => s.send({ t: 'err', v }); const d = ch.progress.diplo;
+    if (m.mode === 'take') { if (d && !d.done) return err('今の書簡を届けてから'); const to = DIPLOMACY[(clock().day + (ch.progress.diploCount || 0)) % DIPLOMACY.length]; ch.progress.diplo = { to, picked: false, done: false }; s.send({ t: 'toast', v: `リリアーナの書簡を${CITIES[to].name}の冒険者ギルドへ届ける` }); }
+    else if (m.mode === 'report') { if (!d?.picked || d.done) return err('まだ書簡を届けていない'); d.done = true; ch.progress.diploCount = (ch.progress.diploCount || 0) + 1; ch.gold += 3000; this.world.events.log(ch, 'nx12', `外交書簡を${CITIES[d.to].name}へ届けた`); if (ch.progress.diploCount >= 5) this.world.events.grant(s, 'nx12', 'envoy', { title: '王女の使者' }); s.send({ t: 'toast', v: '書簡を届けた報酬：3,000G' }); }
+    this.world.sendSelf(s); this.open(s, 'nx12'); }
+  onEnterDiplo(s, z) { const d = s.ch.progress.diplo; if (d && !d.done && !d.picked && z.id === 'in:w_' + d.to + '_guild') { d.picked = true; s.send({ t: 'toast', v: '書簡を届けた。リリアーナに報告しよう' }); } }
   canEnterDungeon(s, d) { if (d.realm && !s.ch.progress.realms?.[d.realm]) { s.send({ t: 'err', v: `${PLACE[d.realm]?.name}はまだ見つかっていない` }); return false; }
     if (!CITY_DUNGEONS[d.id]) return true; if (this.canEnter(s.ch, d.id)) return true; s.send({ t: 'err', v: `${d.name}への道はまだ見つかっていない` }); return false; }
 }
