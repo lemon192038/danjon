@@ -36,5 +36,7 @@ for (const d of c.dungeons) DATA.dungeons.set(d.id, d);
 for (const b of [...EVENT_BOSSES, ...SEALED_BOSSES, ...CITY_BOSSES, ...REALM_BOSSES, ...MACHINA_BOSSES]) if (!DATA.bosses.has(b[0])) DATA.bosses.set(b[0], { key: b[0], name: b[1], sprite: b[2], abilities: b[3] });
 for (const d of [...Object.values(SPECIAL_DUNGEONS), SEALED, ...Object.values(CITY_DUNGEONS), ...Object.values(REALM_DUNGEONS), MACHINA_DUNGEON, ...Object.values(EXPLORE_DUNGEONS), ...Object.values(GRAND_DUNGEONS)]) DATA.dungeons.set(d.id, d);
 
+import { SILVER_KNIFE, SKILLS as CHRONO_SKILLS } from '../shared/data/chrono.js';
+DATA.weapons.set(SILVER_KNIFE.id, SILVER_KNIFE); DATA.skills.set(SILVER_KNIFE.skill.id, SILVER_KNIFE.skill); for (const s of CHRONO_SKILLS) DATA.skills.set(s.id, s);
 export const dataAccess = { weapon: id => DATA.weapons.get(id), job: id => DATA.jobs.get(id), wtSkills: wt => DATA.wtSkills.get(wt) };
 export { WEAPON_TYPES, WT_BY_ID };

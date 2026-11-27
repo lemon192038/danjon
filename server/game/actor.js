@@ -8,6 +8,7 @@ import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { SPECIALS, onAttackHook } from './specials.js';
 import { circleFor } from '../../shared/data/circles.js';
 import { morphMods, morphCombo, morphDodge, skillBlock } from './morph.js';
+import { isChrono, chronoMods, chronoCombo, chronoStep, switchStyle } from './chrono.js';
 import { identityMods, altCombo, preStep, stepOpts, postStep } from './mechanics.js';
 
 let NEXT_ID = 1;
@@ -37,7 +38,7 @@ export class Fighter extends Actor {
     const hpR = this.maxHp ? this.hp / this.maxHp : 1, spR = this.maxSp ? this.sp / this.maxSp : 1;
     this.maxHp = s.maxHp; this.maxSp = s.maxSp; if (this.hp != null) { this.hp = Math.max(1, Math.round(this.maxHp * hpR)); this.sp = Math.round(this.maxSp * spR); }
     this.weaponEl = this.weapon?.el || this.wt.elem[0] || null; this.magic = categoryOf(this.wt.id).id === 'magic';
-    this.visKey = this.wt.key; this.level = this.ch.level; this.name = this.ch.name; this.r = 6; this.dodgeKind = null; this.superArmor = false; morphMods(this, s);
+    this.visKey = this.wt.key; this.level = this.ch.level; this.name = this.ch.name; this.r = 6; this.dodgeKind = null; this.superArmor = false; morphMods(this, s); chronoMods(this, s);
   }
   skillLv(id) { return this.ch.skills?.levels?.[id]?.lv || 1; }
   aspdNow() { let a = this.stats.aspd * (1 + (this.buffMods.aspd || 0)); if (this.gauge?.tempo && this.tempoUntil > this.zone.now) a *= 1 + this.gauge.tempo * this.wt.special.spd; else if (this.gauge?.tempo) this.gauge.tempo = 0; return a; }
@@ -49,7 +50,7 @@ export class Fighter extends Actor {
     if (this.action?.type === 'attack') { if (now > this.action.recAt) this.action.buffered = true; return false; }
     // touch players: lock onto the nearest enemy so attacks home in even while moving with the stick
     if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
-    const combo = morphCombo(this) || altCombo(this) || (this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo);
+    const combo = chronoCombo(this) || morphCombo(this) || altCombo(this) || (this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo);
     if (now - this.lastAttackEnd > 450) this.comboStep = 0;
     const idx = this.comboStep % combo.length, step = combo[idx];
     const sp = this.aspdNow();
@@ -66,7 +67,7 @@ export class Fighter extends Actor {
   // right after a combo finisher (派生). Mastery 60: an extra shockwave hit. Super armor while charging.
   heavy(zone) {
     const now = zone.now; if (!this.canAct(now) || this.statuses.fear) return 'busy'; if ((this.heavyCd || 0) > now) return 'cd';
-    const cbo = morphCombo(this) || this.wt.combo; const chain = this.action?.type === 'attack' && this.action.step === cbo.length - 1 && now >= this.action.recAt;
+    const cbo = chronoCombo(this) || morphCombo(this) || this.wt.combo; const chain = this.action?.type === 'attack' && this.action.step === cbo.length - 1 && now >= this.action.recAt;
     if (this.action && !chain) return 'busy'; if (this.sp < 6) return 'sp';
     const m = this.ch.mastery?.[this.wt.id]?.lv || 1; const fin = cbo[cbo.length - 1];
     const follow = chain && m >= 30; this.sp -= 6; this.heavyCd = now + 1400;
@@ -91,7 +92,7 @@ export class Fighter extends Actor {
   }
   doStep(zone, step, last, first) {
     const now = zone.now;
-    if (this.autoAim) {
+    if (this.autoAim && !step.chronoStep) {
       const t = this.lockTarget(zone, false);
       if (t) {
         const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy); this.facing = Math.atan2(dy, dx);
@@ -107,7 +108,8 @@ export class Fighter extends Actor {
     if (step.status) o.status = step.status;
     if (this.statuses.burn && false) o.m *= 1;
     onAttackHook(zone, this); o = stepOpts(this, o); let hitList = null;
-    if (step.s === 'proj') {
+    if (step.chronoStep) chronoStep(zone, this, step, o, now);
+    else if (step.s === 'proj') {
       let sh = step;
       if (this.wt.special.type === 'boltSwap') { const md = this.boltMode || 0; sh = { ...step, pierce: md === 0 ? 3 : 0, aoe: md === 1 ? 40 : 0 }; if (md === 2) o.status = ['bind', 0.8, 1500]; }
       spawnProj(zone, this, sh, o, this.facing, now);
@@ -144,6 +146,7 @@ export class Fighter extends Actor {
   special(phase, zone) {
     const sp = this.wt.special; const h = SPECIALS[sp.type]; if (!h) return;
     const now = zone.now;
+    if (isChrono(this)) { if (phase === 'press' && this.canAct(now)) switchStyle(zone, this); return; }
     if (phase === 'press') { if (!this.canAct(now) || (this.action && this.action.type !== 'attack' && this.action.until > now)) return; if (this.action?.type === 'attack') this.action = null; h.press?.(zone, this, sp, now); }
     else if (phase === 'hold') h.hold?.(zone, this, sp, now);
     else h.release?.(zone, this, sp, now);

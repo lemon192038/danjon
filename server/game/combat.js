@@ -1,5 +1,6 @@
 import { artTrigger } from './artifacts.js';
 import { morphDmgMul, morphDeal, morphHurt } from './morph.js';
+import { chronoMul, chronoDeal, chronoParry } from './chrono.js';
 // Hit-shape tests and the single damage pipeline used by every attacker (players, NPCs, monsters, summons).
 import { ELEMENT_CHART, STATUS } from '../../shared/constants.js';
 import { angDiff } from '../../shared/util.js';
@@ -54,7 +55,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   const act = tgt.action;
   if (act && !o.noCounter) {
     if ((act.counter && now <= act.counter.until) && Math.abs(angDiff(tgt.facing, ang + Math.PI)) < 2.2) {
-      act.counter.triggered = { src, ang }; zone.fx({ t: 'parry', x: tgt.x, y: tgt.y }); if (tgt.ch) artTrigger(tgt, 'parry'); return 0;
+      act.counter.triggered = { src, ang }; zone.fx({ t: 'parry', x: tgt.x, y: tgt.y }); if (tgt.ch) artTrigger(tgt, 'parry'); if (tgt.chrono) chronoParry(tgt); return 0;
     }
     if (act.guard && Math.abs(angDiff(tgt.facing, ang + Math.PI)) < 1.6 && !o.unblockable) {
       o = { ...o, guarded: act.guard.dr };
@@ -85,6 +86,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   if (o.counterHit) m *= 1 + (sm.counterDmg || 0);
   if (tgt.statuses.curse) m *= 1 + 0.2 * (1 + (src.stats.mods.curseAmp || 0));
   if (src.wt?.morph) m *= morphDmgMul(src, tgt, o);
+  if (src.chrono) m *= chronoMul(zone, src, tgt, o, now);
   let critC = src.stats.crit + (o.critAdd || 0) + (bm.crit || 0);
   const crit = !o.dot && Math.random() < critC;
   if (crit) { m *= src.stats.critDmg + (bm.critDmg || 0); if (src.ch) artTrigger(src, 'crit'); }
@@ -96,7 +98,7 @@ export function dealDamage(zone, src, tgt, o, now) {
   dmg = Math.max(1, Math.round(dmg * (0.92 + Math.random() * 0.16)));
   if (src.kind === 'duelist' && tgt.kind === 'player') dmg = Math.min(dmg, Math.round(tgt.maxHp * 0.35)); // duels: no single unavoidable one-shot
   if (tgt.shield && tgt.shield.until > now && tgt.shield.amt > 0) { const ab = Math.min(tgt.shield.amt, dmg); tgt.shield.amt -= ab; dmg -= ab; if (ab) zone.fx({ t: 'shield', id: tgt.id }); }
-  if (src.wt?.morph) morphDeal(zone, src, tgt, dmg, crit); if (tgt.wt?.morph) morphHurt(zone, tgt, src, dmg);
+  if (src.wt?.morph) morphDeal(zone, src, tgt, dmg, crit); if (src.chrono) chronoDeal(zone, src, tgt, dmg, { ...o, weak: elemMul(el, tgt) > 1 }, now); if (tgt.wt?.morph) morphHurt(zone, tgt, src, dmg);
   tgt.hp -= dmg; tgt.lastHitBy = src.ownerId || src.id; tgt.lastHitAt = now; tgt.combatUntil = now + 5000;
   if (tgt.statuses.sleep) delete tgt.statuses.sleep;
   tgt.threat ||= {}; tgt.threat[src.ownerId || src.id] = (tgt.threat[src.ownerId || src.id] || 0) + dmg * (src.tauntUntil > now ? 3 : 1);

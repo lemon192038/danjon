@@ -10,6 +10,7 @@ import { makeMonster, makeBoss, monsterTick } from './monsters.js';
 import { onHitHook, onKillHook } from './specials.js';
 import { summonTick as bodyTick, onProjHit } from './mechanics.js';
 import { morphTick } from './morph.js';
+import { chronoTick, chronoKill, frozen, slowedSkip, projFrozen } from './chrono.js';
 import { SUMMON_BODIES } from '../../shared/data/identity.js';
 import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
@@ -164,7 +165,7 @@ export class Zone {
       if (t.abilities?.includes('rebirth') && !t.revived && t.boss) { t.revived = true; this.schedule(now + 2500, () => { t.dead = false; t.hp = t.maxHp; t.phase = 1; this.fx({ t: 'revive', id: t.id }); this.fx({ t: 'phase', id: t.id, v: 'rebirth' }); }); return; }
       if (t.abilities?.includes('split') && !t.minion && t.r > 5) for (let i = 0; i < 2; i++) { const m = makeMonster(t.fam, t.level, t.diff || 'NORMAL'); m.maxHp = m.hp = Math.round(t.maxHp * 0.35); m.r = 5; m.minion = true; m.x = t.x + (i ? 8 : -8); m.y = t.y; m.xp = Math.round(t.xp * 0.2); this.add(m); }
       if (t.onDeath === 'explode') { this.fx({ t: 'tele', s: 'circle', x: Math.round(t.x), y: Math.round(t.y), r: 46, d: 700, e: 'fire' }); this.schedule(now + 700, () => { meleeHit(this, t, { s: 'circle', r: 46 }, { m: 1.5, el: 'fire' }, this.now, { x: t.x, y: t.y, a: 0 }); this.fx({ t: 'boom', x: Math.round(t.x), y: Math.round(t.y), r: 46, e: 'fire' }); }); }
-      if (killer.wt) onKillHook(this, killer);
+      if (killer.wt) onKillHook(this, killer); if (killer.chrono) chronoKill(this, killer, now);
       if (killer.stats?.mods.killHeal) killer.heal(killer.maxHp * killer.stats.mods.killHeal, this);
       if (killer.stats?.mods.raiseOnKill && Math.random() < killer.stats.mods.raiseOnKill) this.spawnSummon(killer, 'skeleton', 12000, 0.3);
       if (killer.ch) artTrigger(killer, 'kill');
@@ -241,7 +242,7 @@ export class Zone {
     }
     if (act?.brace) for (const t of this.enemiesOf(a)) { const d = Math.hypot(t.x - a.x, t.y - a.y); if (d < 90 && !act.brace.hitSet.has(t.id) && Math.cos(Math.atan2(t.y - a.y, t.x - a.x) - a.facing) > 0.6) { act.brace.hitSet.add(t.id); dealDamage(this, a, t, { m: act.brace.m, st: 8, kb: 60, ang: a.facing }, now); } }
     // controller
-    if (a.kind === 'monster') monsterTick(this, a, now, dt);
+    if (a.kind === 'monster') { if (frozen(this, a, now) || slowedSkip(this, a, now)) { a.vx = a.vy = 0; } else monsterTick(this, a, now, dt); }
     else if (a.kind === 'summon') this.summonTick(a, now);
     else if (a.kind === 'npc') this.world.npcs.fighterTick(this, a, now);
     else if (a.kind === 'player') this.playerTick(a, now);
@@ -260,6 +261,7 @@ export class Zone {
   }
   playerTick(p, now) {
     if (p.wt?.morph) morphTick(this, p, now);
+    if (p.chrono) chronoTick(this, p, now);
     const inp = p.input || {};
     if (p.aimX != null && (!p.action || p.action.type === 'attack' || p.action.type === 'aim' || p.action.type === 'charge' || p.action.type === 'channel' || p.action.type === 'guard' || p.action.type === 'iai' || p.action.type === 'breath' || p.action.type === 'drill' || p.action.type === 'barrage')) {
       const lock = p.autoAim && p.action?.type === 'attack' ? p.lockTarget(this, false) : null;
@@ -358,6 +360,7 @@ export class Zone {
     const keep = [];
     for (const p of this.projs) {
       if (p.dead) continue;
+      if (projFrozen(this, p, now)) { keep.push(p); continue; }
       const step = dt / 1000;
       if (p.hom && !p.returning) { const t = this.nearestEnemy({ ...p, team: p.owner.team, x: p.x, y: p.y, facing: Math.atan2(p.vy, p.vx) }, 160); if (t) { const want = Math.atan2(t.y - p.y, t.x - p.x), cur = Math.atan2(p.vy, p.vx), sp = Math.hypot(p.vx, p.vy); let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const na = cur + Math.sign(d) * Math.min(Math.abs(d), p.hom * 2); p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp; } }
       if (p.curve && !p.returning) { const cur = Math.atan2(p.vy, p.vx) + p.curve * 0.04, sp = Math.hypot(p.vx, p.vy); p.vx = Math.cos(cur) * sp; p.vy = Math.sin(cur) * sp; }

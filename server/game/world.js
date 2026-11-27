@@ -36,6 +36,7 @@ import { Explore } from './explore.js';
 import { Society } from './society.js';
 import { Grand } from './grand.js';
 import { morphMenu, morphView, bossFactor } from './morph.js';
+import { isChrono as chronoOk, switchStyle as chronoStyle } from './chrono.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
@@ -496,7 +497,7 @@ export class World {
     const inTown = isTown(a.zone);
     switch (m.op) {
       case 'equip': { const it = ch.inventory.find(i => i.uid === m.uid); if (!it) return; if (a.action && a.action.until > a.zone.now) return err('行動中は変更できません');
-        if (it.kind === 'weapon') { const w = DATA.weapons.get(it.ref); if (w.lvl > ch.level + 10 && !WT_BY_ID[w.wt].myth) return err(`Lv${w.lvl - 10}以上で装備できます`); ch.equip.weapon = it.uid; ch.mastery[w.wt] ||= { lv: 1, xp: 0 }; }
+        if (it.kind === 'weapon') { const w = DATA.weapons.get(it.ref); if (w.jobOnly && ch.job !== w.jobOnly) return err('時律投刃士だけが扱える武器です'); if (w.lvl > ch.level + 10 && !WT_BY_ID[w.wt].myth) return err(`Lv${w.lvl - 10}以上で装備できます`); ch.equip.weapon = it.uid; ch.mastery[w.wt] ||= { lv: 1, xp: 0 }; }
         else if (it.kind === 'armor') { if (armorDef(it.slot, it.tier).lvl > ch.level + 10) return err('レベルが足りません'); ch.equip[it.slot] = it.uid; }
         else if (it.kind === 'artifact') { const slot = ART_SLOTS.includes(m.slot) ? m.slot : ART_SLOTS.find(k => !ch.equip[k]) || 'art1'; for (const k of ART_SLOTS) if (ch.equip[k] === it.uid) ch.equip[k] = null; ch.equip[slot] = it.uid; }
         else return;
@@ -504,7 +505,7 @@ export class World {
       case 'alloc': { const st = m.stat; const n = Math.max(1, Math.min(ch.statPoints, m.n | 0 || 1)); if (!STATS.includes(st) || ch.statPoints < n) return; ch.stats[st] += n; ch.statPoints -= n; return ok(); }
       case 'resetStats': { if (!inTown) return err('街でのみ可能です'); const cost = ch.level * 100; if (ch.gold < cost) return err(`${cost}G必要です`); ch.gold -= cost; let sum = 0; for (const k of STATS) { sum += ch.stats[k]; ch.stats[k] = 0; } ch.statPoints += sum; return ok('ステータスを再分配できます'); }
       case 'slot': { const i = m.i | 0; if (i < 0 || i >= SKILL_SLOTS) return; const id = m.id || null; if (id && (!knownSkills(ch).includes(id) || DATA.skills.get(id)?.kind === 'passive')) return err('そのスキルは使用できません'); ch.skills.slots = ch.skills.slots.map(x => x === id ? null : x); ch.skills.slots[i] = id; return ok(); }
-      case 'job': { if (!inTown) return err('職業ギルド（街）で転職できます'); const j = DATA.jobs.get(m.id); if (!j) return; if (!ch.jobs[j.id]) { if (!jobUnlockMet(ch, j)) return err('解放条件を満たしていません'); ch.jobs[j.id] = { rank: 0, xp: 0 }; } ch.job = j.id; return ok(`${j.name}に転職しました`); }
+      case 'job': { if (!inTown) return err('職業ギルド（街）で転職できます'); const j = DATA.jobs.get(m.id); if (!j) return; if (!ch.jobs[j.id]) { if (!jobUnlockMet(ch, j)) return err('解放条件を満たしていません'); ch.jobs[j.id] = { rank: 0, xp: 0 }; } ch.job = j.id; if (j.id === 'ev_chrono' && !ch.inventory.some(i => i.ref === 'job_silverknife')) addItem(ch, { kind: 'weapon', ref: 'job_silverknife', plus: 0 }, n => this.note(s, n)); return ok(`${j.name}に転職しました`); }
       case 'buy': { if (!inTown) return; const kind = m.kind; const town = a.zone.id;
         if (kind === 'weapon') { if (!shopStock(town, 'weapon').includes(m.ref)) return err('在庫がありません'); const w = DATA.weapons.get(m.ref); if (ch.gold < w.price) return err('ゴールドが足りません'); ch.gold -= w.price; addItem(ch, { kind: 'weapon', ref: w.id, plus: 0 }, n => this.note(s, n)); return ok(`${w.name}を購入しました`); }
         if (kind === 'armor') { const tier = m.tier | 0; if (!shopStock(town, 'armor').includes(tier)) return; const slot = m.slot === 'accessory' ? 'accessory' : 'armor'; const price = Math.round(200 * Math.pow(2.2, tier)); if (ch.gold < price) return err('ゴールドが足りません'); ch.gold -= price; addItem(ch, { kind: 'armor', slot, tier, plus: 0 }); return ok(`${armorDef(slot, tier).name}を購入しました`); }
@@ -546,6 +547,7 @@ export class World {
       case 'realm': return this.cev.realmAct(s, m);
       case 'train': return this.explore.trainAct(s, m);
       case 'soc': return this.society.menu(s, m);
+      case 'chrono': { if (!chronoOk(a)) return; if (m.do === 'style') return chronoStyle(a.zone, a); if (m.do === 'collapse') { a.action = a.action?.type === 'attack' ? null : a.action; const r = a.useSkill('chr_collapse', a.zone, {}); if (r !== 'ok' && r !== 'form') err('今は発動できない'); } return; }
       case 'morph': return m.do ? morphMenu(s, m) : s.send({ t: 'open', service: 'morph', data: morphView(s) });
       case 'mapless': return this.explore.readMapless(s, m.id);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });

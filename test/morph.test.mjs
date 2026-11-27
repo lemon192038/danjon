@@ -43,8 +43,8 @@ test('every transformation type: forms, combos, hitbox, resource, form skills, s
     S().stage = 3; p.refreshStats(); S().sigCd = 0; for (let i = 0; i < 10; i++) z.tick(50); p.staggerUntil = 0; p.statuses = {}; p.action = null; press(z, p);
     p.staggerUntil = 0; p.statuses = {}; p.action = null; p.special('press', z); const pa0 = S().pressAt; for (let i = 0; i < 12; i++) { z.tick(50); p.special('hold', z); } assert.ok(pa0, 'pressed ' + JSON.stringify({ ca: p.canAct(z.now), act: p.action, st: p.statuses })); p.special('release', z); assert.equal(S().stage, 0, T.name + ' reverts ' + JSON.stringify({ st: S().stage, pa: S().pressAt, act: p.action, ca: p.canAct(z.now), fear: p.statuses.fear })); assert.equal(p.r, 6); for (let i = 0; i < 40; i++) z.tick(50);
     // the full form drains (doom accumulates instead)
-    p.staggerUntil = 0; p.statuses = {}; p.action = null; S().res = 100; press(z, p); S().res = 100; press(z, p); S().res = 100; press(z, p); assert.equal(S().stage, 3); const before = S().res; for (let i = 0; i < 40; i++) z.tick(50);
-    if (T.res.drain > 0) assert.ok(S().res < before, T.name + ' full drains'); else assert.ok(S().res >= before - 1, 'doom accumulates');
+    p.staggerUntil = 0; p.statuses = {}; p.action = null; S().res = 100; press(z, p); S().res = 100; press(z, p); S().res = 100; press(z, p); assert.equal(S().stage, 3); z.areas = []; S().darkUntil = 0; const before = S().res; for (let i = 0; i < 40; i++) z.tick(50);
+    if (T.res.drain > 0) assert.ok(S().res < before, T.name + ' full drains ' + JSON.stringify({ before, now: S().res, st: S().stage, dark: S().darkUntil - z.now })); else assert.ok(S().res >= before - 1, 'doom accumulates');
     assert.equal(ch.progress.morph.cur.wt, T.id); void keys; }
 });
 

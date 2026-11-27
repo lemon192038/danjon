@@ -66,6 +66,15 @@ export class Renderer {
         break; }
       case 'morph': { const e = E(f.id); if (e) { if (f.v === 'sig' || f.v === 'rewind') { this.fx.push({ k: 'ring', x: e.x, y: e.y, r: 60, e: f.v === 'rewind' ? 'void' : 'holy', t0: now, dur: 400 }); for (let i = 0; i < 16; i++) this.part(e.x, e.y - 10, '#ffffff', 80, 400); }
         if (f.v === 'up' || f.v === 'down') this.texts.push({ x: e.x, y: e.y - 34, v: ['解除', '部分変身', '半変身', '完全変身'][f.st], skill: 1, e: 'holy', t0: now }); } break; }
+      case 'kplant': { const L = (this.planted ||= new Map()); const arr = L.get(f.id) || []; for (let i = 0; i < f.p.length; i += 2) arr.push(f.p[i], f.p[i + 1], now); L.set(f.id, arr); break; }
+      case 'krelease': { const arr = this.planted?.get(f.id) || []; for (let i = 0; i < arr.length; i += 3) this.part(arr[i], arr[i + 1], '#c0e0ff', 40, 250); this.planted?.delete(f.id); break; }
+      case 'tstop': this.fx.push({ k: 'tstop', x: f.x, y: f.y, r: f.r, t0: now, dur: f.d }); break;
+      case 'clocks': { const e = E(f.id); if (e) e.clocksUntil = now + f.d; break; }
+      case 'mirage': this.fx.push({ k: 'mirage', x: f.x, y: f.y, t0: now, dur: 300 }); break;
+      case 'collapse': { const e = E(f.id); if (e) { e.collapseUntil = f.v ? now + 6000 : 0; this.texts.push({ x: e.x, y: e.y - 34, v: f.v ? '時刻崩壊' : '時刻崩壊 終了', skill: 1, e: 'void', t0: now }); if (f.v) this.fx.push({ k: 'ring', x: e.x, y: e.y, r: 90, e: 'void', t0: now, dur: 500 }); } break; }
+      case 'cmark': { const e = E(f.id); if (e) e.cmarkFull = f.v >= 100; break; }
+      case 'resonance': { const e = E(f.id); if (e) this.texts.push({ x: e.x, y: e.y - 30, v: '時間共鳴', skill: 1, e: 'holy', t0: now }); break; }
+      case 'doll': { const e = E(f.id); if (e) this.fx.push({ k: 'ring', x: e.x, y: e.y, r: 40, e: 'holy', t0: now, dur: 1800 }); break; }
       case 'mode': { const e = E(f.id); if (e) this.texts.push({ x: e.x, y: e.y - 26, v: f.v, skill: 1, e: f.e || 'holy', t0: now }); break; }
       case 'die': { const e = E(f.id); if (e) { e.dieAt = now; for (let i = 0; i < 20; i++) this.part(e.x, e.y, e.d.kind === 'monster' ? '#c0c0c0' : '#ff6060', 60, 600); } break; }
       case 'phase': { const e = E(f.id); if (e) { this.texts.push({ x: e.x, y: e.y - 40, v: f.v === 'rage' ? '激昂！' : f.v === 'rebirth' ? '再誕！' : `PHASE ${f.v}`, skill: 1, e: 'fire', t0: now, big: 1 }); this.ring(e.x, e.y, 80, 'fire'); this.shake = 8; } break; }
@@ -117,6 +126,12 @@ export class Renderer {
     // fx
     this.fx = this.fx.filter(f => now - f.t0 < f.dur);
     for (const f of this.fx) if (f.k !== 'tele') this.drawFx(f, ox, oy, now);
+    // chrono: planted knives (fixed in world space until released), luna clocks, full time marks, collapse tint
+    if (this.planted) for (const arr of this.planted.values()) for (let i = 0; i < arr.length; i += 3) { const kx = arr[i] + ox, ky = arr[i + 1] + oy; if (kx < -10 || ky < -10 || kx > W + 10 || ky > H + 10) continue; g.save(); g.translate(kx, ky); g.rotate(0.6 + (i % 7) * 0.4); g.globalAlpha = 0.75 + Math.sin(now / 150 + i) * 0.2; g.shadowColor = '#a0d0ff'; g.shadowBlur = 5; g.fillStyle = '#e8eef8'; g.fillRect(-5, -1, 8, 2); g.fillStyle = '#6a7080'; g.fillRect(-8, -1, 3, 2); g.restore(); }
+    for (const e of state.ents.values()) { if (!e.seen) continue; if (e.clocksUntil > now) for (let i = 0; i < 3; i++) { const a2 = i * TAU / 3 + now / 1500; const cx = e.x + ox + Math.cos(a2) * 28, cy = e.y + oy - 14 + Math.sin(a2) * 16; g.fillStyle = 'rgba(30,40,70,.85)'; g.beginPath(); g.arc(cx, cy, 6, 0, TAU); g.fill(); g.strokeStyle = '#e0f0ff'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, 6, 0, TAU); g.stroke(); g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(now / 160) * 4, cy + Math.sin(now / 160) * 4); g.stroke(); }
+      if (e.cmarkFull && e.d.kind === 'monster') { g.strokeStyle = `rgba(200,230,255,${0.6 + Math.sin(now / 120) * 0.3})`; g.lineWidth = 1.5; g.beginPath(); g.arc(e.x + ox, e.y + oy - 34, 5, 0, TAU); g.stroke(); g.beginPath(); g.moveTo(e.x + ox, e.y + oy - 34); g.lineTo(e.x + ox, e.y + oy - 38); g.stroke(); }
+      if (e.collapseUntil > now) { g.globalAlpha = 0.35; g.strokeStyle = '#c0e0ff'; g.beginPath(); g.arc(e.x + ox, e.y + oy - 10, 18 + Math.sin(now / 80) * 2, 0, TAU); g.stroke(); g.globalAlpha = 1; } }
+    if (state.meEnt?.collapseUntil > now) { g.fillStyle = 'rgba(150,190,255,.07)'; g.fillRect(0, 0, W, H); }
     // particles
     this.parts = this.parts.filter(p => now - p.t0 < p.life);
     for (const p of this.parts) { const k = dt / 1000; p.x += p.vx * k; p.y += p.vy * k; p.vy += p.g * k; p.vx *= 0.96; const a = 1 - (now - p.t0) / p.life; if (p.shape) { drawMotifParticle(g, p, Math.round(p.x + ox), Math.round(p.y + oy), a); continue; } g.globalAlpha = a; g.fillStyle = p.col; g.fillRect(Math.round(p.x + ox), Math.round(p.y + oy), 1, 1); }
@@ -210,6 +225,7 @@ export class Renderer {
   weaponExt(e, now) { const a = e.atk; if (!a || now - a.t0 > a.dur) return 0; const MP = MOTION[e.d?.wv]; if (MP) return motionExt(MP, (now - a.t0) / a.dur); if (a.sh === 'thrust' || a.sh === 'chain') { const p = (now - a.t0) / a.dur; return Math.sin(Math.min(1, p * 2) * Math.PI) * 8; } return 0; }
   drawProj(p, ox, oy, now) {
     const g = this.g; const [x0, y0, a, sz, el, k, , v] = p; const x = x0 + ox, y = y0 + oy; const col = ec(el || 'phys');
+    if (v === 'silverknife') { g.save(); g.translate(x, y); g.rotate(a + (now / 60) % 1 * 0.6 - 0.3); g.shadowColor = '#a0d0ff'; g.shadowBlur = 4; g.fillStyle = '#e8eef8'; g.fillRect(-5, -1, 8, 2); g.fillStyle = '#ffffff'; g.fillRect(-5, -1, 8, 1); g.fillStyle = '#6a7080'; g.fillRect(-8, -1, 3, 2); g.restore(); return; }
     if (v) { const pv = vfxProfile(v, el || null); g.save(); g.translate(x, y); g.rotate(a);
       const s2 = sz + 1; g.globalAlpha = 0.35; g.fillStyle = pv.c2; for (let t = 1; t <= 3; t++) g.fillRect(-s2 * t * 1.2, -s2 / 2 + 0.5, s2, s2 - 1);
       g.globalAlpha = 1; g.fillStyle = pv.c1;
@@ -244,6 +260,9 @@ export class Renderer {
     } else if (f.k === 'ring') { g.globalAlpha = 1 - p; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.ellipse(0, 0, f.r * (0.3 + p), f.r * (0.3 + p) * 0.75, 0, 0, TAU); g.stroke(); }
     else if (f.k === 'flash') { g.globalAlpha = (1 - p) * 0.6; const grd = g.createRadialGradient(0, 0, 0, 0, 0, f.r); grd.addColorStop(0, '#fff'); grd.addColorStop(0.3, col); grd.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grd; g.beginPath(); g.arc(0, 0, f.r, 0, TAU); g.fill(); }
     else if (f.k === 'bolt') { g.globalAlpha = 1 - p; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -80); for (let i = 1; i <= 6; i++) g.lineTo((Math.random() - 0.5) * 10, -80 + i * 13.3); g.stroke(); }
+    else if (f.k === 'tstop') { const pp = Math.min(1, (now - f.t0) / 200); g.globalAlpha = 0.18 * (1 - Math.max(0, p - 0.85) / 0.15); g.fillStyle = '#a0c8ff'; g.beginPath(); g.ellipse(0, 0, f.r * pp, f.r * pp * 0.7, 0, 0, TAU); g.fill(); g.globalAlpha = 0.7; g.strokeStyle = '#e0f0ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, 0, f.r * pp, f.r * pp * 0.7, 0, 0, TAU); g.stroke();
+      for (let i = 0; i < 12; i++) { const a2 = i / 12 * TAU; g.fillRect(Math.cos(a2) * f.r * 0.92 - 1, Math.sin(a2) * f.r * 0.64 - 1, 2, 2); } g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -f.r * 0.4); g.moveTo(0, 0); g.lineTo(Math.cos(-1.2 + p * 0.3) * f.r * 0.3, Math.sin(-1.2 + p * 0.3) * f.r * 0.3); g.stroke(); }
+    else if (f.k === 'mirage') { g.globalAlpha = 0.45 * (1 - p); g.fillStyle = '#c0d8ff'; g.fillRect(-4, -20, 8, 20); }
     else if (f.k === 'sigil') { g.restore(); if (!f.under) this.drawSigil(f, ox, oy, now, 1 - p); return; }
     else if (f.k === 'pillar') { if (now < f.t0) { g.restore(); return; } g.globalAlpha = 1 - p; const grd = g.createLinearGradient(0, -60, 0, 0); grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(1, f.c || col); g.fillStyle = grd; g.fillRect(-3, -60, 6, 60); g.fillStyle = '#fff'; g.fillRect(-1, -60, 2, 60); }
     else if (f.k === 'timestop') { g.globalAlpha = 0.25 * (1 - p); g.fillStyle = '#c0d0ff'; g.beginPath(); g.arc(0, 0, f.r, 0, TAU); g.fill(); g.globalAlpha = 0.6; g.strokeStyle = '#e0e8ff'; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(now / 300) * f.r * 0.5, Math.sin(now / 300) * f.r * 0.5); g.stroke(); }

@@ -40,6 +40,7 @@ export function knownSkills(ch) {
   for (const s of DATA.formSkills?.get(wt) || []) if (s.kind !== 'passive' && s.req.mastery <= m) out.push(s.id);
   for (const s of DATA.levelSkills) if (s.req.level <= ch.level) out.push(s.id);
   const j = DATA.jobs.get(ch.job); if (j) out.push(j.active.id);
+  if (ch.job === 'ev_chrono') out.push('chr_square', 'chr_lunaclock', 'chr_doll');
   for (const [id, v] of Object.entries(ch.spells || {})) if (v.stage >= 4) out.push(id); // learned lost spells
   return out;
 }
