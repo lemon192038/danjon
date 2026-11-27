@@ -156,6 +156,7 @@ export class Zone {
   }
   // ---------- death
   kill(t, src, now) {
+    if (this.pvp && t.kind === 'player' && this.world.pvp?.down(this, t, src)) return;
     if (t.dead) return; t.dead = true; t.hp = 0; t.deadAt = now; t.action = null;
     if (t.buffMods?.revive && t.kind !== 'monster') { t.dead = false; t.hp = Math.round(t.maxHp * 0.4); t.buffs = t.buffs.filter(b => !b.mods.revive); t.recalcBuffs(); t.invulnUntil = now + 2000; this.fx({ t: 'revive', id: t.id }); return; }
     this.fx({ t: 'die', id: t.id });
@@ -195,6 +196,7 @@ export class Zone {
     for (const a of this.actors.values()) { if (a.auraMods || a.hadAura) { a.recalcBuffs(); a.hadAura = !!a.auraMods; } }
     for (const a of this.actors.values()) this.tickActor(a, now, dt);
     this.tickProjs(now, dt);
+    if (this.pvp) this.world.pvp?.tick(this, now);
     if (this.kind === 'dungeon') this.tickHazards(now);
     for (let i = this.respawns.length - 1; i >= 0; i--) if (this.respawns[i].at <= now) { if (!this.world.big?.shouldSkipSpawn(this)) this.spawnFieldMonster(this.respawns[i].cell); this.respawns.splice(i, 1); }
     if (this.drops.length) this.drops = this.drops.filter(d => d.chest || d.until > now);

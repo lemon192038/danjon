@@ -35,6 +35,7 @@ import { Machina } from './machina.js';
 import { Explore } from './explore.js';
 import { Society } from './society.js';
 import { Grand } from './grand.js';
+import { Pvp } from './pvp.js';
 import { morphMenu, morphView, bossFactor } from './morph.js';
 import { isChrono as chronoOk, switchStyle as chronoStyle } from './chrono.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
@@ -52,7 +53,7 @@ export class World {
     this.market = new Market(store.worldState()?.market); this.events = new EventEngine(this, store.worldState()?.events); this.orgs = new Orgs(this, store.worldState()?.orgs); this.sev = new SlumEvents(this); this.sev.place(this.zones.get('gravel')); this.duels = new Duels(this); this.duels.placeGuide(this.zones.get('arcelia')); this.slum = new Slum(this); this.hideout = new Hideout(this);
     this.spells = new Spells(this); this.big = new BigEvents(this); this.library = new Library(this); this.cev = new CityEvents(this); this.cev.place(this.zones); this.machina = new Machina(this); this.machina.decorate(this.zones); this.explore = new Explore(this); this.explore.decorate(this.zones); this.big.decorate(this.zones);
     this.npcs = new NpcManager(this, store.worldState()); this.econ = new Econ(this, store.worldState()?.econ); this.home = { decorate: (z, ch) => this.econ.decorate(z, ch) };
-    this.story = new StoryNpcs(this); this.society = new Society(this); this.grand = new Grand(this); this.society.place(this.zones);
+    this.story = new StoryNpcs(this); this.society = new Society(this); this.grand = new Grand(this); this.pvp = new Pvp(this); this.society.place(this.zones);
     this.last = Date.now();
     setInterval(() => this.step(), TICK_MS);
     setInterval(() => this.npcs.abstractTick(), 1000);
@@ -103,7 +104,7 @@ export class World {
     s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` }); this.society.onLogin(s); this.grand.onLogin(s);
   }
   detach(s) {
-    if (!s.ch) return;
+    if (!s.ch) return; this.pvp?.leave(s);
     this.save(s); const party = this.partyOf(s.ch.id);
     if (s.actor) { s.actor.zone.remove(s.actor); }
     if (party) this.leaveParty(s.ch.id, true);
@@ -157,7 +158,7 @@ export class World {
   exitBuilding(s) { const z = s.actor.zone; const cz = this.zones.get(z.cityId); this.enterZone(s, cz, z.door ? cz.tileCenter([z.door.x, z.door.y + 1]) : null); }
   saveAll() { for (const s of this.sessions.values()) this.save(s); store.saveWorldState({ npcs: this.npcs.list.map(n => ({ ...n, actorId: null })), econ: this.econ.saveState(), market: this.market.save(), events: this.events.save(), orgs: this.orgs.save() }); }
   enterZone(s, z, pos) {
-    const old = s.actor;
+    const old = s.actor; if (old?.zone?.pvp && z !== old.zone) this.pvp?.leave(s);
     let hp = 1, sp = 1; if (old) { hp = old.hp / old.maxHp; sp = old.sp / old.maxSp; old.zone.remove(old); if (old.dead) hp = 1; }
     const a = new Fighter(s.ch, { kind: 'player', team: 'ally', session: s, look: s.ch.look });
     a.hp = Math.max(1, Math.round(a.maxHp * hp)); a.sp = Math.round(a.maxSp * sp);
@@ -547,6 +548,7 @@ export class World {
       case 'realm': return this.cev.realmAct(s, m);
       case 'train': return this.explore.trainAct(s, m);
       case 'soc': return this.society.menu(s, m);
+      case 'pvp': return this.pvp.menu(s, m);
       case 'chrono': { if (!chronoOk(a)) return; if (m.do === 'style') return chronoStyle(a.zone, a); if (m.do === 'collapse') { a.action = a.action?.type === 'attack' ? null : a.action; const r = a.useSkill('chr_collapse', a.zone, {}); if (r !== 'ok' && r !== 'form') err('今は発動できない'); } return; }
       case 'morph': return m.do ? morphMenu(s, m) : s.send({ t: 'open', service: 'morph', data: morphView(s) });
       case 'mapless': return this.explore.readMapless(s, m.id);
