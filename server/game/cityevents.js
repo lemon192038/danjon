@@ -12,7 +12,8 @@ import { newCharacter } from './progress.js';
 import { MACHINA_EVENTS, MECH_WT, MACHINA_SITES } from '../../shared/data/machina.js';
 import { makeBoss } from './monsters.js';
 import { EXPLORE_EVENTS, UNDER_TRADE } from '../../shared/data/explore.js';
-const CITY_EVENTS = { ...CITY_ONLY, ...REALM_EVENTS, ...SAGA_EVENTS, ...MACHINA_EVENTS, ...EXPLORE_EVENTS };
+const CITY_EVENTS = { ...CITY_ONLY, ...REALM_EVENTS, ...SAGA_EVENTS, ...MACHINA_EVENTS, ...EXPLORE_EVENTS, ...GRAND_EVENTS };
+const GATED = new Set(['machina', ...Object.values(CITY_EVENTS).map(E => E.gate).filter(Boolean)]);
 const hostName = E => E.host?.name || STORY_NPCS[E.npc]?.name || '？'; // PHASE 9: realm discovery events run on the same engine
 import { EVENT_BY_ID } from '../../shared/data/events.js';
 import { ITEMS } from '../../shared/data/guilds.js';
@@ -25,6 +26,7 @@ import { clock } from './life.js';
 import { DATA } from '../data.js';
 import { addItem } from './progress.js';
 import { hash32, rng } from '../../shared/util.js';
+import { GRAND_EVENTS } from '../../shared/data/grand.js';
 
 const night = () => { const h = clock().hour; return h >= 20 || h < 5; };
 const STEP_NAME = { observe: '観測', dungeons: '踏破', board: '乗車', cars: '車両', mapless: '読書', sequence: '謎解き', sites: '遺跡調査', bossduel: '決戦', gossip: '聞き込み', days: '交流', meet: '面会', listen: '演奏', trade: '取引', escort: '同行', level: '力', books: '読書', event: '前提', talk: '会話', night: '夜の会話', midnight: '真夜中', fund: '資金', gather: '納品', kill: '討伐', arms: '武器種', duel: '決闘', floor: '探索', visit: '調査', quiz: '知識', spells: '魔法', rank: '昇格試験', choice: '決断' };
@@ -90,6 +92,7 @@ export class CityEvents {
       case 'listen': { if (!this.world.story.near(s, E.npc)) return err('演奏しているところへ行こう'); if (!this.world.story.performing(E.npc)) return err('演奏は夕方（18〜22時）'); const city = this.world.story.cityOf(E.npc); P.data.heard ||= [];
         if (st.distinct ? P.data.heard.includes(city) : P.data.heard.length && P.data.heardDay === clock().day) return err(st.distinct ? 'この街の曲はもう記録した。楽士は明日別の街へ行く' : 'また後で');
         P.data.heard.push(city); P.data.heardDay = clock().day; (ch.progress.songs ||= {})[city] = 1; s.send({ t: 'toast', v: `旋律を記録した（${P.data.heard.length}/${st.n}）：${CITIES[city]?.name}の曲` }); if (P.data.heard.length >= st.n) return this.next(s, ev); return this.open(s, ev); }
+      case 'cond': { const r = this.world.grand.cond(s, st.id); if (r) return err(r); return this.next(s, ev); }
       case 'level': if (ch.level < st.n) return err(`Lv${st.n}が必要（現在Lv${ch.level}）`); return this.next(s, ev);
       case 'books': { const n = BOOKS.filter(b => b.cat === st.cat && (ch.progress.books?.[b.id] || 0) >= b.pages.length).length; if (n < st.n) return err(`禁書庫の書を読み終える必要がある（${n}/${st.n}）`); return this.next(s, ev); }
       case 'event': if (!EV.isDone(ch, st.id)) return err(`イベント「${EVENT_BY_ID[st.id].name}」を達成してから`); return this.next(s, ev);
@@ -152,6 +155,7 @@ export class CityEvents {
   serviceView(s, ev) { const E = CITY_EVENTS[ev], ch = s.ch; if (!E.service) return null; const day = clock().day; const bought = ch.progress.cevBuy?.day === day ? ch.progress.cevBuy.n : {};
     const P = this.world.events.prog(ch, ev); const okP = P && (P.done || P.stage > 1) && (ch.progress.cevPeriod?.[ev] === this.period(E) || !P.done);
     switch (E.service) {
+      case 'grand': return this.world.grand.view(s, ev);
       case 'festival': return { kind: 'shop', title: '祭りの屋台（祭典の間だけ）', items: FESTIVAL.map(x => ({ ...x, name: ITEMS[x.ref].name, left: x.max - (bought[ev + x.ref] || 0) })) };
       case 'midnight': return { kind: 'shop', title: '夜鳴き商人の品（1日の数量限定）', items: MIDNIGHT.map(x => ({ ...x, name: ITEMS[x.ref].name, left: x.max - (bought[ev + x.ref] || 0) })) };
       case 'auction': return { kind: 'auction', title: '本日の出品目録', ok: okP, lots: this.lots().map(({ npc, ...l }) => ({ ...l, state: this.world.events.w.flags.cevAuction[l.id]?.[ch.id] || null })) };
@@ -168,6 +172,7 @@ export class CityEvents {
       case 'duelists': { const F = this.world.events.w.flags.duelists; const today = DUELISTS[day % DUELISTS.length].id; return { kind: 'duelists', today, list: DUELISTS.map(d => { const g = F[d.id] || { w: 0, l: 0, rep: d.rep }; const me = ch.progress.duelRec?.[d.id] || { w: 0, l: 0 }; return { id: d.id, name: d.name, wt: DATA.weapons && WEAPON_TYPES.find(w => w.id === d.wt)?.name, pers: d.pers, rep: Math.round(g.rep ?? d.rep), rec: `${g.w}勝${g.l}敗`, me: `${me.w}勝${me.l}敗` }; }) }; }
     } return null; }
   service(s, ev, m) { const E = CITY_EVENTS[ev], ch = s.ch, err = v => s.send({ t: 'err', v }); const day = clock().day;
+    if (E.service === 'grand') { this.world.grand.svc(s, ev, m); this.world.sendSelf(s); return this.open(s, ev); }
     if (E.service === 'festival' || E.service === 'midnight') { const list = E.service === 'festival' ? FESTIVAL : MIDNIGHT; const it = list.find(x => x.ref === m.ref); if (!it) return; ch.progress.cevBuy = ch.progress.cevBuy?.day === day ? ch.progress.cevBuy : { day, n: {} };
       const k = ev + it.ref; if ((ch.progress.cevBuy.n[k] || 0) >= it.max) return err('今日は売り切れ'); if (ch.gold < it.price) return err('ゴールドが足りない'); ch.gold -= it.price; ch.progress.cevBuy.n[k] = (ch.progress.cevBuy.n[k] || 0) + 1;
       addItem(ch, { kind: ITEMS[it.ref].use || it.ref === 'hp' || it.ref === 'sp' ? 'potion' : 'mat', ref: it.ref, n: 1 }); this.world.events.log(ch, ev, `${ITEMS[it.ref].name}を購入`); }
@@ -257,5 +262,6 @@ export class CityEvents {
   onMapless(s) { this.each(s, (ev, E, P, st) => { if (st.k !== 'mapless') return; P.data.prog = (P.data.prog || 0) + 1; if (P.data.prog >= st.n) this.next(s, ev); }); }
   onSite(s, site) { this.each(s, (ev, E, P, st) => { if (st.k !== 'sites') return; P.data.sites ||= []; if (P.data.sites.includes(site)) return; P.data.sites.push(site); s.send({ t: 'toast', v: `【${EVENT_BY_ID[ev].name}】遺跡を記録した（${P.data.sites.length}/${st.n}）` }); if (P.data.sites.length >= st.n) this.next(s, ev); }); }
   canEnterDungeon(s, d) { if (d.realm && !s.ch.progress.realms?.[d.realm]) { s.send({ t: 'err', v: `${PLACE[d.realm]?.name}はまだ見つかっていない` }); return false; }
-    if (!CITY_DUNGEONS[d.id] && !['machina', 'witherroot', 'statue_ruin', 'mirror_lake'].includes(d.id)) return true; if (this.canEnter(s.ch, d.id)) return true; s.send({ t: 'err', v: `${d.name}への道はまだ見つかっていない` }); return false; }
+    const gb = this.world.grand?.gateBlock(d.id); if (gb) { s.send({ t: 'err', v: gb }); return false; }
+    if (!CITY_DUNGEONS[d.id] && !GATED.has(d.id)) return true; if (this.canEnter(s.ch, d.id)) return true; s.send({ t: 'err', v: `${d.name}への道はまだ見つかっていない` }); return false; }
 }

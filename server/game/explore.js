@@ -1,7 +1,8 @@
 // NEW WORLD EVENTS — PHASE D runner for exploration objects and places: observation under real conditions (time, weather,
 // world state), the statue records, the lake lantern order, the phantom train (appearances, cars, passengers, stops — all
 // recorded), the library outside the map (books written from the reader's own record and the world), underground trade.
-import { EXPLORE_OBJECTS, STATUES, LAKE, TRAIN, MAPLESS_BOOKS, UNDER_TRADE } from '../../shared/data/explore.js';
+import { GRAND_OBJECTS } from '../../shared/data/grand.js';
+import { EXPLORE_OBJECTS as BASE_OBJECTS, STATUES, LAKE, TRAIN, MAPLESS_BOOKS, UNDER_TRADE } from '../../shared/data/explore.js';
 import { EVENT_BY_ID } from '../../shared/data/events.js';
 import { PLACE, REALMS } from '../../shared/data/world.js';
 import { REALM_EVENTS, REALM_LINK } from '../../shared/data/realms.js';
@@ -17,12 +18,13 @@ const H = () => clock().hour;
 const COND = { night: h => h >= 20 || h < 5, dusk: h => h >= 17 && h < 20, dawn: h => h >= 4 && h < 7 };
 export class Explore {
   constructor(world) { this.world = world; const F = world.events.w.flags; F.train ||= { seen: [], rides: 0 }; }
-  decorate(zones) { for (const O of EXPLORE_OBJECTS) { const z = zones.get(O.field); if (!z) continue; const m = z.map; const used = new Set(m.objects.map(o => o.x + ',' + (o.y - 1)));
+  decorate(zones) { const EXPLORE_OBJECTS = [...BASE_OBJECTS, ...GRAND_OBJECTS]; for (const O of EXPLORE_OBJECTS) { const z = zones.get(O.field); if (!z) continue; const m = z.map; const used = new Set(m.objects.map(o => o.x + ',' + (o.y - 1)));
     const cands = m.spawns.filter(c => !used.has(c[0] + ',' + c[1]) && m.tiles[(c[1] + 1) * m.w + c[0]] !== T.BLOCK && m.tiles[(c[1] + 1) * m.w + c[0]] !== T.WALL); if (!cands.length) continue;
     const cell = cands[(hash32(O.field + O.k + O.key) >>> 0) % cands.length]; m.spawns = m.spawns.filter(c => c !== cell); m.tiles[cell[1] * m.w + cell[0]] = T.BLOCK;
-    m.objects.push({ k: O.k, key: O.key, label: O.label, x: cell[0], y: cell[1] + 1 }); m.props.push({ k: O.k === 'moonlake' ? 'fountain' : O.k === 'deadtree' ? 'tree' : O.k === 'lantern' ? 'lamp' : 'statue', x: cell[0], y: cell[1], w: 1, h: 1, v: 1 }); } }
+    m.objects.push({ k: O.k, key: O.key, label: O.label, x: cell[0], y: cell[1] + 1 }); m.props.push({ k: O.k === 'moonlake' ? 'fountain' : O.k === 'deadtree' ? 'tree' : O.k === 'lantern' || O.k === 'unrecorded' ? 'lamp' : 'statue', x: cell[0], y: cell[1], w: 1, h: 1, v: 1 }); } }
   weather(z) { const c = this.world.cityNear(z); return c ? this.world.life.weatherOf(c) : 'clear'; }
   useObject(s, z, o) { const cev = this.world.cev, ch = s.ch, h = H(), say = v => s.send({ t: 'toast', v });
+    if (this.world.grand?.onObject(s, o, z)) return;
     switch (o.k) {
       case 'deepmarker': say('古い標石だ。同じ形の刻みが、別の洞窟にもあるという'); return cev.onObserve(s, o.k, o.key);
       case 'withersample': if (o.key === 'plant') { addItem(ch, { kind: 'mat', ref: 'witherbloom', n: 1 }); say('季節外れの花を採取した（枯れ木の花）'); } else say(o.key === 'soil' ? '土は黒ずみ、魔力がほとんど残っていない' : '湧き水は澱み、底に細い根が絡みついている'); return cev.onObserve(s, o.k, o.key);

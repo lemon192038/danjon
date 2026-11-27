@@ -17,7 +17,7 @@ test('npc sagas', async () => {
     const out = []; const ws = { readyState: 1, bufferedAmount: 0, send: x => out.push(JSON.parse(x)), close() {} }; const last = t => [...out].reverse().find(m => m.t === t); const err = () => out.filter(m => m.t === 'err').at(-1)?.v;
     const r = store.register('saga', 'pass1234'); const s = w.attach(ws, r.account); w.handle(s, { t: 'create', name: '旅人', wt: 1 }); w.handle(s, { t: 'play', id: last('chars').list[0].id });
     const ch = s.ch; ch.level = 60; ch.gold = 1e6; const E = w.events; const menu = m => w.handle(s, { t: 'menu', op: 'cev', ...m });
-    for (const id of ['nx07', 'nx08', 'nx09', 'nx10', 'nx11', 'nx12']) assert.equal(EVENT_BY_ID[id].status, 'live', id); assert.equal(EVENT_BY_ID.nx01.status, 'planned'); assert.equal(Object.keys(EVENT_BY_ID).filter(k => /^nx\d\d$/.test(k)).length, 30);
+    for (const id of ['nx07', 'nx08', 'nx09', 'nx10', 'nx11', 'nx12']) assert.equal(EVENT_BY_ID[id].status, 'live', id); assert.ok(Object.keys(EVENT_BY_ID).filter(k => /^nx\d\d$/.test(k)).every(k => EVENT_BY_ID[k].status === 'live'), 'all 30 new events live'); assert.equal(Object.keys(EVENT_BY_ID).filter(k => /^nx\d\d$/.test(k)).length, 30);
     // story NPCs live in the city simulation: their location follows their schedule
     const clear = () => { for (const k of Object.keys(w.life.weather)) w.life.weather[k] = 'clear'; w.life.nextWx = Infinity; };
     const settle = (city) => { clear(); w.life.inited = false; w.life.last = -1; w.life.step(); for (const c of w.life.citizens) if (c.moving) { c.loc = c.moving.to; c.moving = null; } const z = w.zones.get(city); w.life.sync(z); return z; };
