@@ -298,3 +298,18 @@ export const WEAPON_TYPES = [
 export const WT_BY_ID = Object.fromEntries(WEAPON_TYPES.map(w => [w.id, w]));
 export const STARTER_WEAPON_TYPES = WEAPON_TYPES.filter(w => !w.myth).map(w => w.id);
 export function categoryOf(id) { return WEAPON_CATEGORIES.find(c => id >= c.range[0] && id <= c.range[1]); }
+// ───── 変身系（ids 87-106）: appended; the 86 types above are unchanged ─────
+import { MORPH_TYPES, ATK } from './morph.js';
+WEAPON_CATEGORIES.push({ id: 'morph', name: '変身系', range: [87, 106] });
+const MORPH_VIS = { beast: '#c08040', dragon: '#d04020', insect: '#70a040', phantom: '#c090ff', abyss: '#3070b0', aberrant: '#a04090', demon: '#a01030', spirit: '#60d0ff', shadow: '#403050', doom: '#801850', mech: '#80a0c0', crystal: '#a0f0ff',
+  fluid: '#40c0c0', star: '#ffe080', arms: '#b0b8c0', divine: '#fff0a0', ghost: '#a0c0d0', dream: '#ff9ee0', time: '#8090ff', chimera: '#e0e0e0' };
+const MORPH_SCALE = { beast: { str: 0.7, agi: 0.6 }, dragon: { str: 0.8, vit: 0.4 }, insect: { agi: 0.6, vit: 0.5 }, phantom: { mnd: 0.6, agi: 0.5 }, abyss: { vit: 0.5, int: 0.6 }, aberrant: { str: 0.6, vit: 0.6 }, demon: { str: 0.8, int: 0.4 },
+  spirit: { int: 0.9, mnd: 0.3 }, shadow: { agi: 0.7, dex: 0.5 }, doom: { str: 0.6, int: 0.6 }, mech: { dex: 0.6, str: 0.5 }, crystal: { vit: 0.6, int: 0.5 }, fluid: { agi: 0.6, int: 0.5 }, star: { int: 0.8, mnd: 0.4 }, arms: { str: 0.6, dex: 0.6 },
+  divine: { mnd: 0.8, int: 0.4 }, ghost: { dex: 0.6, int: 0.5 }, dream: { int: 0.6, luk: 0.5 }, time: { dex: 0.6, int: 0.6 }, chimera: { str: 0.4, int: 0.4, agi: 0.4 } };
+const STAT_OF = { fire: 'burn', ice: 'freeze', thunder: 'shock', wind: 'slow', earth: 'stun', water: 'slow', holy: 'stun', dark: 'curse', void: 'silence' };
+for (const M of MORPH_TYPES) { const s0 = M.species[0]; const k = n => ({ ...ATK[n][1], m: Math.round(ATK[n][1].m * 0.8 * 100) / 100 });
+  const els = [...new Set(M.species.map(s => s.el).filter(Boolean))].slice(0, 3); const scale = MORPH_SCALE[M.theme];
+  WEAPON_TYPES.push({ id: M.id, key: M.key, name: M.name, morph: true, combo: [k(s0.half[0]), k(s0.half[1]), { ...ATK[s0.full[2]][1] }], dodge: 'roll', move: 1.0,
+    special: { type: 'morph' }, scale, good: Object.keys(scale).slice(0, 2), weak: [], elem: els, status: els.map(e => STAT_OF[e]).filter(Boolean).slice(0, 2),
+    pros: `${M.partial}→${M.half}→完全変身。形態ごとに攻撃・移動・回避が変わる（資源：${M.res.name}）`, cons: `${M.res.name}が無いと半変身・完全変身できない`, vis: { k: 'core', col: MORPH_VIS[M.theme], glow: MORPH_VIS[M.theme], theme: M.theme } });
+  WT_BY_ID[M.id] = WEAPON_TYPES[WEAPON_TYPES.length - 1]; STARTER_WEAPON_TYPES.push(M.id); }

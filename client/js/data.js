@@ -19,7 +19,7 @@ export async function loadCore() {
 const pending = new Map();
 export function loadType(id) {
   id = +id; if (D.types.has(id)) return Promise.resolve(D.types.get(id)); if (pending.has(id)) return pending.get(id);
-  const p = J(`/shared/gen/types/${id}.json`).then(t => { D.types.set(id, t); for (const s of t.skills) D.skills.set(s.id, s); for (const w of t.weapons) { D.weapons.set(w.id, w); D.skills.set(w.skill.id, w.skill); } pending.delete(id); return t; });
+  const p = J(`/shared/gen/types/${id}.json`).then(t => { D.types.set(id, t); for (const s of t.skills) D.skills.set(s.id, s); for (const w of t.weapons) { D.weapons.set(w.id, w); D.skills.set(w.skill.id, w.skill); } for (const s of t.formSkills || []) D.skills.set(s.id, s); pending.delete(id); return t; });
   pending.set(id, p); return p;
 }
 export const wtOfWeapon = ref => +String(ref).split('_')[0];

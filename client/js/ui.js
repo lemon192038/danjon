@@ -17,6 +17,7 @@ import { installBig, xName } from './uibig.js';
 import { installLib } from './uilib.js';
 import { installCev } from './uicev.js';
 import { installSoc } from './uisoc.js';
+import { installMorph } from './uimorph.js';
 import { CONTINENTS, REALMS, LEGACY_CITIES } from '/shared/data/world.js';
 import { CITIES } from '/shared/data/cities.js';
 import { LOOT, PROV } from '/shared/data/slum.js';
@@ -31,7 +32,7 @@ const DODGE = { roll: 'ローリング', dash: 'ダッシュ', step: 'ステッ�
 const SPECIAL_NAMES = { guard: 'ガード/盾撃', charge: '溜め斬り', iai: '居合', frenzy: '乱舞', parry: 'パリィ', riposte: '受け流し', dashStrike: '突進斬り', execute: '処刑', throwSpin: '回転投擲', backstab: '背面取り', bloodPact: '血の契約', orbit: '周回刃', vault: '棒高跳び', guardCharge: '盾突進', hook: '鉤引き', sweepTrip: '足払い', tide: '激流', spinGuard: '回転防御', leap: '跳躍斬り', brace: '迎撃構え', reap: '刈り取り', rage: '激昂', whirl: '大旋回', spin: '遠心回転', volley: '一斉投擲', armorBreak: '鎧砕き', superArmor: '不動', blessStrike: '祝福打', spikeBurst: '棘爆', tauntRoar: '咆哮', roll: '鉄球転がし', pileLoad: '杭装填', chi: '気功解放', grab: '掴み投げ', pounce: '飛びかかり', tempo: 'テンポ解放', launch: '蹴り上げ', overclock: '過駆動', auraBurst: '闘気解放', aim: '引き絞り', boltSwap: '矢弾切替', barrage: '制圧射撃', manaArrow: '魔力矢', spirit: '精霊召喚', pinThrow: '縫い止め', ricochet: '跳弾', recallStrike: '呼び戻し', heatVent: '排熱爆破', channel: '詠唱', elemShift: '属性切替', quickcast: '高速詠唱', pageSummon: '頁召喚', spellChain: '連鎖詠唱', orbBarrier: '魔力障壁', ringSwap: '指輪切替', rune: 'ルーン刻印', library: '書架展開', modeToggle: '形態切替', transform: '変形', lash: '絡め取り', wireTrap: '鋼線罠', hammerThrow: '鉄球投擲', drill: '穿孔', rev: '回転鋸', umbrellaGuard: '傘防御・反射', rally: '軍旗', song: '旋律', puppet: '人形召喚', divineJudgment: '神の裁き', demonForm: '魔神化', dragonBreath: '竜の吐息', wings: '光翼', soulHarvest: '魂の解放', timeStop: '時間停止', gravityWell: '重力井戸', erase: '消去', meteor: '流星群', unlock: '解錠' };
 
 export class UI {
-  static install() { installCity(UI); installSlum(UI); installEvents(UI); installItems(UI); installOrgs(UI); installSlumEvents(UI); installDuels(UI); installBig(UI); installLib(UI); installCev(UI); installSoc(UI); }
+  static install() { installCity(UI); installSlum(UI); installEvents(UI); installItems(UI); installOrgs(UI); installSlumEvents(UI); installDuels(UI); installBig(UI); installLib(UI); installCev(UI); installSoc(UI); installMorph(UI); }
   constructor(net, state, ctx) {
     this.net = net; this.state = state; this.ctx = ctx; this.modalOpen = false; this.chatOpen = false; this.panel = null; this.service = null; this.sel = {};
     const hud = document.getElementById('hud');
@@ -65,7 +66,8 @@ export class UI {
     const me = m.me; this.me = me;
     this.bar('.hp', me.hp / me.mhp, `${me.hp}/${me.mhp}${me.sh ? ` (+${me.sh})` : ''}`); this.bar('.sp', me.sp / me.msp, `${me.sp}/${me.msp}`);
     if (this.self) { const ch = this.self.ch; this.$('.bar.xp i').style.width = Math.min(100, ch.xp / xpToNext(ch.level) * 100) + '%'; }
-    const g = me.g ? Object.entries(me.g).filter(([k, v]) => v > 0) : []; this.$('#gauges').innerHTML = g.map(([k, v]) => `<span class="gauge">${GAUGE_NAMES[k] || k} ${Math.floor(v * 10) / 10}</span>`).join('') + (me.alt ? '<span class="gauge">第二形態</span>' : '');
+    const MK = ['morph', 'mst', 'mhalf', 'mres', 'mcol']; const g = me.g ? Object.entries(me.g).filter(([k, v]) => v > 0 && !MK.includes(k)) : []; const mg = me.g?.mres ? `<button class="gauge mgauge" onclick="window.__net.menu('morph',{})" style="cursor:pointer;border:1px solid ${me.g.mcol};color:#fff;background:rgba(0,0,0,.5)">${['通常', '部分', '半', '完全'][me.g.mst || 0]}変身 ${me.g.mres} <span style="display:inline-block;width:60px;height:6px;background:#333;vertical-align:middle"><span style="display:block;height:6px;width:${me.g.morph || 0}%;background:${me.g.mcol}"></span></span> ${me.g.morph || 0}${me.g.mhalf ? ` 残${me.g.mhalf}秒` : ''} ▸</button>` : '';
+    this.$('#gauges').innerHTML = mg + g.map(([k, v]) => `<span class="gauge">${GAUGE_NAMES[k] || k} ${Math.floor(v * 10) / 10}</span>`).join('') + (me.alt ? '<span class="gauge">第二形態</span>' : '');
     this.$('#buffs').innerHTML = me.bm ? `<span class="buff">${esc(modsText(me.bm)).slice(0, 80)}</span>` : '';
     for (let i = 0; i < 4; i++) { const id = this.self?.ch.skills.slots[i]; const el = this.$(`#sk${i} .cd`); if (!el) continue; const cd = id && me.cds[id]; const sk = D.skills.get(id); el.style.height = cd && sk ? Math.min(100, cd / sk.cd * 100) + '%' : '0'; this.$(`#sk${i} .cdt`).textContent = cd ? (cd / 1000).toFixed(1) : ''; }
     if (this.self) { const ch = this.self.ch; this.ctx.input.setTouchInfo({ cds: ch.skills.slots.map(id => { const sk = D.skills.get(id); return id && me.cds[id] && sk ? Math.min(1, me.cds[id] / sk.cd) : 0; }), pot: (() => { const r = (ch.potSlots || ['hp', 'sp'])[0]; return `${(ITEMS[r]?.name || r).slice(0, 4)} ${ch.inventory.filter(i => i.ref === r).reduce((t, i) => t + i.n, 0)}`; })(), spc: SPECIAL_NAMES[WT_BY_ID[this.self.d.wt].special.type] }); }

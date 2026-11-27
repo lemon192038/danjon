@@ -1,7 +1,7 @@
 // Validates generated data against the unified skill/effect schema.
 import fs from 'node:fs';
 import { WEAPON_TYPES } from '../shared/data/weaponTypes.js';
-const EFF = new Set(['cmd', 'hit', 'dash', 'blink', 'buff', 'counter', 'shield', 'heal', 'zone', 'barrage', 'summon', 'enchant', 'cleanse', 'aura', 'leap', 'taunt', 'passive']);
+const EFF = new Set(['morph', 'cmd', 'hit', 'dash', 'blink', 'buff', 'counter', 'shield', 'heal', 'zone', 'barrage', 'summon', 'enchant', 'cleanse', 'aura', 'leap', 'taunt', 'passive']);
 const SHAPES = new Set(['arc', 'thrust', 'circle', 'proj', 'beam', 'slam', 'chain', 'whip']);
 const errs = []; const ids = new Set();
 const chk = (sk, where) => {
@@ -19,7 +19,7 @@ for (const wt of WEAPON_TYPES) {
   for (const s of wt.combo.concat(wt.alt || [])) if (!SHAPES.has(s.s) || !s.t || s.t.length !== 3) errs.push(`type ${wt.id} bad combo`);
   const d = JSON.parse(fs.readFileSync(`shared/gen/types/${wt.id}.json`));
   if (d.skills.length !== 100 || d.weapons.length !== 100) errs.push(`type ${wt.id} count`);
-  d.skills.forEach(s => chk(s, `wt${wt.id}`));
+  d.skills.forEach(s => chk(s, `wt${wt.id}`)); (d.formSkills || []).forEach(s => chk(s, `form${wt.id}`)); if (wt.morph && d.formSkills?.length !== 6) errs.push(`type ${wt.id} form skills`);
   d.weapons.forEach(w => { if (!(w.atk > 0) || !w.rar) errs.push(`weapon ${w.id}`); chk(w.skill, w.id); });
   if (new Set(d.weapons.map(w => w.name)).size !== 100) errs.push(`type ${wt.id} duplicate weapon names`);
 }

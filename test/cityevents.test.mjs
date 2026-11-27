@@ -47,7 +47,7 @@ test('city events', async () => {
     // roaming troupe: only in today's city
     setClockAt(80, 12); const tday = CITY_EVENTS.ct_troupe.hosts[80 % 5].city; const other = CITY_EVENTS.ct_troupe.hosts.find(h => h.city !== tday).city; goHost('ct_troupe', other); menu({ ev: 'ct_troupe', act: 'start' }); assert.match(err(), /今日は/); goHost('ct_troupe', tday); menu({ ev: 'ct_troupe', act: 'start' }); assert.ok(E.prog(ch, 'ct_troupe'));
     // hundred arms: all 86 weapon types are listed; try once per type; 5 types to clear the contest
-    setClockAt(75, 12); goHost('ct_hundred_arms'); menu({ ev: 'ct_hundred_arms', act: 'start' }); const sv = last('open').data.service; assert.equal(sv.types.length, 86);
+    setClockAt(75, 12); goHost('ct_hundred_arms'); menu({ ev: 'ct_hundred_arms', act: 'start' }); const sv = last('open').data.service; assert.equal(sv.types.length, 106);
     menu({ ev: 'ct_hundred_arms', act: 'svc', mode: 'try', wt: 44 }); const n1 = ch.inventory.filter(i => i.kind === 'weapon').length; menu({ ev: 'ct_hundred_arms', act: 'svc', mode: 'try', wt: 44 }); assert.match(err(), /試用済み/); assert.equal(ch.inventory.filter(i => i.kind === 'weapon').length, n1);
     menu({ ev: 'ct_hundred_arms', act: 'go' }); for (const wt of [1, 4, 14, 25, 44]) w.cev.onKill(s, { fam: 'slime' }, { wt: { id: wt, name: 'x' } }); assert.equal(E.prog(ch, 'ct_hundred_arms').stage, 2);
     // hidden dungeon gate opens only through its event

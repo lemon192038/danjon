@@ -7,6 +7,8 @@ import { buildWeaponTypeSkill } from './gen/skills.mjs';
 import { buildWeapon } from './gen/weapons.mjs';
 import { buildJobs } from './gen/jobs.mjs';
 import { buildEventJobs } from './gen/eventjobs.mjs';
+import { morphNames, morphSkills } from './gen/morph.mjs';
+import { MORPH_BY_ID } from '../shared/data/morph.js';
 import { buildSpells } from './gen/spells.mjs';
 import { buildLevelSkills, FAMILIES, BOSS_ARCHETYPES, DUNGEONS } from './gen/content.mjs';
 
@@ -22,12 +24,12 @@ const write = (f, o) => fs.writeFileSync(path.join(OUT, f), JSON.stringify(o));
 const index = { types: [], counts: {} };
 let nSkills = 0, nWeapons = 0;
 for (const wt of WEAPON_TYPES) {
-  const sn = skillNames.get(wt.id), wn = weaponNames.get(wt.id);
+  const MN = MORPH_BY_ID[wt.id] && morphNames(MORPH_BY_ID[wt.id]); const sn = MN ? MN.skills : skillNames.get(wt.id), wn = MN ? MN.weapons : weaponNames.get(wt.id);
   if (!sn || sn.length !== 100) throw new Error(`skill names missing for type ${wt.id}`);
   if (!wn || wn.length !== 100) throw new Error(`weapon names missing for type ${wt.id}`);
   const skills = sn.map((n, i) => buildWeaponTypeSkill(n, wt, i));
   const weapons = wn.map((n, i) => buildWeapon(n, wt, i));
-  write(`types/${wt.id}.json`, { id: wt.id, skills, weapons });
+  write(`types/${wt.id}.json`, { id: wt.id, skills, weapons, ...(MN ? { formSkills: morphSkills(MORPH_BY_ID[wt.id]) } : {}) });
   nSkills += skills.length; nWeapons += weapons.length;
   index.types.push({ id: wt.id, name: wt.name, weapons: weapons.map(w => [w.id, w.name, w.rar, w.lvl]) });
 }

@@ -35,6 +35,7 @@ import { Machina } from './machina.js';
 import { Explore } from './explore.js';
 import { Society } from './society.js';
 import { Grand } from './grand.js';
+import { morphMenu, morphView, bossFactor } from './morph.js';
 import { STORY_NPCS } from '../../shared/data/sagas.js';
 import { REGIONS, LOOT, LAYERS, FACTIONS, PROV, LOOT_CAT } from '../../shared/data/slum.js';
 import { dangerAt, skeleton, SW, SH } from './slumgen.js';
@@ -277,7 +278,7 @@ export class World {
       const c = ch.progress.clears[z.dungeon.id] ||= {}; if (z.floor > (c[diff] || 0)) c[diff] = z.floor; c.max = Math.max(c.max || 0, z.floor);
       if (['HARD', 'HELL', 'ABYSS'].includes(diff) && z.floor >= 50) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 2 }); this.note(s, { t: 'msg', v: '特性変更チケット×2を手に入れた' }); }
       const am = rollArtifactMat(z, ch); if (am) this.note(s, { t: 'msg', v: `アーティファクト素材：${matName(am)}（${z.dungeon.name} ${z.floor}F ${diff}）を手に入れた` });
-      this.big.onSunkenBoss(s, z); this.big.onLunaBoss(s, z); this.big.onBoss(); this.library.onBossKilled(s, z); this.cev.onFloor(s, z, true); this.grand.onBoss(s, z);
+      this.big.onSunkenBoss(s, z); this.big.onLunaBoss(s, z); this.big.onBoss(); this.library.onBossKilled(s, z); this.cev.onFloor(s, z, true); this.grand.onBoss(s, z); if (s.actor?.wt?.morph) bossFactor(s);
       checkJobUnlocks(ch, n => this.note(s, n));
       this.sendSelf(s);
       void di;
@@ -499,7 +500,7 @@ export class World {
         else if (it.kind === 'armor') { if (armorDef(it.slot, it.tier).lvl > ch.level + 10) return err('レベルが足りません'); ch.equip[it.slot] = it.uid; }
         else if (it.kind === 'artifact') { const slot = ART_SLOTS.includes(m.slot) ? m.slot : ART_SLOTS.find(k => !ch.equip[k]) || 'art1'; for (const k of ART_SLOTS) if (ch.equip[k] === it.uid) ch.equip[k] = null; ch.equip[slot] = it.uid; }
         else return;
-        a.comboStep = 0; a.altMode = false; a.gauge = null; return ok('装備を変更しました'); }
+        a.comboStep = 0; a.altMode = false; a.gauge = null; if (a.morph) { a.morph = null; a.flyUntil = 0; a.refreshStats(); } return ok('装備を変更しました'); }
       case 'alloc': { const st = m.stat; const n = Math.max(1, Math.min(ch.statPoints, m.n | 0 || 1)); if (!STATS.includes(st) || ch.statPoints < n) return; ch.stats[st] += n; ch.statPoints -= n; return ok(); }
       case 'resetStats': { if (!inTown) return err('街でのみ可能です'); const cost = ch.level * 100; if (ch.gold < cost) return err(`${cost}G必要です`); ch.gold -= cost; let sum = 0; for (const k of STATS) { sum += ch.stats[k]; ch.stats[k] = 0; } ch.statPoints += sum; return ok('ステータスを再分配できます'); }
       case 'slot': { const i = m.i | 0; if (i < 0 || i >= SKILL_SLOTS) return; const id = m.id || null; if (id && (!knownSkills(ch).includes(id) || DATA.skills.get(id)?.kind === 'passive')) return err('そのスキルは使用できません'); ch.skills.slots = ch.skills.slots.map(x => x === id ? null : x); ch.skills.slots[i] = id; return ok(); }
@@ -545,6 +546,7 @@ export class World {
       case 'realm': return this.cev.realmAct(s, m);
       case 'train': return this.explore.trainAct(s, m);
       case 'soc': return this.society.menu(s, m);
+      case 'morph': return m.do ? morphMenu(s, m) : s.send({ t: 'open', service: 'morph', data: morphView(s) });
       case 'mapless': return this.explore.readMapless(s, m.id);
       case 'worldInfo': return s.send({ t: 'open', service: 'worldInfo', data: this.big.info(s) });
       case 'leave': if (a.zone.kind === 'dungeon') this.leaveDungeon(s); return;
@@ -593,6 +595,7 @@ export class World {
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.wpn && DATA.weapons.get(m.wpn)) { const u = uid(); ch.inventory.push({ uid: u, kind: 'weapon', ref: m.wpn, plus: 0 }); ch.equip.weapon = u; ch.mastery[DATA.weapons.get(m.wpn).wt] ||= { lv: 100, xp: 0 }; ch.skills.slots[0] = DATA.weapons.get(m.wpn).skill.id; a.refreshStats(); a.comboStep = 0; a.altMode = false; this.sendSelf?.(s); }
         if (m.god) a.invulnUntil = z.now + 3600000;
+        if (m.mres != null && a.wt?.morph) { a.morph ||= null; if (!a.morph) a.refreshStats(); if (a.morph) a.morph.res = m.mres; }
         if (m.foe) { const mo = makeMonster('golem', 20, 'NORMAL'); mo.x = a.x + 70; mo.y = a.y; mo.maxHp = mo.hp = 1e7; mo.stats.atk = 1; z.add(mo); }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
       case 'events': return s.send({ t: 'open', service: 'journal', data: this.events.journal(ch) });

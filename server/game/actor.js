@@ -7,6 +7,7 @@ import { DATA, dataAccess } from '../data.js';
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { SPECIALS, onAttackHook } from './specials.js';
 import { circleFor } from '../../shared/data/circles.js';
+import { morphMods, morphCombo, morphDodge, skillBlock } from './morph.js';
 import { identityMods, altCombo, preStep, stepOpts, postStep } from './mechanics.js';
 
 let NEXT_ID = 1;
@@ -36,7 +37,7 @@ export class Fighter extends Actor {
     const hpR = this.maxHp ? this.hp / this.maxHp : 1, spR = this.maxSp ? this.sp / this.maxSp : 1;
     this.maxHp = s.maxHp; this.maxSp = s.maxSp; if (this.hp != null) { this.hp = Math.max(1, Math.round(this.maxHp * hpR)); this.sp = Math.round(this.maxSp * spR); }
     this.weaponEl = this.weapon?.el || this.wt.elem[0] || null; this.magic = categoryOf(this.wt.id).id === 'magic';
-    this.visKey = this.wt.key; this.level = this.ch.level; this.name = this.ch.name;
+    this.visKey = this.wt.key; this.level = this.ch.level; this.name = this.ch.name; this.r = 6; this.dodgeKind = null; this.superArmor = false; morphMods(this, s);
   }
   skillLv(id) { return this.ch.skills?.levels?.[id]?.lv || 1; }
   aspdNow() { let a = this.stats.aspd * (1 + (this.buffMods.aspd || 0)); if (this.gauge?.tempo && this.tempoUntil > this.zone.now) a *= 1 + this.gauge.tempo * this.wt.special.spd; else if (this.gauge?.tempo) this.gauge.tempo = 0; return a; }
@@ -48,7 +49,7 @@ export class Fighter extends Actor {
     if (this.action?.type === 'attack') { if (now > this.action.recAt) this.action.buffered = true; return false; }
     // touch players: lock onto the nearest enemy so attacks home in even while moving with the stick
     if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
-    const combo = altCombo(this) || (this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo);
+    const combo = morphCombo(this) || altCombo(this) || (this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo);
     if (now - this.lastAttackEnd > 450) this.comboStep = 0;
     const idx = this.comboStep % combo.length, step = combo[idx];
     const sp = this.aspdNow();
@@ -65,9 +66,9 @@ export class Fighter extends Actor {
   // right after a combo finisher (派生). Mastery 60: an extra shockwave hit. Super armor while charging.
   heavy(zone) {
     const now = zone.now; if (!this.canAct(now) || this.statuses.fear) return 'busy'; if ((this.heavyCd || 0) > now) return 'cd';
-    const chain = this.action?.type === 'attack' && this.action.step === this.wt.combo.length - 1 && now >= this.action.recAt;
+    const cbo = morphCombo(this) || this.wt.combo; const chain = this.action?.type === 'attack' && this.action.step === cbo.length - 1 && now >= this.action.recAt;
     if (this.action && !chain) return 'busy'; if (this.sp < 6) return 'sp';
-    const m = this.ch.mastery?.[this.wt.id]?.lv || 1; const fin = this.wt.combo[this.wt.combo.length - 1];
+    const m = this.ch.mastery?.[this.wt.id]?.lv || 1; const fin = cbo[cbo.length - 1];
     const follow = chain && m >= 30; this.sp -= 6; this.heavyCd = now + 1400;
     if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
     const sp = this.aspdNow(); const charge = follow ? 120 : (fin.t[0] * 1.6 + 260) / sp; const rec = fin.t[2] * 1.2 / sp;
@@ -103,6 +104,7 @@ export class Fighter extends Actor {
     let o = { m: step.m, st: step.st || 1, kb: step.kb, pen: step.pen, ls: step.ls, el: step.el, pull: step.pull, finisher: last };
     if (step.bleed) o.status = ['bleed', 0.35, 4000];
     if (step.stun) o.status = ['stun', 0.5, step.stun];
+    if (step.status) o.status = step.status;
     if (this.statuses.burn && false) o.m *= 1;
     onAttackHook(zone, this); o = stepOpts(this, o); let hitList = null;
     if (step.s === 'proj') {
@@ -121,6 +123,7 @@ export class Fighter extends Actor {
   useSkill(id, zone, ctx = {}) {
     const now = zone.now; let sk = DATA.skills.get(id); if (sk?.src === 'spell' && this.ch && zone.world?.spells) sk = zone.world.spells.custom(this.ch, sk); // improved lost spell
     if (!sk || sk.kind === 'passive' || !this.canAct(now) || this.statuses.silence) return 'ng';
+    const fb = skillBlock(this, sk); if (fb) { this.session?.send({ t: 'err', v: fb }); return 'form'; }
     if (this.action && !['attack'].includes(this.action.type) && this.action.until > now) return 'busy';
     if ((this.cds[id] || 0) > now) return 'cd';
     const cost = Math.round(sk.cost * (1 - (this.buffMods.spCost || 0)));
@@ -149,11 +152,12 @@ export class Fighter extends Actor {
     const now = zone.now; if (!this.canAct(now) || (this.dodgeCd || 0) > now || this.statuses.bind) return;
     if (this.action?.lockMove && this.action.until > now) return;
     const ang = (dx || dy) ? Math.atan2(dy, dx) : this.facing;
-    const D = { roll: [72, 320, 600], dash: [92, 220, 520], step: [54, 260, 380], blink: [84, 160, 700], slide: [82, 280, 520], hop: [64, 380, 560] }[this.wt.dodge] || [70, 300, 600];
+    const D = { roll: [72, 320, 600], dash: [92, 220, 520], step: [54, 260, 380], blink: [84, 160, 700], slide: [82, 280, 520], hop: [64, 380, 560] }[this.dodgeKind || this.wt.dodge] || [70, 300, 600]; const dk = this.dodgeKind || this.wt.dodge;
     this.dodgeCd = now + D[2]; this.invulnUntil = now + D[1] + (this.stats.mods.iframe || 0); this.action = { type: 'dodge', until: now + D[1] * 0.9, lockMove: true };
-    if (this.wt.dodge === 'blink') { zone.fx({ t: 'blink', x: Math.round(this.x), y: Math.round(this.y) }); zone.teleport(this, this.x + Math.cos(ang) * D[0], this.y + Math.sin(ang) * D[0]); }
+    morphDodge(zone, this);
+    if (dk === 'blink') { zone.fx({ t: 'blink', x: Math.round(this.x), y: Math.round(this.y) }); zone.teleport(this, this.x + Math.cos(ang) * D[0], this.y + Math.sin(ang) * D[0]); }
     else { const n = 6; for (let i = 1; i <= n; i++) zone.schedule(now + i * D[1] / n * 0.8, () => zone.moveActor(this, Math.cos(ang) * D[0] / n, Math.sin(ang) * D[0] / n)); }
-    zone.fx({ t: 'dodge', id: this.id, k: this.wt.dodge, a: +ang.toFixed(2) });
+    zone.fx({ t: 'dodge', id: this.id, k: dk, a: +ang.toFixed(2) });
   }
 }
 export function statusMoveMul(a) { let m = 1; if (a.statuses.slow) m *= 1 + STATUS.slow.move; if (a.statuses.bind) m = 0; return m; }

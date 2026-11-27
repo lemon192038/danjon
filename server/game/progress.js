@@ -5,6 +5,7 @@ import { MAX_LEVEL, MAX_MASTERY, DIFFICULTIES, STATS } from '../../shared/consta
 import { STARTER_WEAPON_TYPES } from '../../shared/data/weaponTypes.js';
 import { hash32, rng } from '../../shared/util.js';
 import { CITIES } from '../../shared/data/cities.js';
+import { grantFactors } from './morph.js';
 
 let uidc = Date.now() % 100000;
 export const uid = () => 'i' + (uidc++).toString(36) + Math.floor(Math.random() * 1e4).toString(36);
@@ -36,6 +37,7 @@ export function knownSkills(ch) {
   const m = ch.mastery[wt]?.lv || 0;
   for (const s of DATA.wtSkills.get(wt)) if (s.req.mastery <= m) out.push(s.id);
   if (w) out.push(w.skill.id);
+  for (const s of DATA.formSkills?.get(wt) || []) if (s.kind !== 'passive' && s.req.mastery <= m) out.push(s.id);
   for (const s of DATA.levelSkills) if (s.req.level <= ch.level) out.push(s.id);
   const j = DATA.jobs.get(ch.job); if (j) out.push(j.active.id);
   for (const [id, v] of Object.entries(ch.spells || {})) if (v.stage >= 4) out.push(id); // learned lost spells
@@ -56,7 +58,7 @@ export function grantXp(ch, n, notify) {
 export function grantMastery(ch, wt, n, notify) {
   const m = ch.mastery[wt] ||= { lv: 1, xp: 0 }; if (m.lv >= MAX_MASTERY) return;
   m.xp += n;
-  while (m.lv < MAX_MASTERY && m.xp >= masteryXpToNext(m.lv)) { m.xp -= masteryXpToNext(m.lv); m.lv++; const s = DATA.wtSkills.get(wt)[m.lv - 1]; notify?.({ t: 'mastery', wt, lv: m.lv, n: s?.name });
+  while (m.lv < MAX_MASTERY && m.xp >= masteryXpToNext(m.lv)) { m.xp -= masteryXpToNext(m.lv); m.lv++; if (m.lv === 10) grantFactors(ch, v => notify?.({ t: 'msg', v })); const s = DATA.wtSkills.get(wt)[m.lv - 1]; notify?.({ t: 'mastery', wt, lv: m.lv, n: s?.name });
     const ms = MASTERY_MILESTONES.find(x => x.lv === m.lv); if (ms) { const title = masteryTitle(wt, m.lv); if (ms.title && !ch.progress.titles.includes(title)) { ch.progress.titles.push(title); notify?.({ t: 'title', v: title }); } if (ms.msg) notify?.({ t: 'msg', v: `${WT_BY_ID[wt].name}熟練度${m.lv}：${ms.msg}` }); } }
 }
 // ── weapon mastery milestones (titles + unlocked techniques; techniques are resolved in actor.heavy)

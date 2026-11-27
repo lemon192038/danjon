@@ -201,6 +201,8 @@ export function weaponSprite(vis, rarCol) {
     case 'floatblades': { for (let k = 0; k < 3; k++) px(6 + k * 5, cy - 6 + k * 5, 4, 1, col); break; }
     case 'umbrella': { px(0, cy - 1, 16, 1, '#5a3a22'); for (let i = 0; i < 8; i++) px(14 - i, cy - 6 + i * 0.2 | 0, 1, 12 - i * 1.4 | 0, i % 2 ? col : shade(col, 1.3)); break; }
     case 'lute': { g.fillStyle = col; g.beginPath(); g.ellipse(6, cy, 5, 4, 0, 0, 7); g.fill(); px(10, cy - 1, 10, 2, shade(col, 0.6)); px(5, cy - 1, 2, 2, '#2a1a0a'); break; }
+    case 'core': { const gl = vis.glow || col; px(0, cy - 1, 6, 2, '#5a4a3a'); g.fillStyle = col; g.beginPath(); g.arc(11, cy, 5, 0, 7); g.fill(); g.fillStyle = shade(col, 1.5); g.fillRect(9, cy - 3, 2, 2);
+      g.strokeStyle = gl; g.lineWidth = 1; g.beginPath(); g.arc(11, cy, 7, 0.3, 5.9); g.stroke(); for (let i = 0; i < 4; i++) px(17 + i * 3, cy - 1 + (i % 2 ? 2 : -2), 2, 2, gl); break; }
     case 'key': { px(0, cy - 3, 6, 6, col); px(2, cy - 1, 2, 2, '#0008'); px(6, cy - 1, 14, 2, col); px(16, cy + 1, 2, 3, col); px(19, cy + 1, 1, 4, col); break; }
     default: px(0, cy - 1, 14, 2, col);
   }

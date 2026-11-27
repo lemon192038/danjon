@@ -7,6 +7,7 @@ import { vfxProfile, motifParticles, drawMotifParticle } from './vfx.js';
 import { drawMagicCircle } from './circles.js';
 import { identWeapon, drawWielder, drawBody, isBody } from './identity.js';
 import { MOTION, motionAngle, motionExt } from './motion.js';
+import { morphOf, drawFull, drawPartial, transitionAlpha } from './morphs.js';
 
 const TAU = Math.PI * 2;
 const ec = e => ELEMENT_COLORS[e] || '#fff';
@@ -63,6 +64,8 @@ export class Renderer {
         if (kind === 'melody') this.texts.push({ x: f.x, y: f.y - 30, v: { heal: '♪癒', beat: '♫響', wind: '♪風', hex: '♩呪', war: '♬鼓舞', ward: '♪守' }[sub] || '♪', skill: 1, e: 'holy', col, t0: now });
         if (kind === 'spirit') this.fx.push({ k: 'mc', x: f.x, y: f.y, mc: 'mc_pact_summon', r: 14, t0: now, dur: 500 });
         break; }
+      case 'morph': { const e = E(f.id); if (e) { if (f.v === 'sig' || f.v === 'rewind') { this.fx.push({ k: 'ring', x: e.x, y: e.y, r: 60, e: f.v === 'rewind' ? 'void' : 'holy', t0: now, dur: 400 }); for (let i = 0; i < 16; i++) this.part(e.x, e.y - 10, '#ffffff', 80, 400); }
+        if (f.v === 'up' || f.v === 'down') this.texts.push({ x: e.x, y: e.y - 34, v: ['解除', '部分変身', '半変身', '完全変身'][f.st], skill: 1, e: 'holy', t0: now }); } break; }
       case 'mode': { const e = E(f.id); if (e) this.texts.push({ x: e.x, y: e.y - 26, v: f.v, skill: 1, e: f.e || 'holy', t0: now }); break; }
       case 'die': { const e = E(f.id); if (e) { e.dieAt = now; for (let i = 0; i < 20; i++) this.part(e.x, e.y, e.d.kind === 'monster' ? '#c0c0c0' : '#ff6060', 60, 600); } break; }
       case 'phase': { const e = E(f.id); if (e) { this.texts.push({ x: e.x, y: e.y - 40, v: f.v === 'rage' ? '激昂！' : f.v === 'rebirth' ? '再誕！' : `PHASE ${f.v}`, skill: 1, e: 'fire', t0: now, big: 1 }); this.ring(e.x, e.y, 80, 'fire'); this.shake = 8; } break; }
@@ -168,9 +171,14 @@ export class Renderer {
       const drawW = () => { if (!wt) return; const wsp = d.wl ? identWeapon(weaponSprite(wt.vis, wcol), d.wl, e.flags & 4096, wcol) : weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); const MP = MOTION[d.wv]; const atkOn = e.atk && now - e.atk.t0 < e.atk.dur;
         if (MP?.trail && atkOn) for (let k = 1; k <= MP.trail; k++) { g.save(); g.globalAlpha *= 0.28 / k; g.translate(flip ? -3 : 3, -9); g.rotate(this.weaponAngle(e, now - k * 28, wt)); g.drawImage(wsp, -2 + this.weaponExt(e, now - k * 28), -12); g.restore(); }
         g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); if (MP?.glow && atkOn) { g.shadowColor = MP.glow; g.shadowBlur = 8; } g.drawImage(wsp, -2 + ext, -12); if (MP?.ghost && atkOn) { g.globalAlpha *= 0.3; g.drawImage(wsp, 2 + ext, -15); } g.restore(); };
+      const MM = morphOf(d, e.flags); if (MM && e.mSt !== MM.st) { if (e.mSt != null) { e.mTrans = { from: e.mSt, to: MM.st, t0: now }; for (let k = 0; k < 26; k++) this.part(x, y - 10, k % 2 ? MM.sp.col : '#ffffff', 70, 550, true); } e.mSt = MM.st; }
+      const TR = MM && transitionAlpha(e, now); const fullA = MM ? (MM.st === 3 ? (TR && TR.from !== 3 ? TR.p : 1) : (TR && TR.from === 3 ? 1 - TR.p : 0)) : 0; const humanA = 1 - fullA;
+      if (fullA > 0) { g.save(); g.globalAlpha *= fullA; if (Math.cos(e.facing) < 0) g.scale(-1, 1); const sc = TR ? 0.55 + 0.45 * (TR.to === 3 ? TR.p : 1 - TR.p) : 1; g.scale(sc, sc); if (e.dodgeAt && now - e.dodgeAt < 250) g.scale(1.25, 0.8); if (e.flags & 16) g.translate(-3, 0);
+        drawFull(g, MM, e, now, d.fac); if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(-30, -50, 60, 55); } g.restore(); }
+      const ga0 = g.globalAlpha; if (humanA > 0.01) { g.globalAlpha *= humanA;
       if (dir === 1) drawW();
       g.save(); if (flip) g.scale(-1, 1); if (e.dodgeAt && now - e.dodgeAt < 250) { g.rotate((now - e.dodgeAt) / 250 * TAU * (flip ? -1 : 1) * 0.5); }
-      g.drawImage(spr, -8, -22); if (d.mask && dir !== 1) { g.fillStyle = '#efe8d8'; g.fillRect(-5, -18, 10, 4); g.fillStyle = '#1a1a1a'; g.fillRect(-3, -17, 2, 1); g.fillRect(1, -17, 2, 1); } if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
+      g.drawImage(spr, -8, -22); if (MM && MM.st >= 1 && MM.st <= 2) drawPartial(g, MM, MM.st); if (d.mask && dir !== 1) { g.fillStyle = '#efe8d8'; g.fillRect(-5, -18, 10, 4); g.fillStyle = '#1a1a1a'; g.fillRect(-3, -17, 2, 1); g.fillRect(1, -17, 2, 1); } if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
       if (dir !== 1) drawW();
       if (d.wl) drawWielder(g, d.wl, e.flags, now);
       if (e.flags & 4) { g.strokeStyle = 'rgba(140,200,255,.8)'; g.beginPath(); g.arc(Math.cos(e.facing) * 6, Math.sin(e.facing) * 6 - 8, 9, e.facing - 1, e.facing + 1); g.stroke(); }
@@ -178,6 +186,7 @@ export class Renderer {
       if (e.cast && now - e.cast.t0 < e.cast.dur) { const pv = e.cast.pv, p = (now - e.cast.t0) / e.cast.dur; g.globalAlpha = 0.6 * (1 - p); g.strokeStyle = pv.c1; g.beginPath(); g.arc(0, -10, 8 + p * 8, 0, TAU); g.stroke(); g.globalAlpha = 1; g.fillStyle = pv.c2; for (let i = 0; i < 3; i++) { const an = now / 90 + i * 2.1; g.fillRect(Math.cos(an) * 9, -10 + Math.sin(an) * 5 - p * 8, 1, 1); } }
       if (e.ench) { g.globalAlpha = 0.5; g.fillStyle = ec(e.ench); for (let i = 0; i < 2; i++) g.fillRect(Math.cos(now / 100 + i * 3) * 8, -10 + Math.sin(now / 130 + i) * 6, 1, 1); }
       if (e.flags & 1024) { g.globalAlpha = 0.7; g.fillStyle = '#fff'; g.fillRect(-10, -16 + Math.sin(now / 100) * 2, 4, 2); g.fillRect(6, -16 + Math.sin(now / 100) * 2, 4, 2); }
+      g.globalAlpha = ga0; }
       g.restore();
     }
     if (e.flags & 64) { g.strokeStyle = 'rgba(120,180,255,.7)'; g.beginPath(); g.arc(x, y - 8, (d.r || 6) + 6, 0, TAU); g.stroke(); }

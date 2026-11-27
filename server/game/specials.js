@@ -1,6 +1,7 @@
 // Weapon-type special actions (right click / ◆ button). One handler per special type; params come from weaponTypes data.
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { puppetPress } from './mechanics.js';
+import { MORPH_SPECIAL, morphKill } from './morph.js';
 import { dealDamage } from './combat.js';
 const opt = (m, x = {}) => ({ m, st: 3, ...x });
 const ready = (a, now, cd) => { if ((a.spCd || 0) > now) return false; a.spCd = now + cd; return true; };
@@ -98,6 +99,7 @@ export const SPECIALS = {
   umbrellaGuard: hold(0.7, { reflect: true }),
   rally: { press: (z, a, s, now) => { if (!ready(a, now, s.dur + 4000)) return; z.addArea({ owner: a, x: a.x, y: a.y, r: s.r, until: now + s.dur, tick: 500, next: now, opt: {}, e: { ally: 1, auraMods: { atk: s.atk, dr: s.def }, flag: 1 } }); } },
   song: { press: (z, a, s, now) => { if (!ready(a, now, 4000)) return; a.songIdx = ((a.songIdx ?? -1) + 1) % s.modes.length; const mode = s.modes[a.songIdx]; const mods = mode === 'atk' ? { atk: 0.2, aspd: 0.1 } : mode === 'def' ? { dr: 0.2 } : { regen: 0.01 }; z.areas = z.areas.filter(r => !(r.owner === a && r.song)); z.addArea({ owner: a, x: a.x, y: a.y, r: s.r, until: now + s.dur, tick: 500, next: now, song: 1, follow: a, opt: {}, e: { ally: 1, auraMods: mods } }); z.fx({ t: 'mode', id: a.id, v: { atk: '勇壮の旋律', def: '守護の旋律', heal: '癒しの旋律' }[mode] }); } },
+  morph: MORPH_SPECIAL,
   puppet: { press: (z, a, s, now) => { if (!ready(a, now, 3000)) return; puppetPress(z, a, s, now); } },
   divineJudgment: { press: (z, a, s, now) => ready(a, now, 6000) && execEffects(z, a, [{ t: 'barrage', n: 1, r: s.r, spread: 0, delay: s.delay, m: s.m, el: 'holy', status: ['stun', 0.6, 1500], st: 8 }], { tx: a.aimX, ty: a.aimY }, now) },
   demonForm: { press: (z, a, s, now) => { if (!ready(a, now, s.dur + 10000)) return; a.demonUntil = now + s.dur; buff(a, { atk: s.dmg, ls: 0.08, range: 0.4, aspd: 0.2 }, s.dur); z.fx({ t: 'buff', id: a.id, e: 'dark' }); } },
@@ -123,4 +125,4 @@ export function onHitHook(z, a) {
   if (t === 'chi') setG(a, 'chi', Math.min(a.wt.special.max, gauge(a, 'chi') + 0.34));
   if (t === 'tempo') { setG(a, 'tempo', Math.min(a.wt.special.max, gauge(a, 'tempo') + 1)); a.tempoUntil = z.now + 1500; }
 }
-export function onKillHook(z, a) { if (a.wt?.special.type === 'soulHarvest') setG(a, 'soul', Math.min(a.wt.special.max, gauge(a, 'soul') + 1)); }
+export function onKillHook(z, a) { morphKill(z, a); if (a.wt?.special.type === 'soulHarvest') setG(a, 'soul', Math.min(a.wt.special.max, gauge(a, 'soul') + 1)); }

@@ -9,6 +9,7 @@ import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { makeMonster, makeBoss, monsterTick } from './monsters.js';
 import { onHitHook, onKillHook } from './specials.js';
 import { summonTick as bodyTick, onProjHit } from './mechanics.js';
+import { morphTick } from './morph.js';
 import { SUMMON_BODIES } from '../../shared/data/identity.js';
 import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
@@ -258,6 +259,7 @@ export class Zone {
     if (a.kind === 'player' || a.kind === 'npc') this.tileEffects(a, now);
   }
   playerTick(p, now) {
+    if (p.wt?.morph) morphTick(this, p, now);
     const inp = p.input || {};
     if (p.aimX != null && (!p.action || p.action.type === 'attack' || p.action.type === 'aim' || p.action.type === 'charge' || p.action.type === 'channel' || p.action.type === 'guard' || p.action.type === 'iai' || p.action.type === 'breath' || p.action.type === 'drill' || p.action.type === 'barrage')) {
       const lock = p.autoAim && p.action?.type === 'attack' ? p.lockTarget(this, false) : null;
@@ -396,7 +398,7 @@ export class Zone {
     for (const a of this.actors.values()) {
       if (Math.abs(a.x - vx) > R || Math.abs(a.y - vy) > R) continue;
       let flags = 0; const n = this.now;
-      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048; if (a.altMode) flags |= 4096; if (a.core) flags |= Math.min(7, a.core) << 13;
+      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048; if (a.altMode) flags |= 4096; if (a.core) flags |= Math.min(7, a.core) << 13; if (a.morph && a.wt?.morph) flags |= ((a.morph.stage & 3) << 16) | ((a.morphSi || 0) & 7) << 18 | ((a.wt.id - 86) & 31) << 21;
       const sts = Object.keys(a.statuses).join(',');
       ents.push([a.id, Math.round(a.x), Math.round(a.y), +a.facing.toFixed(2), Math.round(a.hp / a.maxHp * 1000), flags, sts, a.action?.type || '', a.enchant?.until > n ? a.enchant.el : '']);
       if (!viewer.known.has(a.id)) { viewer.known.add(a.id); full.push(this.describe(a)); }
@@ -408,7 +410,7 @@ export class Zone {
   }
   describe(a) {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
-    if (a.kind === 'player' || a.kind === 'npc' || a.kind === 'duelist') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; const I = a.weapon?.ident; if (I) { d.wv = I.variant; d.wl = I.look; } }
+    if (a.kind === 'player' || a.kind === 'npc' || a.kind === 'duelist') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; const I = a.weapon?.ident; if (I) { d.wv = I.variant; d.wl = I.look; } if (a.wt?.morph && a.ch?.progress.morph) d.fac = Object.values(a.ch.progress.morph.build || {}); }
     else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; if (a.faction) d.fac = a.faction; }
     else if (a.kind === 'resident' || a.kind === 'slumnpc') { d.look = a.look; d.job = a.job; if (a.faction) d.fac = a.faction; }
     if (this.masq && (a.kind === 'player' || a.kind === 'duelist')) { d.name = '仮面の闘士'; d.look = { ...d.look, outfit: 5, hairColor: 9 }; d.mask = 1; d.job = null; } // identities hidden, appearance unified

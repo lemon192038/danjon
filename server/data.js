@@ -20,6 +20,7 @@ for (const wt of WEAPON_TYPES) {
   DATA.wtSkills.set(wt.id, d.skills); DATA.wtWeapons.set(wt.id, d.weapons);
   for (const s of d.skills) DATA.skills.set(s.id, s);
   for (const w of d.weapons) { DATA.weapons.set(w.id, w); DATA.skills.set(w.skill.id, w.skill); }
+  if (d.formSkills) { DATA.formSkills ||= new Map(); DATA.formSkills.set(wt.id, d.formSkills); for (const s of d.formSkills) DATA.skills.set(s.id, s); }
 }
 DATA.jobList = J('jobs.json');
 for (const j of DATA.jobList) { DATA.jobs.set(j.id, j); DATA.skills.set(j.active.id, j.active); }
