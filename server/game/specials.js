@@ -1,5 +1,6 @@
 // Weapon-type special actions (right click / ◆ button). One handler per special type; params come from weaponTypes data.
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
+import { puppetPress } from './mechanics.js';
 import { dealDamage } from './combat.js';
 const opt = (m, x = {}) => ({ m, st: 3, ...x });
 const ready = (a, now, cd) => { if ((a.spCd || 0) > now) return false; a.spCd = now + cd; return true; };
@@ -97,7 +98,7 @@ export const SPECIALS = {
   umbrellaGuard: hold(0.7, { reflect: true }),
   rally: { press: (z, a, s, now) => { if (!ready(a, now, s.dur + 4000)) return; z.addArea({ owner: a, x: a.x, y: a.y, r: s.r, until: now + s.dur, tick: 500, next: now, opt: {}, e: { ally: 1, auraMods: { atk: s.atk, dr: s.def }, flag: 1 } }); } },
   song: { press: (z, a, s, now) => { if (!ready(a, now, 4000)) return; a.songIdx = ((a.songIdx ?? -1) + 1) % s.modes.length; const mode = s.modes[a.songIdx]; const mods = mode === 'atk' ? { atk: 0.2, aspd: 0.1 } : mode === 'def' ? { dr: 0.2 } : { regen: 0.01 }; z.areas = z.areas.filter(r => !(r.owner === a && r.song)); z.addArea({ owner: a, x: a.x, y: a.y, r: s.r, until: now + s.dur, tick: 500, next: now, song: 1, follow: a, opt: {}, e: { ally: 1, auraMods: mods } }); z.fx({ t: 'mode', id: a.id, v: { atk: '勇壮の旋律', def: '守護の旋律', heal: '癒しの旋律' }[mode] }); } },
-  puppet: { press: (z, a, s, now) => { if (!ready(a, now, 3000)) return; const mine = z.actorsList().filter(x => x.kind === 'summon' && x.ownerId === a.id && x.sumKind === 'puppet'); if (mine.length >= s.max) mine[0].dead = true; z.spawnSummon(a, 'puppet', s.dur, s.m); } },
+  puppet: { press: (z, a, s, now) => { if (!ready(a, now, 3000)) return; puppetPress(z, a, s, now); } },
   divineJudgment: { press: (z, a, s, now) => ready(a, now, 6000) && execEffects(z, a, [{ t: 'barrage', n: 1, r: s.r, spread: 0, delay: s.delay, m: s.m, el: 'holy', status: ['stun', 0.6, 1500], st: 8 }], { tx: a.aimX, ty: a.aimY }, now) },
   demonForm: { press: (z, a, s, now) => { if (!ready(a, now, s.dur + 10000)) return; a.demonUntil = now + s.dur; buff(a, { atk: s.dmg, ls: 0.08, range: 0.4, aspd: 0.2 }, s.dur); z.fx({ t: 'buff', id: a.id, e: 'dark' }); } },
   dragonBreath: { press: (z, a, s, now) => { if (!ready(a, now, 6000)) return; a.action = { type: 'breath', until: now + s.dur, moveMul: 0.3 }; for (let t = 0; t < s.dur; t += 150) z.schedule(now + t, () => meleeHit(z, a, { s: 'arc', r: s.l, a: s.a }, opt(s.m, { el: 'fire', status: ['burn', 0.3, 3000], st: 1 }), z.now)); buff(a, { dr: 0.2 }, s.dur + 3000); } },
@@ -116,6 +117,7 @@ export function onAttackHook(z, a) {
   if (t === 'heatVent') { const h = gauge(a, 'heat') + 18; setG(a, 'heat', Math.min(100, h)); if (h >= 100) { a.staggerUntil = z.now + 900; setG(a, 'heat', 40); z.fx({ t: 'steam', id: a.id }); } }
   if (t === 'spellChain') setG(a, 'chain', Math.min(a.wt.special.max, gauge(a, 'chain') + 1));
 }
+// puppet special: weapon identity decides which puppet body is summoned (see mechanics.js)
 export function onHitHook(z, a) {
   const t = a.wt.special.type;
   if (t === 'chi') setG(a, 'chi', Math.min(a.wt.special.max, gauge(a, 'chi') + 0.34));

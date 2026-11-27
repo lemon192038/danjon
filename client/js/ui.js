@@ -5,6 +5,7 @@ import { STAT_NAMES, STATS, RARITIES, ELEMENT_NAMES, ELEMENT_COLORS, DIFFICULTIE
 import { describeSkill, modsText, SRC_NAMES, ACQ_NAMES, unlockText } from '/shared/skillText.js';
 import { xpToNext, masteryXpToNext, jobXpToNext, enhanceCost, armorDef } from '/shared/formulas.js';
 import { weaponSprite } from './sprites.js';
+import { circleName } from '/shared/data/circles.js';
 import { sfx } from './sfx.js';
 import { Tutorial } from './tutorial.js';
 import { installCity } from './uicity.js';
@@ -203,7 +204,8 @@ export class UI {
       <p>攻撃力 <b>${w.atk}</b> ・ 会心 ${pct(w.crit)} ・ 攻速 ${pct(w.spd)}${w.el ? ` ・ <span style="color:${ELEMENT_COLORS[w.el]}">${ELEMENT_NAMES[w.el]}属性</span>` : ''}</p>
       <p>能力補正: ${Object.entries(w.stats).map(([k, v]) => `${STAT_NAMES[k]}+${v}`).join(' ')}</p>
       <h4>武器特性${it?.traits ? ' <small class="good">（祭壇で変更済み）</small>' : ''}</h4>${(it?.traits || w.traits).map(t => `<p>◆ ${esc(t.name)}: ${esc(modsText(t.mods))}</p>`).join('') || '<p class="dim">なし</p>'}
-      <h4>固有スキル「${esc(w.skill.name)}」</h4><p>${esc(describeSkill(w.skill))}</p><p class="dim">SP${w.skill.cost} ・ CD${w.skill.cd / 1000}秒${w.skill.cast ? ` ・ 詠唱${w.skill.cast}ms` : ''}</p>
+      ${w.ident ? `<h4>武器の個性「${esc(w.ident.label)}」</h4><p>形状: ${esc(w.ident.silhouette)}</p><p>固有能力: ${esc(w.ident.ability)}</p><p>戦闘スタイル: ${esc(w.ident.style)}</p><p><span class="good">長所: ${esc(w.ident.pros)}</span><br><span class="bad">短所: ${esc(w.ident.cons)}</span></p>` : ''}
+      <h4>固有スキル「${esc(w.skill.name)}」</h4><p>${esc(describeSkill(w.skill))}</p>${w.skill.target ? `<p class="dim"><small>対象: ${esc(w.skill.target)} ／ 制限: ${esc(w.skill.limit)}${w.skill.circle ? ` ／ 魔法陣: ${esc(circleName(w.skill.circle))}${w.skill.circle2 ? '＋' + esc(circleName(w.skill.circle2)) : ''}` : ''}</small></p>` : ''}<p class="dim">SP${w.skill.cost} ・ CD${w.skill.cd / 1000}秒${w.skill.cast ? ` ・ 詠唱${w.skill.cast}ms` : ''}</p>
       <h4>入手方法</h4><p>${ACQ_NAMES[w.acq.src] || w.acq.src}（${w.acq.diff}以上・${w.acq.minFloor}階〜） ・ 売値目安 ${Math.round(w.price * 0.3).toLocaleString()}G</p>`;
   }
   p_status() {

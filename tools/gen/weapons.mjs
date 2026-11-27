@@ -1,6 +1,8 @@
 // Individual weapon generator (100 per type). Each weapon: rarity, stats, unique skill, passive trait, acquisition.
 import { K, elementOf, statusOf } from './keywords.mjs';
 import { hash32, rng } from '../../shared/util.js';
+import { IDENTITY, variantOf } from '../../shared/data/identity.js';
+import { circleFor } from '../../shared/data/circles.js';
 const r2 = v => Math.round(v * 100) / 100;
 
 export const SIGNATURES = {
@@ -120,9 +122,24 @@ export function buildWeapon(name, wt, i) {
   for (const t of traits) if (t.key === 'elemDmg') t.name = `${ELN[el]}威力上昇`;
   const sub = {}; // stat bonuses
   for (const s of wt.good) sub[s] = Math.round((2 + lvl * 0.12) * (1 + pw * 0.3));
-  return {
+  const w = {
     id: `${wt.id}_${String(i + 1).padStart(3, '0')}`, name, wt: wt.id, idx: i, rar, lvl, atk, el, stats: sub, traits, skill,
     spd: r2(0.95 + r() * 0.1), crit: r2(0.02 + (wt.key === 'rapier' || wt.key === 'katana' ? 0.05 : 0) + pw * 0.01), acq: acquisition(wt, i, rar, r),
     price: Math.round(atk * 12 * [0, 1, 2, 5, 12, 30, 80][rar]),
   };
+  applyIdentity(w, m, el, status);
+  return w;
+}
+// WEAPON IDENTITY: the weapon's variant decides its structure, mechanic, trade-offs and its unique skill (name = effect).
+// Stats, name and acquisition stay as they were; only the unique skill's effect/name follow the weapon's identity.
+function applyIdentity(w, m, el, status) {
+  const V = variantOf(w); if (!V) return; const T = IDENTITY[w.wt]; const seed = hash32(w.id);
+  w.ident = { model: `wt${w.wt}_${V.key}`, variant: V.key, label: V.label, silhouette: V.sil, look: { ...V.look, seed: seed % 1000 }, mechanic: V.mech, ability: V.ability, style: V.style, pros: V.pros, cons: V.cons,
+    mods: V.mods || null, anim: `anim_${w.wt}_${V.key}`, fx: `fx_${T.theme}_${V.key}`, sound: `snd_${T.theme}_${V.key}` };
+  const S = V.skill; const eff = S.eff(m, el, status); for (const e of eff) if (el && !e.el && (e.t === 'hit' || e.t === 'barrage')) e.el = el;
+  Object.assign(w.skill, { name: S.name, sig: 'ident', eff, kind: S.cat, cat: S.cat, activation: '武器固有スキル（スロットに設定して使用）', actual: V.ability, target: S.target, limit: S.limit, anim: w.ident.anim, fx: w.ident.fx, sound: w.ident.sound });
+  // outer circle = what the skill does (effect × element), inner circle = the weapon's own theme
+  const at = eff.some(e => e.t === 'heal' || e.heal) ? 'heal' : eff.some(e => e.t === 'shield') ? 'guard' : eff.some(e => e.t === 'cmd' || e.t === 'summon') ? 'summon' : (el || 'phys');
+  const outer = circleFor({ ...w.skill, circle: null }); w.skill.circle = eff.some(e => e.t === 'cmd') ? `mc_${['volley', 'chain'].includes(eff[0].c) ? 'multisummon' : eff[0].c === 'formation' ? 'tiered' : eff[0].c === 'swap' ? 'fold' : eff[0].c === 'coreBurst' ? 'crystal' : eff[0].c === 'orbitStorm' ? 'chainlink' : eff[0].c === 'slam' ? 'gravity' : 'puppet'}_${at}` : outer;
+  w.skill.circle2 = `mc_${T.theme}_${at}`;
 }

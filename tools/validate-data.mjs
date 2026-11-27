@@ -1,7 +1,7 @@
 // Validates generated data against the unified skill/effect schema.
 import fs from 'node:fs';
 import { WEAPON_TYPES } from '../shared/data/weaponTypes.js';
-const EFF = new Set(['hit', 'dash', 'blink', 'buff', 'counter', 'shield', 'heal', 'zone', 'barrage', 'summon', 'enchant', 'cleanse', 'aura', 'leap', 'taunt', 'passive']);
+const EFF = new Set(['cmd', 'hit', 'dash', 'blink', 'buff', 'counter', 'shield', 'heal', 'zone', 'barrage', 'summon', 'enchant', 'cleanse', 'aura', 'leap', 'taunt', 'passive']);
 const SHAPES = new Set(['arc', 'thrust', 'circle', 'proj', 'beam', 'slam', 'chain', 'whip']);
 const errs = []; const ids = new Set();
 const chk = (sk, where) => {

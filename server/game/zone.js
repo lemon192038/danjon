@@ -8,6 +8,8 @@ import { dealDamage, applyStatus } from './combat.js';
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { makeMonster, makeBoss, monsterTick } from './monsters.js';
 import { onHitHook, onKillHook } from './specials.js';
+import { summonTick as bodyTick, onProjHit } from './mechanics.js';
+import { SUMMON_BODIES } from '../../shared/data/identity.js';
 import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
 import { rollLoot } from './progress.js';
@@ -24,6 +26,7 @@ const SUMMON_DEF = {
   spirit: { name: '精霊', hp: 0.3, ai: 'ranged', r: 5 }, turret: { name: '自動砲台', hp: 0.4, ai: 'turret', r: 7 }, skeleton: { name: '骸骨兵', hp: 0.3, ai: 'melee', r: 6 },
   beast: { name: '魔獣', hp: 0.6, ai: 'melee', r: 8 }, puppet: { name: '操り人形', hp: 0.5, ai: 'melee', r: 6, taunt: true }, tome: { name: '浮遊魔導書', hp: 0.2, ai: 'ranged', r: 5 },
 };
+for (const [k, B] of Object.entries(SUMMON_BODIES)) SUMMON_DEF[k] = { name: B.name, hp: B.hp, ai: B.ai, r: B.r, taunt: !!B.taunt, dr: B.dr || 0, move: B.move || 1, fly: !!B.fly };
 
 export class Zone {
   constructor(world, id, opts) {
@@ -142,7 +145,7 @@ export class Zone {
   spawnSummon(owner, kind, dur, pw, el) {
     const D = SUMMON_DEF[kind] || SUMMON_DEF.familiar;
     const s = new Actor({ kind: 'summon', team: owner.team, sumKind: kind, name: D.name, ownerId: owner.ownerId || owner.id, owner, until: this.now + dur, x: owner.x + (Math.random() - 0.5) * 30, y: owner.y + (Math.random() - 0.5) * 30, r: D.r, sai: D.ai,
-      stats: { atk: (owner.stats.matk > owner.stats.atk ? owner.stats.matk : owner.stats.atk) * pw * 2, matk: 0, def: owner.stats.def * 0.5, crit: owner.stats.crit, critDmg: owner.stats.critDmg, dr: 0, mods: {}, range: 1, move: 1.1 },
+      stats: { atk: (owner.stats.matk > owner.stats.atk ? owner.stats.matk : owner.stats.atk) * pw * 2, matk: 0, def: owner.stats.def * 0.5, crit: owner.stats.crit, critDmg: owner.stats.critDmg, dr: D.dr || 0, mods: {}, range: 1, move: 1.1 * (D.move || 1) },
       maxHp: Math.round(owner.maxHp * D.hp), weaponEl: el || owner.weaponEl, visKey: owner.visKey, atkCd: 0, taunt: D.taunt, look: D.copy ? owner.look : null, level: owner.level });
     s.hp = s.maxHp; if (this.blocked(s.x, s.y)) { s.x = owner.x; s.y = owner.y; }
     if (D.taunt) s.tauntUntil = s.until;
@@ -275,6 +278,7 @@ export class Zone {
   summonTick(s, now) {
     const owner = this.actors.get(s.ownerId);
     if (!s.canAct(now)) { s.vx = s.vy = 0; return; }
+    if (bodyTick(this, s, now)) return;
     const t = this.nearestEnemy(s, 220);
     if (!t) { if (owner && Math.hypot(owner.x - s.x, owner.y - s.y) > 40) { const a = Math.atan2(owner.y - s.y, owner.x - s.x); s.vx = Math.cos(a) * 90; s.vy = Math.sin(a) * 90; } else s.vx = s.vy = 0; return; }
     const d = Math.hypot(t.x - s.x, t.y - s.y), ang = Math.atan2(t.y - s.y, t.x - s.x); s.facing = ang;
@@ -370,7 +374,7 @@ export class Zone {
         p.hits.add(t.id);
         const res = p.aoe ? 0 : dealDamage(this, p.owner, t, { ...p.opt, ang: Math.atan2(p.vy, p.vx) }, now);
         if (res === -1) { p.owner = t; p.vx = -p.vx; p.vy = -p.vy; p.hits.clear(); p.travelled = 0; break; }
-        if (p.owner.wt && res > 0) onHitHook(this, p.owner);
+        if (p.owner.wt && res > 0) { onHitHook(this, p.owner); onProjHit(this, p.owner, t, now, p); }
         if (p.aoe) { end = true; break; }
         if (p.chain > 0) { p.chain--; const n = this.enemiesOf(p.owner).filter(o => !p.hits.has(o.id) && Math.hypot(o.x - p.x, o.y - p.y) < 130).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; if (n) { const sp = Math.hypot(p.vx, p.vy); const ang = Math.atan2(n.y - p.y, n.x - p.x); p.vx = Math.cos(ang) * sp; p.vy = Math.sin(ang) * sp; p.travelled = 0; this.fx({ t: 'bolt', x: Math.round(n.x), y: Math.round(n.y), e: p.opt.el || 'thunder' }); continue; } }
         if (p.pierce > 0) { p.pierce--; continue; }
@@ -392,7 +396,7 @@ export class Zone {
     for (const a of this.actors.values()) {
       if (Math.abs(a.x - vx) > R || Math.abs(a.y - vy) > R) continue;
       let flags = 0; const n = this.now;
-      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048;
+      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048; if (a.altMode) flags |= 4096; if (a.core) flags |= Math.min(7, a.core) << 13;
       const sts = Object.keys(a.statuses).join(',');
       ents.push([a.id, Math.round(a.x), Math.round(a.y), +a.facing.toFixed(2), Math.round(a.hp / a.maxHp * 1000), flags, sts, a.action?.type || '', a.enchant?.until > n ? a.enchant.el : '']);
       if (!viewer.known.has(a.id)) { viewer.known.add(a.id); full.push(this.describe(a)); }
@@ -404,7 +408,7 @@ export class Zone {
   }
   describe(a) {
     const d = { id: a.id, kind: a.kind, name: a.name, lv: a.level, team: a.team, r: a.r };
-    if (a.kind === 'player' || a.kind === 'npc' || a.kind === 'duelist') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; }
+    if (a.kind === 'player' || a.kind === 'npc' || a.kind === 'duelist') { d.look = a.ch.look; d.wt = a.wt.id; d.wr = a.weapon?.rar || 1; d.job = a.ch.job; d.wn = a.weapon?.name; const I = a.weapon?.ident; if (I) { d.wv = I.variant; d.wl = I.look; } }
     else if (a.kind === 'monster') { d.sprite = a.sprite; d.fam = a.fam; d.el = a.el; d.boss = !!a.boss; d.elite = !!a.elite; d.affix = a.affixNames || null; if (a.faction) d.fac = a.faction; }
     else if (a.kind === 'resident' || a.kind === 'slumnpc') { d.look = a.look; d.job = a.job; if (a.faction) d.fac = a.faction; }
     if (this.masq && (a.kind === 'player' || a.kind === 'duelist')) { d.name = '仮面の闘士'; d.look = { ...d.look, outfit: 5, hairColor: 9 }; d.mask = 1; d.job = null; } // identities hidden, appearance unified

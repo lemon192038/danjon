@@ -1,5 +1,6 @@
 // Executes unified skill effect lists (weapon-type / unique weapon / level / job / monster abilities).
 import { dealDamage, inShape, isTip } from './combat.js';
+import { command } from './mechanics.js';
 import { ELEMENTS } from '../../shared/constants.js';
 
 const NEG = ['burn', 'freeze', 'shock', 'bleed', 'poison', 'stun', 'slow', 'curse', 'fear', 'bind', 'armorbreak', 'sleep', 'silence', 'stop'];
@@ -118,6 +119,7 @@ function execOne(zone, a, e, ctx, lvM, el, now) {
       }
       break;
     }
+    case 'cmd': command(zone, a, e, lvM, now); break;
     case 'summon': {
       const pw = (e.m || 0.4) * lvM * (1 + (a.stats.mods.summonPower || 0));
       for (let i = 0; i < (e.n || 1); i++) zone.spawnSummon(a, e.kind, e.dur, pw, e.el);

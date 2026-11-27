@@ -4,6 +4,8 @@ import { renderTileMap, charSprite, weaponSprite, monsterSprite, PALETTES, T, EL
 import { ELEMENT_COLORS, RARITIES, STATUS } from '/shared/constants.js';
 import { WT_BY_ID } from '/shared/data/weaponTypes.js';
 import { vfxProfile, motifParticles, drawMotifParticle } from './vfx.js';
+import { drawMagicCircle } from './circles.js';
+import { identWeapon, drawWielder, drawBody, isBody } from './identity.js';
 
 const TAU = Math.PI * 2;
 const ec = e => ELEMENT_COLORS[e] || '#fff';
@@ -45,7 +47,7 @@ export class Renderer {
       case 'dmg': if (this.settings.dmgNumbers || f.a) this.texts.push({ x: f.x + (Math.random() - 0.5) * 10, y: f.y, v: f.v, c: f.c, e: f.e, h: f.h, a: f.a, dot: f.dot, t0: now }); { const e = [...ents.values()].find(e => Math.abs(e.x - f.x) < 14 && Math.abs(e.y - 10 - f.y) < 14); if (e && !f.h) e.flash = now; } if (!f.h && !f.dot) for (let i = 0; i < (f.c ? 10 : 4); i++) this.part(f.x, f.y + 6, f.c ? '#ffe060' : ec(f.e), 50, 250); break;
       case 'atk': { const e = E(f.id); if (e) e.atk = { t0: now, dur: f.d, step: f.s, sh: f.sh }; break; }
       case 'dodge': { const e = E(f.id); if (e) e.dodgeAt = now; break; }
-      case 'skill': { const e = E(f.id); if (e) { const pv = vfxProfile(f.sid || f.n, f.e !== 'phys' ? f.e : null); this.texts.push({ x: e.x, y: e.y - 26, v: f.n, skill: 1, e: f.e, col: pv.c1, t0: now }); e.cast = { t0: now, dur: Math.max(380, f.c || 0), kind: f.k, pv }; this.fx.push({ k: 'sigil', follow: e, x: e.x, y: e.y, r: 18 + (f.c ? 10 : 0), pv, t0: now, dur: Math.max(500, (f.c || 0) + 300), under: 1 }); motifParticles(this, pv, e.x, e.y - 8, 16); } break; }
+      case 'skill': { const e = E(f.id); if (e) { const pv = vfxProfile(f.sid || f.n, f.e !== 'phys' ? f.e : null); this.texts.push({ x: e.x, y: e.y - 26, v: f.n, skill: 1, e: f.e, col: pv.c1, t0: now }); e.cast = { t0: now, dur: Math.max(380, f.c || 0), kind: f.k, pv }; this.fx.push({ k: 'sigil', follow: e, x: e.x, y: e.y, r: 18 + (f.c ? 10 : 0), pv, t0: now, dur: Math.max(500, (f.c || 0) + 300), under: 1, mc: f.c1, mc2: f.c2 }); motifParticles(this, pv, e.x, e.y - 8, 16); } break; }
       case 'parry': case 'counter': { const e = f.id ? E(f.id) : null; const x = e ? e.x : f.x, y = e ? e.y : f.y; this.fx.push({ k: 'flash', x, y, r: 26, e: 'holy', t0: now, dur: 200 }); for (let i = 0; i < 10; i++) this.part(x, y, '#fff', 70, 300); this.texts.push({ x, y: y - 20, v: f.t === 'parry' ? 'PARRY' : 'COUNTER', skill: 1, e: 'holy', t0: now }); break; }
       case 'charge': { const e = E(f.id); if (e) { this.fx.push({ k: 'tele', t: 'tele', s: 'circle', x: e.x, y: e.y, r: 26, d: f.d, e: 'fire', ally: 1, t0: now, dur: Math.max(120, f.d) }); this.texts.push({ x: e.x, y: e.y - 26, v: f.f ? '派生！' : '溜め', skill: 1, e: 'fire', t0: now }); } break; }
       case 'stagger': { const e = E(f.id); if (e) this.texts.push({ x: e.x, y: e.y - 22, v: 'BREAK', skill: 1, e: 'fire', t0: now }); break; }
@@ -53,6 +55,13 @@ export class Renderer {
       case 'heal': for (let i = 0; i < 18; i++) this.part(f.x + (Math.random() - 0.5) * f.r, f.y + (Math.random() - 0.5) * f.r, '#80ff90', 20, 800, true); break;
       case 'buff': case 'shield': { const e = E(f.id); if (e) for (let i = 0; i < 12; i++) this.part(e.x, e.y, f.t === 'shield' ? '#80c0ff' : ec(f.e || 'holy'), 25, 700, true); break; }
       case 'say': { const e = E(f.id); if (e) e.say = { v: f.v, t0: now }; break; }
+      case 'mc': { const e = E(f.id); if (e) this.fx.push({ k: 'mc', follow: e, x: e.x, y: e.y, mc: f.c, r: f.r || 14, t0: now, dur: f.d || 600 }); break; }
+      case 'mech': { const v = String(f.v), [kind, sub] = v.split(':'); const col = { wave: '#9ad8ff', split: '#c0c8d8', core: '#e080ff', deploy: '#a0a8b8', link: '#ffd060', orbit: '#d0d8e8', orbitHit: '#ffffff', crystal: '#a0e8ff', tip: '#ffe0a0', melody: '#fff0a0', spirit: '#a0ffd0', heal: '#80ffa0' }[kind] || '#fff';
+        const n = kind === 'core' || kind === 'deploy' ? 18 : 6; for (let i = 0; i < n; i++) this.part(f.x, f.y - 8, col, kind === 'core' ? 60 : 30, 400);
+        if (kind === 'core' || kind === 'deploy') this.fx.push({ k: 'ring', x: f.x, y: f.y, r: kind === 'core' ? 60 : 70, e: kind === 'core' ? 'dark' : 'phys', t0: now, dur: 350 });
+        if (kind === 'melody') this.texts.push({ x: f.x, y: f.y - 30, v: { heal: '♪癒', beat: '♫響', wind: '♪風', hex: '♩呪', war: '♬鼓舞', ward: '♪守' }[sub] || '♪', skill: 1, e: 'holy', col, t0: now });
+        if (kind === 'spirit') this.fx.push({ k: 'mc', x: f.x, y: f.y, mc: 'mc_pact_summon', r: 14, t0: now, dur: 500 });
+        break; }
       case 'mode': { const e = E(f.id); if (e) this.texts.push({ x: e.x, y: e.y - 26, v: f.v, skill: 1, e: f.e || 'holy', t0: now }); break; }
       case 'die': { const e = E(f.id); if (e) { e.dieAt = now; for (let i = 0; i < 20; i++) this.part(e.x, e.y, e.d.kind === 'monster' ? '#c0c0c0' : '#ff6060', 60, 600); } break; }
       case 'phase': { const e = E(f.id); if (e) { this.texts.push({ x: e.x, y: e.y - 40, v: f.v === 'rage' ? '激昂！' : f.v === 'rebirth' ? '再誕！' : `PHASE ${f.v}`, skill: 1, e: 'fire', t0: now, big: 1 }); this.ring(e.x, e.y, 80, 'fire'); this.shake = 8; } break; }
@@ -92,7 +101,7 @@ export class Renderer {
     }
     // ground fx: areas, telegraphs, drops
     for (const a of state.areas || []) this.drawArea(a, ox, oy, now);
-    for (const f of this.fx) if (f.k === 'tele') this.drawTele(f, ox, oy, now); else if (f.k === 'sigil' && f.under) this.drawSigil(f, ox, oy, now, 1 - Math.max(0, (now - f.t0) / f.dur - 0.6) / 0.4);
+    for (const f of this.fx) if (f.k === 'tele') this.drawTele(f, ox, oy, now); else if (f.k === 'sigil' && f.under) { if (f.mc) this.drawCircleFx(f, ox, oy, now); else this.drawSigil(f, ox, oy, now, 1 - Math.max(0, (now - f.t0) / f.dur - 0.6) / 0.4); } else if (f.k === 'mc') this.drawCircleFx(f, ox, oy, now);
     for (const d of state.drops || []) { const x = d[1] + ox, y = d[2] + oy + Math.sin(now / 300 + d[1]) * 1.5; if (d[3] === 'chest') { g.fillStyle = '#8a5a2a'; g.fillRect(x - 6, y - 5, 12, 9); g.fillStyle = '#e0c060'; g.fillRect(x - 6, y - 2, 12, 1); g.fillRect(x - 1, y - 2, 2, 3); } else { const col = d[3] === 'weapon' ? (RARITIES[d[4]]?.color || '#fff') : d[3] === 'armor' ? '#a0c0ff' : '#c0ff90'; g.fillStyle = col; g.fillRect(x - 2, y - 2, 4, 4); g.fillStyle = '#fff'; g.fillRect(x - 1, y - 2, 1, 1); g.globalAlpha = 0.25 + Math.sin(now / 200) * 0.15; g.fillRect(x - 1, y - 14, 2, 12); g.globalAlpha = 1; } }
     // entities sorted by y
     if (!this.staticNpcs || this.staticZone !== z) { this.staticZone = z; this.staticNpcs = (z.npcs || []).map((n, i) => ({ d: { kind: 'npc', name: n.name, look: { body: i % 3, skin: (i * 3) % 5, hair: i % 6, hairColor: (i * 7) % 10, outfit: (i * 3 + 1) % 10 }, r: 6, service: 1 }, x: n.x * 16 + 8, y: n.y * 16 + 8, facing: Math.PI / 2, seen: true, flags: 0, hp: 1000, svc: true })); }
@@ -145,8 +154,8 @@ export class Renderer {
       const sc = d.boss ? 2 : d.kind === 'summon' ? 0.75 : 1; const spr = d.kind === 'summon' ? monsterSprite({ sprite: { clone: 'spirit', familiar: 'spirit', golem: 'golem', spirit: 'spirit', turret: 'golem', skeleton: 'undead', beast: 'beast', puppet: 'humanoid', tome: 'eye' }[d.sk] || 'spirit', fam: d.sk, el: 'holy' }, Math.floor(now / 300) % 2) : monsterSprite(d, Math.floor(now / (300 - (moving ? 120 : 0))) % 2);
       g.translate(x, y + air); const flip = Math.cos(e.facing) < 0 ? -1 : 1; g.scale(flip * sc, sc);
       if (e.flags & 512) { g.shadowColor = '#ff2040'; g.shadowBlur = 6; }
-      g.drawImage(spr, -12, -20);
-      if (flash) { g.globalCompositeOperation = 'source-atop'; g.globalAlpha = 0.8; g.fillStyle = '#fff'; g.fillRect(-12, -20, 24, 24); }
+      if (isBody(d.sk)) drawBody(g, d.sk, now, e.act); else g.drawImage(spr, -12, -20);
+      if (flash && !isBody(d.sk)) { g.globalCompositeOperation = 'source-atop'; g.globalAlpha = 0.8; g.fillStyle = '#fff'; g.fillRect(-12, -20, 24, 24); }
       g.restore();
     } else {
       const look = d.look || {}; const c = Math.cos(e.facing), s = Math.sin(e.facing); const dir = Math.abs(c) > 0.55 ? 2 : s < 0 ? 1 : 0;
@@ -155,11 +164,12 @@ export class Renderer {
       const wt = WT_BY_ID[d.wt]; const wcol = RARITIES[d.wr || 1]?.color;
       g.translate(x, y + air);
       const flip = dir === 2 && c < 0;
-      const drawW = () => { if (!wt) return; const wsp = weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); g.drawImage(wsp, -2 + ext, -12); g.restore(); };
+      const drawW = () => { if (!wt) return; const wsp = d.wl ? identWeapon(weaponSprite(wt.vis, wcol), d.wl, e.flags & 4096, wcol) : weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); g.drawImage(wsp, -2 + ext, -12); g.restore(); };
       if (dir === 1) drawW();
       g.save(); if (flip) g.scale(-1, 1); if (e.dodgeAt && now - e.dodgeAt < 250) { g.rotate((now - e.dodgeAt) / 250 * TAU * (flip ? -1 : 1) * 0.5); }
       g.drawImage(spr, -8, -22); if (d.mask && dir !== 1) { g.fillStyle = '#efe8d8'; g.fillRect(-5, -18, 10, 4); g.fillStyle = '#1a1a1a'; g.fillRect(-3, -17, 2, 1); g.fillRect(1, -17, 2, 1); } if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
       if (dir !== 1) drawW();
+      if (d.wl) drawWielder(g, d.wl, e.flags, now);
       if (e.flags & 4) { g.strokeStyle = 'rgba(140,200,255,.8)'; g.beginPath(); g.arc(Math.cos(e.facing) * 6, Math.sin(e.facing) * 6 - 8, 9, e.facing - 1, e.facing + 1); g.stroke(); }
       if (e.flags & 2048 || (e.stanceAt && now - e.stanceAt < 500)) { g.strokeStyle = `rgba(255,255,200,${0.5 + Math.sin(now / 50) * 0.3})`; g.beginPath(); g.arc(0, -10, 12, 0, TAU); g.stroke(); }
       if (e.cast && now - e.cast.t0 < e.cast.dur) { const pv = e.cast.pv, p = (now - e.cast.t0) / e.cast.dur; g.globalAlpha = 0.6 * (1 - p); g.strokeStyle = pv.c1; g.beginPath(); g.arc(0, -10, 8 + p * 8, 0, TAU); g.stroke(); g.globalAlpha = 1; g.fillStyle = pv.c2; for (let i = 0; i < 3; i++) { const an = now / 90 + i * 2.1; g.fillRect(Math.cos(an) * 9, -10 + Math.sin(an) * 5 - p * 8, 1, 1); } }
@@ -226,6 +236,8 @@ export class Renderer {
     else if (f.k === 'timestop') { g.globalAlpha = 0.25 * (1 - p); g.fillStyle = '#c0d0ff'; g.beginPath(); g.arc(0, 0, f.r, 0, TAU); g.fill(); g.globalAlpha = 0.6; g.strokeStyle = '#e0e8ff'; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(now / 300) * f.r * 0.5, Math.sin(now / 300) * f.r * 0.5); g.stroke(); }
     g.restore(); g.globalAlpha = 1;
   }
+  drawCircleFx(f, ox, oy, now) { const x = (f.follow ? f.follow.x : f.x) + ox, y = (f.follow ? f.follow.y : f.y) + oy; const p = Math.min(1, (now - f.t0) / f.dur); const r = Math.max(f.r, 22);
+    drawMagicCircle(this.g, f.mc, x, y, r, p, now, 0.75); if (f.mc2) drawMagicCircle(this.g, f.mc2, x, y, r * 0.55, p, now * -1, 0.9); }
   drawSigil(f, ox, oy, now, alpha) {
     const g = this.g, pv = f.pv; const x = (f.follow ? f.follow.x : f.x) + ox, y = (f.follow ? f.follow.y : f.y) + oy; const p = Math.min(1, (now - f.t0) / f.dur);
     const r = f.r * (f.under ? Math.min(1, p * 4) : 0.6 + p * 0.5);

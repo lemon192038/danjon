@@ -6,6 +6,8 @@ import { WT_BY_ID, categoryOf } from '../../shared/data/weaponTypes.js';
 import { DATA, dataAccess } from '../data.js';
 import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { SPECIALS, onAttackHook } from './specials.js';
+import { circleFor } from '../../shared/data/circles.js';
+import { identityMods, altCombo, preStep, stepOpts, postStep } from './mechanics.js';
 
 let NEXT_ID = 1;
 export const newId = () => NEXT_ID++;
@@ -30,7 +32,7 @@ export class Fighter extends Actor {
   constructor(ch, o) { super(o); this.ch = ch; this.comboStep = 0; this.lastAttackEnd = 0; this.refreshStats(); this.hp = this.maxHp; this.sp = this.maxSp; this.r = 6; this.maxPoise = 14; this.poise = 14; }
   refreshStats() {
     const s = computeStats(this.ch, dataAccess, this.extraMods || null);
-    this.stats = s; this.wt = WT_BY_ID[s.wt]; this.weapon = s.weapon;
+    this.stats = s; this.wt = WT_BY_ID[s.wt]; this.weapon = s.weapon; identityMods(this, s);
     const hpR = this.maxHp ? this.hp / this.maxHp : 1, spR = this.maxSp ? this.sp / this.maxSp : 1;
     this.maxHp = s.maxHp; this.maxSp = s.maxSp; if (this.hp != null) { this.hp = Math.max(1, Math.round(this.maxHp * hpR)); this.sp = Math.round(this.maxSp * spR); }
     this.weaponEl = this.weapon?.el || this.wt.elem[0] || null; this.magic = categoryOf(this.wt.id).id === 'magic';
@@ -46,7 +48,7 @@ export class Fighter extends Actor {
     if (this.action?.type === 'attack') { if (now > this.action.recAt) this.action.buffered = true; return false; }
     // touch players: lock onto the nearest enemy so attacks home in even while moving with the stick
     if (this.autoAim) { const t = this.lockTarget(zone, true); if (t) this.facing = Math.atan2(t.y - this.y, t.x - this.x); }
-    const combo = this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo;
+    const combo = altCombo(this) || (this.altMode && this.wt.alt ? this.wt.alt : this.wt.combo);
     if (now - this.lastAttackEnd > 450) this.comboStep = 0;
     const idx = this.comboStep % combo.length, step = combo[idx];
     const sp = this.aspdNow();
@@ -97,20 +99,22 @@ export class Fighter extends Actor {
       }
     }
     if (first && step.lg) zone.lunge(this, step.lg);
-    const o = { m: step.m, st: step.st || 1, kb: step.kb, pen: step.pen, ls: step.ls, el: step.el, pull: step.pull, finisher: last };
+    step = preStep(this, step);
+    let o = { m: step.m, st: step.st || 1, kb: step.kb, pen: step.pen, ls: step.ls, el: step.el, pull: step.pull, finisher: last };
     if (step.bleed) o.status = ['bleed', 0.35, 4000];
     if (step.stun) o.status = ['stun', 0.5, step.stun];
     if (this.statuses.burn && false) o.m *= 1;
-    onAttackHook(zone, this);
+    onAttackHook(zone, this); o = stepOpts(this, o); let hitList = null;
     if (step.s === 'proj') {
       let sh = step;
       if (this.wt.special.type === 'boltSwap') { const md = this.boltMode || 0; sh = { ...step, pierce: md === 0 ? 3 : 0, aoe: md === 1 ? 40 : 0 }; if (md === 2) o.status = ['bind', 0.8, 1500]; }
       spawnProj(zone, this, sh, o, this.facing, now);
     } else {
-      meleeHit(zone, this, step, o, now);
+      hitList = meleeHit(zone, this, step, o, now);
       if (this.demonUntil > now) meleeHit(zone, this, { s: 'circle', r: 60 }, { ...o, m: o.m * 0.4, el: 'dark' }, now);
       if (step.echo) zone.schedule(now + step.echo, () => meleeHit(zone, this, step, { ...o, m: o.m * 0.5 }, zone.now));
     }
+    if (first) postStep(zone, this, step, o, now, last, hitList);
     if (this.consumeNextHit) { this.buffs = this.buffs.filter(b => !b.mods.nextHit); this.recalcBuffs(); this.consumeNextHit = false; }
   }
   // ---- skills
@@ -127,7 +131,7 @@ export class Fighter extends Actor {
     this.cds[id] = now + sk.cd * (1 - cdr) * (1 - (lv - 1) * 0.03);
     const c = { id, lvM, el: sk.el, tx: ctx.tx ?? this.aimX, ty: ctx.ty ?? this.aimY };
     const fire = () => { if (this.dead) return; execEffects(zone, this, sk.eff, c, zone.now); };
-    zone.fx({ t: 'skill', id: this.id, sid: sk.id, n: sk.name, e: sk.el || 'phys', k: sk.kind, c: sk.cast || 0 });
+    zone.fx({ t: 'skill', id: this.id, sid: sk.id, n: sk.name, e: sk.el || 'phys', k: sk.kind, c: sk.cast || 0, c1: sk.circle || circleFor(sk), c2: sk.circle2 || null });
     if (sk.cast) { this.action = { type: 'cast', until: now + sk.cast, lockMove: true }; zone.schedule(now + sk.cast, fire); }
     else { if (!this.action || this.action.type === 'attack') this.action = { type: 'skillAnim', until: now + 220, moveMul: 0.5 }; fire(); }
     this.onSkillUsed?.(sk);
