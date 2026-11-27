@@ -11,6 +11,7 @@ export function identWeapon(base, look, alt, rarCol) {
   const c = document.createElement('canvas'); c.width = 40; c.height = 24; const g = c.getContext('2d'); const cy = 12;
   const px = (x, y, w, h, cc) => { g.fillStyle = cc; g.fillRect(x | 0, y | 0, w, h); }; const rc = rarCol || '#e0c060';
   const redraw = look.chain || look.threads || look.inst || (look.alt && alt) || look.barrel || look.spirit || look.head && !look.threads && ['crystal', 'fork', 'long', 'twin', 'hook', 'wind'].includes(look.head);
+  if (look.deco) { decorate(g, base, look, rc); cache.set(key, c); return c; }
   if (!redraw) g.drawImage(base, 0, 0);
   if (look.edge) { const L = 20; // one-handed sword variants
     if (look.edge === 'wave') for (let i = 0; i < L; i++) px(6 + i, cy - 2 + Math.round(Math.sin(i / 2) * 1), 1, 3, i % 3 ? '#9ad8ff' : '#e0f6ff');
@@ -71,7 +72,7 @@ export function identWeapon(base, look, alt, rarCol) {
 export function drawWielder(g, look, flags, now) {
   if (!look) return; const core = (flags >> 13) & 7;
   if (look.orbit) for (let i = 0; i < look.orbit; i++) { const a = now / 380 + i * TAU / look.orbit; const x = Math.cos(a) * 16, y = Math.sin(a) * 7 - 10; g.save(); g.translate(x, y); g.rotate(a + Math.PI / 2); g.fillStyle = '#d0d8e8'; g.fillRect(-1, -4, 2, 8); g.fillStyle = '#fff'; g.fillRect(-0.5, -4, 1, 3); g.restore(); }
-  if (look.edge === 'core' && core) for (let i = 0; i < core; i++) { const a = now / 500 + i * TAU / 5; g.fillStyle = '#e080ff'; g.globalAlpha = 0.8; g.beginPath(); g.arc(Math.cos(a) * 10, -20 + Math.sin(a) * 3, 1.6, 0, TAU); g.fill(); g.globalAlpha = 1; }
+  if ((look.edge === 'core' || look.core) && core) for (let i = 0; i < core; i++) { const a = now / 500 + i * TAU / 5; g.fillStyle = '#e080ff'; g.globalAlpha = 0.8; g.beginPath(); g.arc(Math.cos(a) * 10, -20 + Math.sin(a) * 3, 1.6, 0, TAU); g.fill(); g.globalAlpha = 1; }
   if (look.inst && Math.floor(now / 700) % 2) { g.fillStyle = '#fff0a0'; g.font = '7px serif'; g.fillText('♪', 6 + Math.sin(now / 300) * 3, -24 - (now % 700) / 70); }
   if (look.spirit) { const a = now / 600; g.fillStyle = { hawk: '#a0ffd0', wolf: '#c0d0ff', wisp: '#fff8c0', serpent: '#90e070', owl: '#d0b080', salamander: '#ff8040' }[look.spirit]; g.globalAlpha = 0.6; g.beginPath(); g.arc(Math.cos(a) * 9, -24 + Math.sin(a * 2) * 2, 1.8, 0, TAU); g.fill(); g.globalAlpha = 1; }
   if (look.threads && Math.floor(now / 200) % 3 === 0) { g.strokeStyle = 'rgba(255,220,255,.35)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(4, -12); g.lineTo(14, -2); g.stroke(); }
@@ -103,4 +104,50 @@ export function drawBody(g, kind, now, act) {
     case 'shield': px(W / 2, top + 6, 5, 9, '#9aa6b6'); px(W / 2 + 1, top + 8, 3, 5, '#e0e8f0'); break; case 'heavy': px(-W / 2 - 4, top + 6, 4, 8, dk); px(W / 2, top + 6 - sw, 4, 8, dk); break;
     case 'rifle': px(W / 2 - 1, top + 9, 12, 2, '#3a4050'); px(W / 2 + 9, top + 8, 2, 4, '#a0c0ff'); break; case 'blades': px(W / 2, top + 8 - sw, 1, 7, '#e0e8f0'); px(-W / 2 - 1, top + 8 + sw, 1, 7, '#e0e8f0'); break;
     case 'mixed': px(W / 2, top + 8, 6, 1, '#e0e8f0'); px(-W / 2 - 2, top + 8, 2, 5, '#a08060'); break; case 'claws': for (const s of [-1, 1]) for (let i = 0; i < 3; i++) px(s * (W / 2 + 2) + (s < 0 ? -2 : 0), top + 12 + i * 3 - sw, 3, 1, '#f0e0d0'); px(-W / 2 - 3, top + 6, 3, 8, dk); px(W / 2, top + 6, 3, 8, dk); break; }
+}
+
+// ── wave 2: one generic structure layer per archetype on top of the type's own sprite (scaled, tinted, decorated)
+const tips = new WeakMap();
+function tipOf(base) { if (tips.has(base)) return tips.get(base); let t = 20; try { const d = base.getContext('2d').getImageData(0, 0, base.width, base.height).data; for (let x = base.width - 1; x >= 0; x--) { let hit = false; for (let y = 0; y < base.height; y++) if (d[(y * base.width + x) * 4 + 3] > 0) { hit = true; break; } if (hit) { t = x + 1; break; } } } catch { } tips.set(base, t); return t; }
+function decorate(g, base, look, rc) {
+  const cy = 12, sc = look.sc || 1, T = look.tint || '#ffffff'; const px = (x, y, w, h, cc) => { g.fillStyle = cc; g.fillRect(x | 0, y | 0, w, h); };
+  g.save(); g.translate(0, cy); g.scale(sc, sc); g.drawImage(base, 0, -cy); g.restore();
+  g.save(); g.globalCompositeOperation = 'source-atop'; g.globalAlpha = look.deco === 'big' || look.deco === 'thin' ? 0.25 : 0.18; g.fillStyle = T; g.fillRect(0, 0, 40, 24); g.restore(); // structural tint
+  const L = Math.min(38, tipOf(base) * sc); const at = f => Math.max(2, 4 + (L - 4) * f); // point along the weapon's real length (0 grip → 1 tip)
+  switch (look.deco) {
+    case 'wave': for (let i = 0; i < 14; i++) px(at(0.3 + i / 20), cy - 4 + Math.round(Math.sin(i / 1.6) * 1.5), 1, 1, T); break;
+    case 'split': for (const o of [-4, 4]) px(at(0.55), cy + o, L * 0.42, 1, T); break;
+    case 'core': px(at(0.35) - 2, cy - 2, 5, 5, '#301838'); px(at(0.35) - 1, cy - 1, 3, 3, T); break;
+    case 'gear': for (const f of [0.4, 0.6, 0.8]) { px(at(f) - 1, cy - 4, 3, 2, T); px(at(f) - 1, cy + 3, 3, 2, T); } break;
+    case 'long': px(at(0.95), cy - 1, 3, 2, '#ffffff'); break;
+    case 'runes': for (let i = 0; i < 5; i++) px(at(0.3 + i * 0.12), cy - 1 + (i % 2), 1, 1, T); g.globalAlpha = 0.35; px(at(0.25), cy - 3, L * 0.65, 6, T); g.globalAlpha = 1; break;
+    case 'chainwrap': for (let i = 0; i < 6; i++) px(at(0.2 + i * 0.12), cy + (i % 2 ? 2 : -3), 2, 1, T); break;
+    case 'heavyhead': px(at(0.85) - 3, cy - 5, 7, 10, T); px(at(0.85) - 3, cy - 5, 7, 1, '#ffffff'); break;
+    case 'hook': px(at(0.9), cy - 1, 4, 2, T); px(at(0.9) + 3, cy - 5, 2, 5, T); px(at(0.9) + 1, cy - 6, 3, 1, T); break;
+    case 'drip': for (const f of [0.5, 0.7, 0.9]) { px(at(f), cy + 2, 1, 2, T); px(at(f), cy + 5, 1, 1, T); } break;
+    case 'crystal': for (const f of [0.45, 0.7, 0.95]) { px(at(f) - 1, cy - 4, 3, 3, T); px(at(f), cy - 5, 1, 1, '#ffffff'); } break;
+    case 'spark': g.strokeStyle = T; g.lineWidth = 1; g.beginPath(); g.moveTo(at(0.3), cy - 4); for (let i = 1; i <= 6; i++) g.lineTo(at(0.3 + i * 0.11), cy - 4 + (i % 2 ? 3 : 0)); g.stroke(); break;
+    case 'veins': for (let i = 0; i < 4; i++) px(at(0.3 + i * 0.16), cy - 1 + (i % 2 ? 1 : -1), 4, 1, T); break;
+    case 'flame': for (const f of [0.5, 0.7, 0.9]) { px(at(f), cy - 5, 2, 3, T); px(at(f) + 1, cy - 7, 1, 2, '#ffd060'); } break;
+    case 'serrated': for (let i = 0; i < 8; i++) px(at(0.3 + i * 0.08), cy + 2, 1, 2 + (i % 2), T); break;
+    case 'spikes': for (const f of [0.4, 0.6, 0.8, 0.95]) { px(at(f), cy - 5, 1, 3, T); px(at(f), cy + 3, 1, 3, T); } break;
+    case 'skull': px(at(0.15), cy - 3, 5, 5, '#e8e0d0'); px(at(0.15) + 1, cy - 2, 1, 1, '#301030'); px(at(0.15) + 3, cy - 2, 1, 1, '#301030'); break;
+    case 'wings': for (const s of [-1, 1]) { g.fillStyle = T; g.beginPath(); g.moveTo(at(0.25), cy); g.lineTo(at(0.1), cy + s * 7); g.lineTo(at(0.35), cy + s * 2); g.fill(); } break;
+    case 'ghost': g.globalAlpha = 0.35; g.drawImage(g.canvas, 3, -2); g.globalAlpha = 1; break;
+    case 'ribbon': for (let i = 0; i < 6; i++) px(at(0.15) - i, cy + 2 + Math.round(Math.sin(i) * 2) + i, 1, 1, T); break;
+    case 'plate': px(at(0.15), cy - 6, 6, 12, T); px(at(0.15) + 1, cy - 5, 4, 1, '#ffffff'); break;
+    case 'guard': px(at(0.12), cy - 6, 2, 12, T); break;
+    case 'thin': px(at(0.97), cy, 2, 1, '#ffffff'); break;
+    case 'big': px(at(0.2), cy - 3, 3, 6, T); break;
+    case 'halo': g.strokeStyle = T; g.lineWidth = 1; g.beginPath(); g.ellipse(at(0.9), cy, 3, 6, 0, 0, Math.PI * 2); g.stroke(); break;
+    case 'charm': for (const f of [0.3, 0.5]) { px(at(f), cy + 2, 1, 3, '#c0c0c0'); px(at(f) - 1, cy + 5, 3, 4, T); } break;
+    case 'flag': px(at(0.75), cy - 10, 1, 10, '#6a4a2a'); px(at(0.75) - 8, cy - 10, 8, 6, T); px(at(0.75) - 8, cy - 10, 8, 1, '#ffffff'); break;
+    case 'split2': break;
+    case 'eye': px(at(0.4) - 2, cy - 2, 5, 4, '#ffffff'); px(at(0.4), cy - 1, 2, 2, T); break;
+    case 'rings': g.strokeStyle = T; g.lineWidth = 1; for (const f of [0.4, 0.7]) { g.beginPath(); g.arc(at(f), cy, 4, 0, Math.PI * 2); g.stroke(); } break;
+    case 'curve': g.strokeStyle = T; g.lineWidth = 2; g.beginPath(); g.arc(at(0.6), cy + 8, 10, -2.4, -0.7); g.stroke(); break;
+    case 'feather': for (const f of [0.15, 0.25]) { px(at(f), cy + 2, 1, 5, T); px(at(f) - 1, cy + 3, 1, 3, '#ffffff'); } break;
+    case 'spiritgem': g.fillStyle = T; g.shadowColor = T; g.shadowBlur = 4; g.beginPath(); g.arc(at(0.2), cy, 2.5, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0; break;
+  }
+  if (look.sc && look.sc > 1.1) px(0, cy - 1, 2, 2, rc);
 }

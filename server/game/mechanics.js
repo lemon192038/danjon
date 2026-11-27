@@ -2,30 +2,37 @@
 // these functions apply it around the normal attack, on hits, to summons and in command skills. Effects shown on the
 // client are only the result of what is decided here.
 import { SUMMON_BODIES } from '../../shared/data/identity.js';
-import { meleeHit, spawnProj } from './skillExec.js';
+import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { dealDamage, applyStatus } from './combat.js';
 
 const mechOf = a => a.weapon?.ident?.mechanic || null;
 const mine = (z, a, pre) => z.actorsList().filter(x => x.kind === 'summon' && x.ownerId === a.id && !x.dead && (!pre || String(x.sumKind).startsWith(pre)));
 // stat trade-offs of the weapon's structure (and of its transformed form)
 export function identityMods(a, s) { const I = a.weapon?.ident; if (!I) return; const md = { ...(I.mods || {}) }; if (a.altMode && I.mechanic?.altMods) Object.assign(md, I.mechanic.altMods);
-  if (md.atk) { s.atk = Math.round(s.atk * (1 + md.atk)); s.matk = Math.round(s.matk * (1 + md.atk)); } if (md.aspd) s.aspd *= 1 + md.aspd; if (md.range) s.range = (s.range || 1) * (1 + md.range); if (md.dr) s.dr = Math.min(0.8, (s.dr || 0) + md.dr); }
+  if (md.atk) { s.atk = Math.round(s.atk * (1 + md.atk)); s.matk = Math.round(s.matk * (1 + md.atk)); } if (md.aspd) s.aspd *= 1 + md.aspd; if (md.range) s.range = (s.range || 1) * (1 + md.range); if (md.dr) s.dr = Math.max(0, Math.min(0.8, (s.dr || 0) + md.dr)); if (md.crit) s.crit = (s.crit || 0) + md.crit; }
 // before a normal-attack step: reach, bullets, transformed combos are applied to the step shape
 export function preStep(a, step) { const M = mechOf(a); if (!M) return step;
   if (M.k === 'reach' && step.s !== 'proj') return { ...step, r: step.r ? Math.round(step.r * M.mul) : step.r, l: step.l ? Math.round(step.l * M.mul) : step.l, d: step.d ? Math.round(step.d * M.mul) : step.d };
-  if (M.k === 'bullet' && step.s === 'proj') return { ...step, pierce: M.pierce ?? step.pierce, spd: (step.spd || 8) * (M.spd || 1), n: M.n || step.n, sp: M.sp || step.sp, rng: Math.round((step.rng || 200) * (M.rng || 1)), aoe: M.aoe || step.aoe, hom: M.hom || step.hom, m: step.m * (M.m || 1) };
+  if (M.k === 'rush' && step.s !== 'proj') return { ...step, lg: (step.lg || 0) + M.lg };
+  if (M.k === 'bullet' && step.s === 'proj') return { ...step, bnc: M.bnc ?? step.bnc, ret: M.ret ?? step.ret, pierce: M.pierce ?? step.pierce, spd: Math.min(Math.max(step.spd || 8, 12), (step.spd || 8) * (M.spd || 1)), n: M.n || step.n, sp: M.sp || step.sp, rng: Math.round((step.rng || 200) * (M.rng || 1)), aoe: M.aoe || step.aoe, hom: M.hom || step.hom, m: step.m * (M.m || 1) };
   return step; }
 export function altCombo(a) { const M = mechOf(a); return M?.k === 'alt' && a.altMode ? M.combo : null; }
 export function stepOpts(a, o) { const M = mechOf(a); if (!M) return o; if (M.k === 'mana') { if (a.sp >= M.cost) { a.sp -= M.cost; return { ...o, el: a.weaponEl || 'void' }; } return { ...o, m: o.m * 0.7 }; }
-  if (M.k === 'bullet') return { ...o, el: M.el || o.el, status: M.status || o.status }; return o; }
+  if (M.k === 'bullet') return { ...o, el: M.el || o.el, status: M.status || o.status }; if (M.k === 'leech') return { ...o, ls: (o.ls || 0) + M.ls }; return o; }
+// repeat a step (melee shape or projectile) — used by split / link / echo so they work for every weapon shape
+function again(zone, a, step, o, now, rot = 0) { if (step.s === 'proj') spawnProj(zone, a, step, o, a.facing + rot / 57.3, now); else meleeHit(zone, a, rot ? { ...step, rot } : step, o, now); }
 // after a normal-attack step (hit = targets hit by a melee step)
 export function postStep(zone, a, step, o, now, last, hit) { const M = mechOf(a); if (!M) return; const fx = (v) => zone.fx({ t: 'mech', id: a.id, v, x: Math.round(a.x), y: Math.round(a.y), a: +a.facing.toFixed(2) });
   switch (M.k) {
     case 'wave': if (last) { spawnProj(zone, a, { spd: 10, rng: M.rng, sz: 9, pierce: 9, wave: 1 }, { ...o, m: o.m * M.m / 0.6 }, a.facing, now); fx('wave'); } break;
-    case 'split': for (let i = 0; i < M.n; i++) meleeHit(zone, a, { ...step, rot: (i % 2 ? 1 : -1) * M.spread * 57 * Math.ceil((i + 1) / 2) }, { ...o, m: o.m * M.m }, now); fx('split'); break;
+    case 'split': for (let i = 0; i < M.n; i++) again(zone, a, step, { ...o, m: o.m * M.m }, now, (i % 2 ? 1 : -1) * M.spread * 57 * Math.ceil((i + 1) / 2)); fx('split'); break;
     case 'core': if (last && a.core >= M.max) { meleeHit(zone, a, { s: 'circle', r: M.r }, { ...o, m: o.m * (1 + M.m * a.core) }, now); a.core = 0; fx('core'); } break;
-    case 'deploy': if (last) { meleeHit(zone, a, M.circle ? { s: 'circle', r: M.r } : { s: 'arc', r: M.r, a: 200 }, { ...o, m: o.m * M.m }, now); fx('deploy'); } break;
-    case 'link': if (last) zone.schedule(now + 180, () => { if (!a.dead) { meleeHit(zone, a, step, { ...o, m: o.m * M.m }, zone.now); fx('link'); } }); break;
+    case 'deploy': if (last) { meleeHit(zone, a, M.circle ? { s: 'circle', r: M.r } : { s: 'arc', r: M.r, a: 200 }, { ...o, m: o.m * M.m, ...(M.fx === 'quake' ? { st: 5, kb: 30 } : {}) }, now); fx(M.fx || 'deploy'); } break;
+    case 'link': if (last) zone.schedule(now + 180, () => { if (!a.dead) { again(zone, a, step, { ...o, m: o.m * M.m }, zone.now); fx('link'); } }); break;
+    case 'echo': zone.schedule(now + 140, () => { if (!a.dead) { again(zone, a, step, { ...o, m: o.m * M.m, vfx: 'echo' }, zone.now); fx('echo'); } }); break;
+    case 'tempo': { a.tempoN = (a.lastTempo > now - 1200 ? a.tempoN || 0 : 0) + 1; a.lastTempo = now; a.addBuff({ aspd: Math.min(M.max, a.tempoN * M.step) }, 1500, 'tempo'); if (a.tempoN % 4 === 0) fx('tempo'); break; }
+    case 'rainShot': a.shots = (a.shots || 0) + 1; if (a.shots >= M.every) { a.shots = 0; const t = zone.nearestEnemy(a, 300); if (t) { execEffects(zone, a, [{ t: 'barrage', n: M.n, r: 26, spread: 50, delay: 400, interval: 100, m: o.m * M.m }], { lvM: 1, el: a.weaponEl, tx: t.x, ty: t.y }, now); fx('rain'); } } break;
+    case 'phase': if (last) { const t = zone.nearestEnemy(a, M.r); if (t) { const bx = t.x + Math.cos(a.facing) * (t.r + 10), by = t.y + Math.sin(a.facing) * (t.r + 10); if (!zone.blocked(bx, by)) { zone.fx({ t: 'blink', x: Math.round(a.x), y: Math.round(a.y), e: 'void' }); a.x = bx; a.y = by; a.facing = Math.atan2(t.y - a.y, t.x - a.x); fx('phase'); } } } break;
     case 'orbit': { const ts = zone.enemiesOf(a).filter(t => Math.hypot(t.x - a.x, t.y - a.y) < M.r).slice(0, M.n); for (const t of ts) dealDamage(zone, a, t, { ...o, m: o.m * M.m, noCounter: true }, now); if (ts.length) fx('orbit'); break; }
     case 'melody': a.notes = (a.notes || 0) + 1; if (a.notes >= M.every) { a.notes = 0; melody(zone, a, M.kind, o, now); fx('melody:' + M.kind); } break;
     case 'spiritShot': a.shots = (a.shots || 0) + 1; if (a.shots >= M.every) { a.shots = 0; const have = mine(zone, a, 's'); if (have.length >= 3) have[0].dead = true; zone.spawnSummon(a, M.kind, 6000, 0.35, a.weaponEl); fx('spirit:' + M.kind); } break;
@@ -34,6 +41,7 @@ export function postStep(zone, a, step, o, now, last, hit) { const M = mechOf(a)
 function onHits(zone, a, step, o, now, hit) { const M = mechOf(a); const fx = (v) => zone.fx({ t: 'mech', id: a.id, v, x: Math.round(a.x), y: Math.round(a.y), a: +a.facing.toFixed(2) });
   switch (M.k) {
     case 'core': a.core = Math.min(M.max, (a.core || 0) + 1); break;
+    case 'ignite': for (const t of hit) applyStatus(zone, a, t, M.status, now); break;
     case 'crystal': { const t = hit[0]; zone.addArea({ owner: a, x: t.x, y: t.y, r: M.r, until: now + M.dur, tick: 500, next: now + 300, opt: { m: o.m * M.m, el: a.weaponEl || 'ice' }, e: { slow: M.slow ? 1 : 0, el: a.weaponEl || 'ice' } }); fx('crystal'); } break;
     case 'spark': { const t0 = hit[0]; const near = zone.enemiesOf(a).filter(t => !hit.includes(t) && Math.hypot(t.x - t0.x, t.y - t0.y) < 90).slice(0, M.n); for (const t of near) { dealDamage(zone, a, t, { ...o, m: o.m * M.m, el: 'thunder', noCounter: true }, now); zone.fx({ t: 'zap', x1: Math.round(t0.x), y1: Math.round(t0.y), x2: Math.round(t.x), y2: Math.round(t.y) }); } } break;
     case 'tip': case 'reach': { const far = (step.r || step.l || 40) * 0.6; for (const t of hit) { if (Math.hypot(t.x - a.x, t.y - a.y) < far) continue; if (M.stun) applyStatus(zone, a, t, ['stun', 0.6, M.stun], now); if (M.pull) zone.push(t, (a.x - t.x) * M.pull / 100, (a.y - t.y) * M.pull / 100); if (M.status) applyStatus(zone, a, t, M.status, now); if (M.tip) dealDamage(zone, a, t, { ...o, m: o.m * M.tip, noCounter: true }, now); fx('tip'); } } break;

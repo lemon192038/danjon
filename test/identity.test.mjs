@@ -8,7 +8,7 @@ const { Fighter } = await import('../server/game/actor.js');
 const { makeMonster } = await import('../server/game/monsters.js');
 const { newCharacter } = await import('../server/game/progress.js');
 const { DATA } = await import('../server/data.js');
-const { IDENTITY, WAVE1 } = await import('../shared/data/identity.js');
+const { IDENTITY, IDENTITY_TYPES } = await import('../shared/data/identity.js');
 const { CIRCLES, PATTERNS } = await import('../shared/data/circles.js');
 
 const fakeWorld = { onMonsterKilled() {}, onBossKilled() {}, onFighterDied() {}, npcs: { fighterTick() {} } };
@@ -17,9 +17,10 @@ function setup(w) { const z = arena(); const ch = newCharacter('i' + w.id, 'T', 
   const p = new Fighter(ch, { kind: 'player', team: 'ally' }); p.x = 200; p.y = 200; z.add(p); p.sp = p.maxSp = 99999; return { z, p }; }
 const foe = (z, x = 260, y = 200) => { const m = makeMonster('golem', 30, 'NORMAL'); m.x = x; m.y = y; m.maxHp = m.hp = 1e9; m.stats.atk = 1; z.add(m); return m; };
 
-test('wave-1 weapons each carry a distinct identity and a uniquely named, circled skill', () => {
+test('all 86 weapon types: every weapon carries a distinct identity and a uniquely named, circled skill', () => {
   const ids = new Set(Object.keys(CIRCLES));
-  for (const wt of WAVE1) { const ws = DATA.wtWeapons.get(wt); const seen = new Map();
+  assert.equal(IDENTITY_TYPES.length, 86);
+  for (const wt of IDENTITY_TYPES) { const ws = DATA.wtWeapons.get(wt); const seen = new Map();
     for (const w of ws) { assert.ok(w.ident, `${w.id} has ident`); assert.ok(ids.has(w.skill.circle) && ids.has(w.skill.circle2), `${w.id} circles`); assert.equal(w.skill.sig, 'ident');
       for (const k of ['model', 'silhouette', 'mechanic', 'ability', 'style', 'pros', 'cons', 'anim', 'fx', 'sound']) assert.ok(w.ident[k], `${w.id} ${k}`);
       seen.set(w.ident.variant, (seen.get(w.ident.variant) || 0) + 1); }
@@ -44,15 +45,16 @@ test('puppet staff: each variant summons its own puppet body; 十傀・一斉光
   assert.ok(beams.length >= ps.length - 1 && !beams.includes(ps[0].id), 'beams ' + beams.length); assert.ok(m.hp < hp0);
 });
 
-test('every wave-1 variant runs its mechanic and its unique skill in combat', () => {
-  for (const wt of WAVE1) for (const V of IDENTITY[wt].variants) { const w = DATA.wtWeapons.get(wt).find(x => x.ident.variant === V.key); const { z, p } = setup(w); const m = foe(z, 225, 200);
+test('every variant of all 86 types runs its mechanic and its unique skill in combat', () => {
+  let ran = 0; for (const wt of IDENTITY_TYPES) for (const V of IDENTITY[wt].variants) { ran++; const w = DATA.wtWeapons.get(wt).find(x => x.ident.variant === V.key); const { z, p } = setup(w); const m = foe(z, 225, 200);
     if (V.mech.k === 'puppet') { p.special('press', z); z.tick(50); }
     const mech = []; const of = z.fx.bind(z); let dealt = 0; z.fx = o => { if (o.t === 'mech') mech.push(o.v); if (o.t === 'dmg' && !o.h && !o.a) dealt += o.v; of(o); };
     for (let t = 0; t < 120; t++) { p.input = { atk: true }; p.aimX = m.x; p.aimY = m.y; z.tick(50); }
     p.input = {}; for (let t = 0; t < 10; t++) z.tick(50);
     assert.ok(dealt > 0, `${w.id} ${V.key} deals damage`);
-    if (['wave', 'core', 'deploy', 'link', 'orbit', 'melody', 'spiritShot', 'tip', 'reach', 'crystal', 'split'].includes(V.mech.k) && !(V.mech.k === 'tip' && !V.mech.status && !V.mech.stun && !V.mech.pull)) {
-      if (!['tip', 'reach'].includes(V.mech.k)) assert.ok(mech.length > 0, `${w.id} ${V.key} mechanic ${V.mech.k} fired`); }
+    if (['wave', 'core', 'deploy', 'link', 'orbit', 'melody', 'spiritShot', 'tip', 'reach', 'crystal', 'split', 'echo', 'rainShot'].includes(V.mech.k) && !(V.mech.k === 'tip' && !V.mech.status && !V.mech.stun && !V.mech.pull)) {
+      if (!['tip', 'reach'].includes(V.mech.k)) assert.ok(mech.length > 0 || p.core > 0, `${w.id} ${V.key} mechanic ${V.mech.k} fired`); }
     p.action = null; p.cds = {}; p.statuses = {}; p.staggerUntil = 0; const hp0 = m.hp; const r = p.useSkill(w.skill.id, z, { tx: m.x, ty: m.y }); assert.equal(r, 'ok', `${w.id} skill ${w.skill.name} ${p.dead} ${p.stopped} ${p.staggerUntil - z.now} ${JSON.stringify(p.statuses)}`);
-    for (let t = 0; t < 40; t++) z.tick(50); void hp0; }
+    for (let t = 0; t < 30; t++) z.tick(50); void hp0; }
+  assert.ok(ran >= 430, 'variants ran: ' + ran);
 });

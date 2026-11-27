@@ -383,7 +383,7 @@ export class Zone {
       }
       if (!p.returning && p.travelled >= p.rng) { if (p.ret) p.returning = true; else end = true; }
       if (p.returning && p.travelled > p.rng * 3) end = true;
-      if (end) { if (p.aoe) { meleeHit(this, p.owner, { s: 'circle', r: p.aoe }, { ...p.opt }, now, { x: p.x, y: p.y, a: 0 }); this.fx({ t: 'boom', x: Math.round(p.x), y: Math.round(p.y), r: p.aoe, e: p.opt.el || 'fire' }); } continue; }
+      if (end) { if (p.aoe) { const ah = meleeHit(this, p.owner, { s: 'circle', r: p.aoe }, { ...p.opt }, now, { x: p.x, y: p.y, a: 0 }); if (p.owner.wt && ah[0]) onProjHit(this, p.owner, ah[0], now, p); this.fx({ t: 'boom', x: Math.round(p.x), y: Math.round(p.y), r: p.aoe, e: p.opt.el || 'fire' }); } continue; }
       keep.push(p);
     }
     this.projs = keep;

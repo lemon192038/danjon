@@ -3,6 +3,8 @@
 // defines its silhouette/structure (look), its unique mechanic (server-side, data), its trade-offs, and its unique
 // skill (name matches the actual effect). Weapon names, stats and acquisition are unchanged.
 // Wave 1 types: 76 操偶杖, 1 片手剣, 64 変形武器, 23 鎖鎌, 75 楽器武器, 14 槍, 48 精霊弓, 52 魔導砲.
+import { buildWave2 } from './identity2.js';
+import { WT_BY_ID } from './weaponTypes.js';
 const r2 = v => Math.round(v * 100) / 100;
 const V = (key, label, kw, o) => ({ key, label, kw, ...o });
 export const IDENTITY = {
@@ -130,7 +132,11 @@ export const IDENTITY = {
       skill: { name: '充填砲・極光の一撃', cat: '溜め砲撃', eff: (m, el, st) => [{ t: 'hit', shape: { s: 'beam', l: 280, w: 30 }, m: r2(m * 1.6), st: 8, delay: 500, status: st }], target: '前方の太い光線', limit: '発射まで0.5秒動けない' } })] },
 };
 export const WAVE1 = Object.keys(IDENTITY).map(Number);
-export function variantOf(w) { const T = IDENTITY[w.wt]; if (!T) return null; const vs = T.variants; return vs.find(v => v.kw.test(w.name)) || vs[w.idx % vs.length]; }
+Object.assign(IDENTITY, buildWave2(id => WT_BY_ID[id].name)); // wave 2: the remaining 78 types from the archetype catalog
+export const IDENTITY_TYPES = Object.keys(IDENTITY).map(Number);
+// keywords are matched on the weapon's own name with the type name's characters removed (so 「魔弓」 does not make every bow a 魔力 bow)
+export function variantOf(w) { const T = IDENTITY[w.wt]; if (!T) return null; const vs = T.variants; const tn = WT_BY_ID[w.wt]?.name.replace(/（.*）/, '') || ''; const nm = [...w.name].filter(c => !tn.includes(c)).join('');
+  return vs.find(v => v.kw.test(nm)) || vs[w.idx % vs.length]; }
 // summon bodies (puppets and spirits): body, AI, attack — used by the server simulation and the client drawing
 export const SUMMON_BODIES = {
   pGuard: { name: '白銀の盾人形', hp: 1.1, r: 10, ai: 'guard', move: 0.7, atk: 'slam', cd: 1100, m: 0.8, taunt: true, dr: 0.25, body: { h: 18, w: 10, head: 'helm', arms: 'shield', col: '#d8dce8' } },

@@ -56,9 +56,9 @@ export class Renderer {
       case 'buff': case 'shield': { const e = E(f.id); if (e) for (let i = 0; i < 12; i++) this.part(e.x, e.y, f.t === 'shield' ? '#80c0ff' : ec(f.e || 'holy'), 25, 700, true); break; }
       case 'say': { const e = E(f.id); if (e) e.say = { v: f.v, t0: now }; break; }
       case 'mc': { const e = E(f.id); if (e) this.fx.push({ k: 'mc', follow: e, x: e.x, y: e.y, mc: f.c, r: f.r || 14, t0: now, dur: f.d || 600 }); break; }
-      case 'mech': { const v = String(f.v), [kind, sub] = v.split(':'); const col = { wave: '#9ad8ff', split: '#c0c8d8', core: '#e080ff', deploy: '#a0a8b8', link: '#ffd060', orbit: '#d0d8e8', orbitHit: '#ffffff', crystal: '#a0e8ff', tip: '#ffe0a0', melody: '#fff0a0', spirit: '#a0ffd0', heal: '#80ffa0' }[kind] || '#fff';
-        const n = kind === 'core' || kind === 'deploy' ? 18 : 6; for (let i = 0; i < n; i++) this.part(f.x, f.y - 8, col, kind === 'core' ? 60 : 30, 400);
-        if (kind === 'core' || kind === 'deploy') this.fx.push({ k: 'ring', x: f.x, y: f.y, r: kind === 'core' ? 60 : 70, e: kind === 'core' ? 'dark' : 'phys', t0: now, dur: 350 });
+      case 'mech': { const v = String(f.v), [kind, sub] = v.split(':'); const col = { wave: '#9ad8ff', split: '#c0c8d8', core: '#e080ff', deploy: '#a0a8b8', link: '#ffd060', orbit: '#d0d8e8', orbitHit: '#ffffff', crystal: '#a0e8ff', tip: '#ffe0a0', melody: '#fff0a0', spirit: '#a0ffd0', heal: '#80ffa0', echo: '#c0a0ff', tempo: '#a0ffc0', rain: '#c0e0ff', phase: '#8040c0', quake: '#c09050' }[kind] || '#fff';
+        const n = kind === 'core' || kind === 'deploy' || kind === 'quake' ? 18 : 6; for (let i = 0; i < n; i++) this.part(f.x, f.y - 8, col, kind === 'core' ? 60 : 30, 400);
+        if (kind === 'core' || kind === 'deploy' || kind === 'quake') this.fx.push({ k: 'ring', x: f.x, y: f.y, r: kind === 'core' ? 60 : 70, e: kind === 'core' ? 'dark' : kind === 'quake' ? 'earth' : 'phys', t0: now, dur: 350 });
         if (kind === 'melody') this.texts.push({ x: f.x, y: f.y - 30, v: { heal: '♪癒', beat: '♫響', wind: '♪風', hex: '♩呪', war: '♬鼓舞', ward: '♪守' }[sub] || '♪', skill: 1, e: 'holy', col, t0: now });
         if (kind === 'spirit') this.fx.push({ k: 'mc', x: f.x, y: f.y, mc: 'mc_pact_summon', r: 14, t0: now, dur: 500 });
         break; }
