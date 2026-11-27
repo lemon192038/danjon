@@ -101,7 +101,7 @@ export class World {
     migrate(ch); s.ch = ch; this.sessions.set(cid, s); this.econ.catchUp(ch);
     const zid = this.zones.has(ch.pos.zone) && WORLD[ch.pos.zone] ? ch.pos.zone : 'haven';
     if (!(ch.raid && this.slum.rejoin(s))) { this.enterZone(s, this.zones.get(zid), ch.pos.zone === zid ? ch.pos : null); if (ch.raid) this.slum.fail(s, 'dc'); }
-    s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` }); this.society.onLogin(s); this.grand.onLogin(s);
+    s.send({ t: 'chat', from: 'system', v: `ようこそ、${ch.name}。ABYSS : ETERNAL FRONTIER へ。` }); this.society.onLogin(s); this.grand.onLogin(s); for (const v of ch.progress.notices || []) { s.send({ t: 'chat', from: 'system', v }); s.send({ t: 'toast', v, cls: 'big' }); } ch.progress.notices = [];
   }
   detach(s) {
     if (!s.ch) return; this.pvp?.leave(s);
@@ -199,7 +199,7 @@ export class World {
       const to = this.zones.get(ex.to); const back = to.map.exits.find(e => e.to === z.id);
       const p = back ? to.tileCenter([back.x + (back.dir === 'east' ? -3 : back.dir === 'west' ? 3 : 0), back.y + (back.dir === 'south' ? -3 : back.dir === 'north' ? 3 : 0)]) : null;
       this.enterZone(s, to, p);
-    } else if (tile === T.STAIRS && z.kind === 'dungeon' && z.map.stairsOpen) this.nextFloor(s, z);
+    } else if (z.kind === 'dungeon' && z.map.stairsOpen && z.map.stairs && (tile === T.STAIRS || this.nearStairs(z, a, 12))) this.nextFloor(s, z);
     else if (tile === T.MAT && (z.kind === 'interior' || z.kind === 'arena')) { if ((z.bout && !z.bout.done) || (z.arena && !z.arena.duel && !z.arena.done && !z.bout)) { if (!s.matWarn || Date.now() - s.matWarn > 4000) { s.matWarn = Date.now(); s.send({ t: 'toast', v: '決闘中は闘技場から出られない' }); } return; } if (z.kind === 'arena') this.econ?.leaveArena(s); else this.exitBuilding(s); }
     // auto pickup drops
     // iterate over a snapshot: picking up can drop items again (overweight), which must never be re-picked in the same pass
@@ -447,9 +447,11 @@ export class World {
     const ch = newCharacter('c' + uid(), name, wt, look); ch.account = acc.id; acc.chars.push(ch.id); store.saveAccount(acc); store.saveChar(ch);
     s.send({ t: 'chars', list: store.listChars(s.account) });
   }
+  nearStairs(z, a, r) { const p = z.tileCenter(z.map.stairs); return Math.hypot(p.x - a.x, p.y - a.y) <= r; }
   interact(s) {
     const a = s.actor, z = a.zone;
     if (a.dead) return;
+    if (z.kind === 'dungeon' && z.map.stairs && this.nearStairs(z, a, 28)) { if (z.map.stairsOpen) return this.nextFloor(s, z); return s.send({ t: 'toast', v: 'この階のボスを倒すと階段が開く' }); }
     for (const o of z.map.objects || []) if (o.k === 'altar') { const p = z.tileCenter([o.x, o.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < 20 && this.useObject(s, z, o) !== false) return; } // standing at the altar beats the priest
     for (const n of z.map.npcs || []) { const p = z.tileCenter([n.x, n.y]); if (Math.hypot(p.x - a.x, p.y - a.y) < (z.kind === 'interior' ? 44 : 30)) return this.openService(s, n.service, n); }
     for (const d of z.map.doors || []) { const p = z.tileCenter([d.x, d.y]); if (Math.hypot(p.x - a.x, p.y - (a.y - 6)) < 22) return this.enterBuilding(s, d); }
@@ -599,6 +601,8 @@ export class World {
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.wpn && DATA.weapons.get(m.wpn)) { const u = uid(); ch.inventory.push({ uid: u, kind: 'weapon', ref: m.wpn, plus: 0 }); ch.equip.weapon = u; ch.mastery[DATA.weapons.get(m.wpn).wt] ||= { lv: 100, xp: 0 }; ch.skills.slots[0] = DATA.weapons.get(m.wpn).skill.id; a.refreshStats(); a.comboStep = 0; a.altMode = false; this.sendSelf?.(s); }
         if (m.god) a.invulnUntil = z.now + 3600000;
+        if (m.killall) for (const x of [...z.actors.values()]) if (x.kind === 'monster' && !x.dead) z.kill(x, a, z.now);
+        if (m.stairs && z.map.stairs) { const p = z.tileCenter(z.map.stairs); a.x = p.x; a.y = p.y; }
         if (m.mres != null && a.wt?.morph) { a.morph ||= null; if (!a.morph) a.refreshStats(); if (a.morph) a.morph.res = m.mres; }
         if (m.foe) { const mo = makeMonster('golem', 20, 'NORMAL'); mo.x = a.x + 70; mo.y = a.y; mo.maxHp = mo.hp = 1e7; mo.stats.atk = 1; z.add(mo); }
         if (m.level) { ch.level = m.level | 0; } if (m.gold) ch.gold = m.gold | 0; if (m.give) { addItem(ch, { kind: 'mat', ref: 'traitTicket', n: 3 }); const W = DATA.wtWeapons.get(1); for (const r of [1, 1, 2, 3]) ch.inventory.push({ uid: uid(), kind: 'weapon', ref: W.find(x => x.rar === r && x.traits.length).id, plus: 0 }); ch.inventory.push({ uid: uid(), kind: 'amat', ref: 'acond', key: 'skill', dg: 'd05', floor: 80, diff: 'HARD', pow: 1.24, n: 1 }, { uid: uid(), kind: 'amat', ref: 'aeff', key: 'fire', dg: 'd02', floor: 90, diff: 'HELL', pow: 1.72, n: 1 }); } if (m.loot) for (const r of m.loot) this.slum.addLoot(ch, { ref: r, n: 3, q: 1.1, prov: LOOT[r].prov }); return this.sendSelf(s); }
@@ -616,4 +620,13 @@ export class World {
   }
 }
 function clampN(v) { v = +v; return Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0; }
-function migrate(ch) { ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }
+// one-time reset (2026-11-27): 時律投刃士 now needs the prerequisite job 投刃士 and the unlock event 刻を止める銀刃,
+// so the job is removed from everyone who already had it (job, rank and the job-only knives; other assets untouched)
+function resetChrono(ch) { if (ch.progress.chronoReset1) return; ch.progress.chronoReset1 = 1; if (!ch.jobs) return; const had = ch.jobs.ev_chrono || ch.job === 'ev_chrono'; delete ch.jobs.ev_chrono;
+  if (ch.job === 'ev_chrono') { const others = Object.entries(ch.jobs).sort((x, y) => (y[1].rank || 0) - (x[1].rank || 0)); ch.job = others[0]?.[0] || 'warrior_0'; ch.jobs[ch.job] ||= { rank: 0, xp: 0 }; }
+  const knives = ch.inventory.filter(i => i.ref === 'job_silverknife').map(i => i.uid); if (knives.length) { ch.inventory = ch.inventory.filter(i => i.ref !== 'job_silverknife');
+    if (knives.includes(ch.equip.weapon)) { const w = ch.inventory.filter(i => i.kind === 'weapon').map(i => ({ i, w: DATA.weapons.get(i.ref) })).filter(x => x.w && !x.w.jobOnly && x.w.lvl <= ch.level + 10).sort((x, y) => y.w.atk - x.w.atk)[0];
+      if (w) ch.equip.weapon = w.i.uid; else { const st = DATA.wtWeapons.get(ch.starterType || 1)?.[0]; const uid = 'st' + Date.now().toString(36); ch.inventory.push({ uid, kind: 'weapon', ref: st.id, plus: 0 }); ch.equip.weapon = uid; } } }
+  for (const k of ['chr_square', 'chr_lunaclock', 'chr_doll', 'chr_collapse', 'job_ev_chrono']) ch.skills.slots = ch.skills.slots.map(x => x === k ? null : x);
+  if (had) (ch.progress.notices ||= []).push('時律投刃士は、前提職「投刃士」と解放イベント「刻を止める銀刃」（ヴェルミオンの老時計師）を経て就く職業になりました。いったん職業から外れています'); }
+function migrate(ch) { resetChrono(ch); ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }

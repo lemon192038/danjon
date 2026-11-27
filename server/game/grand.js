@@ -47,6 +47,7 @@ export class Grand {
   // ════ condition steps
   cond(s, id) { const ch = s.ch, P = this.P(ch), G = this.G; const [k, v] = id.split(':'); const n = +v;
     switch (k) {
+      case 'job': { const need = +id.split(':')[2] || 0; return (ch.jobs?.[v]?.rank ?? -1) >= need ? null : `前提職の熟練が足りない（${v === 'ev_bladethrower' ? '投刃士' : v} 熟練${need}以上）`; }
       case 'trials': return P.trials.length >= n ? null : `試練の達成が足りない（${P.trials.length}/${n}）。試練の記録から達成済みの試練を受け取ろう`;
       case 'bureau': return P.reported.length >= n ? null : `報告した記録が足りない（${P.reported.length}/${n}）`;
       case 'catalog': return this.catalog(ch).length >= n ? null : `UR以上を入手した武器種が足りない（${this.catalog(ch).length}/${n}）`;

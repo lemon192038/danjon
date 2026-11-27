@@ -65,7 +65,7 @@ test('challenge, collection and great world events', async () => {
     const h0 = G.tower.h; setClockAt(270, 12); w.grand.sim(1); assert.ok(G.tower.h > h0); w.grand.onBoss(s, { dungeon: { id: 'sea_tower' } }); assert.ok(G.tower.h < h0 + 4);
     host('nx06'); menu({ ev: 'nx06', act: 'start' }); go('nx06'); w.cev.onFloor(s, { dungeon: { id: 'sea_tower' }, floor: 10 }, true); w.cev.onFloor(s, { dungeon: { id: 'sea_tower' }, floor: 20 }, true); go('nx06', { choice: 'seal' }); assert.ok(E.prog(ch, 'nx06').done);
     // panels render for every event
-    for (const ev of Object.keys(GRAND_EVENTS)) { const v = w.grand.view(s, ev); assert.equal(v.kind, 'grand'); assert.ok(v.rows.length, ev); }
+    for (const ev of Object.keys(GRAND_EVENTS).filter(k => GRAND_EVENTS[k].service === 'grand')) { const v = w.grand.view(s, ev); assert.equal(v.kind, 'grand'); assert.ok(v.rows.length, ev); }
     void SPECIES; void toast;
   } finally { setTimeout(() => process.exit(process.exitCode || 0), 50); }
 });

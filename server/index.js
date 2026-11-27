@@ -33,7 +33,7 @@ wss.on('connection', ws => {
     const now = Date.now(); if (now - windowStart > 1000) { count = 0; windowStart = now; } if (++count > 80) return; // flood guard
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!s) { if (m.t === 'auth') { const acc = store.auth(m.token); if (!acc) return ws.send(JSON.stringify({ t: 'authfail' })); s = world.attach(ws, acc); ws.send(JSON.stringify({ t: 'authok', account: acc })); } return; }
-    try { world.handle(s, m); } catch (e) { console.error('handle', m.t, e); }
+    try { world.handle(s, m); } catch (e) { console.error('handle', m.t, m.op || '', m.do || m.act || '', s.actor?.zone?.id || '', s.actor?.wt?.id || '', e?.stack || e); }
   });
   ws.on('close', () => { if (s) world.detach(s); });
 });

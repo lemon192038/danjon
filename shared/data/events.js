@@ -103,6 +103,7 @@ EVENTS.push(...[['nx01', '天空に現れた城', 'THE CASTLE ABOVE', ['astralhe
   ['nx27', '伝説武器の目録', 'THE LEGENDARY ARMAMENT CATALOG', ['world'], ['permanent', 'title'], ['lg_collector', 'ev_swordmaster']], ['nx28', '大陸横断レース', 'THE CONTINENTAL RALLY', ['world'], ['timed'], []],
   ['nx29', '至高の職人', 'THE ULTIMATE ARTISAN', ['world'], ['timed'], []], ['nx30', '星を読む者たち', 'THE STAR READERS', ['world'], ['permanent', 'hidden'], ['lg_last_observer', 'ev_blackmoon']]]
   .map(([id, n, en, loc, kinds, links]) => E(id, n, en, 'nx', { loc, kinds, links, detail: 'spec', notes: '新規30イベント指示書。実装段階は docs/ABYSS_NEW_EVENTS_PLAN.md' })));
+EVENTS.push(E('ct_chrono', '刻を止める銀刃', 'THE SILVER BLADE THAT STOPS TIME', 'nx', { kinds: ['city', 'job'], loc: ['vermion'], scope: 'personal', trigger: 'ヴェルミオンの老時計師', notes: '時律投刃士の解放イベント（前提：投刃士の熟練3以上）', links: [] }));
 // already-implemented content that the event engine adopts (kept as-is; see docs/ABYSS_CONFLICT_REPORT.md)
 EVENTS.push(
   ...[['celestia', '王位継承の陰謀', 'ct_succession'], ['marina', '灯台の消えた夜', ''], ['vulcan', '深層採掘の是非', ''], ['arcanum', '終焉の鍵の欠片', ''], ['lumina', '夜明けの灯', '']]

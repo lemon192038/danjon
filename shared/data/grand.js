@@ -69,6 +69,16 @@ export const RIFT_FIELDS = [{ id: 'r1', field: 'field_greatwood', name: '森の�
 export const GRAND_OBJECTS = [...STARS.map(s => ({ field: s.field, k: 'starstone', key: s.key, label: '◇ 星見の石台' })), ...UNRECORDED.map(u => ({ field: u.field, k: 'unrecorded', key: u.key, label: u.label }))];
 
 export const GRAND_EVENTS = {
+  // 時律投刃士の解放イベント（前提職：投刃士）
+  ct_chrono: { host: { name: '老時計師クロノス', city: 'vermion', near: 'w_vermion_bank' }, reward: { xp: 30000, title: '刻を止める者', flag: 'chronoTrial' }, steps: [
+    T('「その投げナイフ……昔、時を止めて刃を並べる投手がいた。わしの時計は、その者の“刻”を預かっている」'),
+    C('job:ev_bladethrower:3', '投刃士として腕を磨く（投刃士の熟練3以上）'),
+    T('「よろしい。まずは数を投げ、数を当てよ。時を止める者は、止まった世界でも手を休めぬ」'),
+    { k: 'kill', n: 40, text: '魔物を40体倒す（投刃士として）' },
+    { k: 'quiz', text: '老時計師が問う。', q: '止まった時の中で放った刃が、敵に届くのはいつか', options: ['刃を放った瞬間', '時が再び動き出した瞬間', '敵がこちらを向いた瞬間'], a: 1, hint: '止まった世界では、刃も止まっている' },
+    { k: 'floor', floor: 20, text: 'どこかのダンジョンで20階を越え、刻の流れを体で覚える' },
+    { k: 'midnight', text: '真夜中（0時台）、時計師の工房で最後の鐘を聞く' },
+    T('「鐘が止まった。……今、お前の刃も止められる。銀の刃を持て。時律投刃士として、刻を律せ」')] },
   nx25: { host: { name: '試練官グラディス', city: 'haven', near: 'h_guild' }, service: 'grand', reward: { xp: 50000, title: '百の試練に挑む者' }, steps: [
     T('「百の試練――剣の腕、旅の長さ、集めた武器、見届けた出来事。あなたのこれまでを、百の物差しで測らせてほしい」'),
     C('trials:10', '試練を10個達成する（試練の記録から受け取る）'),

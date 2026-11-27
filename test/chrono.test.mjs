@@ -15,10 +15,19 @@ await store.init(); setClockAt(300, 12);
 test('chrono blade thrower', async () => {
   const w = new World();
   try {
-    const out = []; const ws = { readyState: 1, bufferedAmount: 0, send: x => out.push(JSON.parse(x)), close() {} }; const r = store.register('chrono1', 'pass1234'); const s = w.attach(ws, r.account);
+    const out = []; const ws = { readyState: 1, bufferedAmount: 0, send: x => out.push(JSON.parse(x)), close() {} }; const r = store.register('chrono1', 'pass1234'); void 0; const s = w.attach(ws, r.account);
     w.handle(s, { t: 'create', name: '時の投手', wt: 9 }); w.handle(s, { t: 'play', id: [...out].reverse().find(m => m.t === 'chars').list[0].id }); const ch = s.ch; let a = s.actor; ch.level = 30;
     const err = () => out.filter(m => m.t === 'err').at(-1)?.v; const menu = m => w.handle(s, { t: 'menu', ...m });
     ch.inventory.push({ uid: 'K0', kind: 'weapon', ref: 'job_silverknife', plus: 0 }); menu({ op: 'equip', uid: 'K0' }); assert.match(err() || '', /時律投刃士/, 'job-only weapon');
+    w.enterZone(s, w.zones.get('haven')); menu({ op: 'job', id: 'ev_chrono' }); assert.notEqual(ch.job, 'ev_chrono', 'locked without the prerequisite job and event');
+    // prerequisite job 投刃士 (Lv15) → unlock event 刻を止める銀刃 → 時律投刃士 (Lv30)
+    ch.level = 30; menu({ op: 'job', id: 'ev_bladethrower' }); assert.equal(ch.job, 'ev_bladethrower');
+    const E = w.events; const cev = m => w.handle(s, { t: 'menu', op: 'cev', ...m }); const vz = w.zones.get('vermion'); w.enterZone(s, vz); const host = vz.map.npcs.find(n => n.ev === 'ct_chrono'); assert.ok(host, 'clockmaker placed');
+    const toHost = () => { if (s.actor.zone !== vz) w.enterZone(s, vz); const p = vz.tileCenter([host.x, host.y]); s.actor.x = p.x; s.actor.y = p.y + 10; };
+    toHost(); cev({ ev: 'ct_chrono', act: 'start' }); cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' }); assert.match(err(), /前提職/);
+    ch.jobs.ev_bladethrower.rank = 3; cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' }); for (let i = 0; i < 40; i++) w.cev.onKill(s, { fam: 'slime' }, s.actor);
+    toHost(); cev({ ev: 'ct_chrono', act: 'go', choice: 1 }); w.cev.onFloor(s, { dungeon: { id: 'd01' }, floor: 21 }, false); setClockAt(301, 0); toHost(); cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' });
+    assert.ok(E.prog(ch, 'ct_chrono').done, 'unlock event done'); setClockAt(301, 12);
     w.enterZone(s, w.zones.get('haven')); menu({ op: 'job', id: 'ev_chrono' }); assert.equal(ch.job, 'ev_chrono'); const kn = ch.inventory.find(i => i.ref === 'job_silverknife'); menu({ op: 'equip', uid: kn.uid }); a = s.actor; assert.equal(ch.equip.weapon, kn.uid); assert.ok(C.isChrono(a));
     // an arena
     const z = w.zones.get('field_greatwood'); w.enterZone(s, z); a = s.actor; for (const x of [...z.actors.values()]) if (x.kind === 'monster') z.remove(x);
@@ -53,5 +62,10 @@ test('chrono blade thrower', async () => {
     a.cds = {}; a.action = null; assert.equal(a.useSkill('chr_lunaclock', z, {}), 'ok'); const n0 = z.projs.length; for (let i = 0; i < 30; i++) z.tick(50); assert.ok(z.projs.length > n0 || m1.hp < 1e9, 'clocks fire');
     a.cds = {}; a.action = null; let dollN = 0; const ap = z.addProj.bind(z); z.addProj = p => { if (p.owner === a) dollN++; ap(p); }; a.chrono.clocks = []; assert.equal(a.useSkill('chr_doll', z, {}), 'ok'); for (let i = 0; i < 45; i++) z.tick(50); assert.equal(dollN, 40, 'killing doll launches 40 knives');
     assert.equal(COMBO.length, 5); assert.ok(ch.progress, 'state lives on the character');
+    // one-time reset for characters that already had the job: job, rank, knives and skill slots removed; other assets kept
+    const gold = ch.gold; delete ch.progress.chronoReset1; ch.jobs.ev_chrono = { rank: 7, xp: 0 }; ch.job = 'ev_chrono'; ch.skills.slots[0] = 'chr_square'; const cid = ch.id; w.detach(s); out.length = 0;
+    const s2 = w.attach(ws, r.account); w.handle(s2, { t: 'play', id: cid }); const c2 = s2.ch; assert.ok(!c2.jobs.ev_chrono && c2.job !== 'ev_chrono', 'job removed'); assert.ok(!c2.inventory.some(i => i.ref === 'job_silverknife'), 'job-only knives removed');
+    assert.ok(c2.equip.weapon && c2.inventory.some(i => i.uid === c2.equip.weapon), 'another weapon equipped'); assert.equal(c2.skills.slots[0], null); assert.equal(c2.gold, gold); assert.ok(out.some(m => m.t === 'chat' && /投刃士/.test(m.v)), 'player told why');
+    const again = c2.job; w.detach(s2); const s3 = w.attach(ws, r.account); w.handle(s3, { t: 'play', id: cid }); assert.equal(s3.ch.job, again, 'reset runs once');
   } finally { setTimeout(() => process.exit(process.exitCode || 0), 50); }
 });
