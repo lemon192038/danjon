@@ -7,6 +7,8 @@ function tone(f0, f1, dur, type = 'square', g = 0.2, noise = false) {
   if (noise) { const b = a.createBuffer(1, a.sampleRate * dur, a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length); const s = a.createBufferSource(); s.buffer = b; const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = f0; s.connect(f); f.connect(gain); s.start(t); return; }
   const o = a.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur); o.connect(gain); o.start(t); o.stop(t + dur);
 }
+// layered synthesized sound: [f0, f1, dur, wave, gain, noise, delayMs] × n, scaled by g (distance)
+export function playLayers(list, g = 1) { if (!list) return; for (const [f0, f1, d, ty, gn, nz, at] of list) { if (at) setTimeout(() => tone(f0, f1, d, ty, gn * g, nz), at); else tone(f0, f1, d, ty, gn * g, nz); } }
 export const sfx = {
   swing: () => tone(1800, 400, 0.08, 'sine', 0.05, true), heavy: () => tone(500, 120, 0.18, 'sine', 0.12, true), shoot: () => tone(900, 300, 0.1, 'triangle', 0.08),
   hit: () => tone(220, 60, 0.08, 'square', 0.1), crit: () => { tone(880, 220, 0.12, 'square', 0.1); tone(2400, 800, 0.08, 'sine', 0.05, true); }, hurt: () => tone(160, 50, 0.15, 'sawtooth', 0.12),

@@ -6,6 +6,7 @@ import { WT_BY_ID } from '/shared/data/weaponTypes.js';
 import { vfxProfile, motifParticles, drawMotifParticle } from './vfx.js';
 import { drawMagicCircle } from './circles.js';
 import { identWeapon, drawWielder, drawBody, isBody } from './identity.js';
+import { MOTION, motionAngle, motionExt } from './motion.js';
 
 const TAU = Math.PI * 2;
 const ec = e => ELEMENT_COLORS[e] || '#fff';
@@ -164,7 +165,9 @@ export class Renderer {
       const wt = WT_BY_ID[d.wt]; const wcol = RARITIES[d.wr || 1]?.color;
       g.translate(x, y + air);
       const flip = dir === 2 && c < 0;
-      const drawW = () => { if (!wt) return; const wsp = d.wl ? identWeapon(weaponSprite(wt.vis, wcol), d.wl, e.flags & 4096, wcol) : weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); g.drawImage(wsp, -2 + ext, -12); g.restore(); };
+      const drawW = () => { if (!wt) return; const wsp = d.wl ? identWeapon(weaponSprite(wt.vis, wcol), d.wl, e.flags & 4096, wcol) : weaponSprite(wt.vis, wcol); const ang = this.weaponAngle(e, now, wt); const MP = MOTION[d.wv]; const atkOn = e.atk && now - e.atk.t0 < e.atk.dur;
+        if (MP?.trail && atkOn) for (let k = 1; k <= MP.trail; k++) { g.save(); g.globalAlpha *= 0.28 / k; g.translate(flip ? -3 : 3, -9); g.rotate(this.weaponAngle(e, now - k * 28, wt)); g.drawImage(wsp, -2 + this.weaponExt(e, now - k * 28), -12); g.restore(); }
+        g.save(); g.translate(flip ? -3 : 3, -9); g.rotate(ang); const ext = this.weaponExt(e, now); if (MP?.glow && atkOn) { g.shadowColor = MP.glow; g.shadowBlur = 8; } g.drawImage(wsp, -2 + ext, -12); if (MP?.ghost && atkOn) { g.globalAlpha *= 0.3; g.drawImage(wsp, 2 + ext, -15); } g.restore(); };
       if (dir === 1) drawW();
       g.save(); if (flip) g.scale(-1, 1); if (e.dodgeAt && now - e.dodgeAt < 250) { g.rotate((now - e.dodgeAt) / 250 * TAU * (flip ? -1 : 1) * 0.5); }
       g.drawImage(spr, -8, -22); if (d.mask && dir !== 1) { g.fillStyle = '#efe8d8'; g.fillRect(-5, -18, 10, 4); g.fillStyle = '#1a1a1a'; g.fillRect(-3, -17, 2, 1); g.fillRect(1, -17, 2, 1); } if (flash) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(-8, -22, 16, 24); } g.restore();
@@ -186,6 +189,7 @@ export class Renderer {
     if (e.cast && now - e.cast.t0 < e.cast.dur) { const p = (now - e.cast.t0) / e.cast.dur; const k = e.cast.kind; if (k === 'spin' || k === 'multi') return base + p * TAU * 2; if (['buff', 'guard', 'summon', 'zone', 'barrage', 'job', 'heal', 'aegis', 'blessing', 'sanctuary', 'meteor', 'starfall'].includes(k)) return -Math.PI / 2 + Math.sin(p * 12) * 0.15; if (k === 'heavy' || k === 'leap') return base - 2 + p * 2.4; }
     if (a && now - a.t0 < a.dur) {
       const p = Math.min(1, (now - a.t0) / a.dur), sw = Math.min(1, p * 2.2); const dirn = a.step % 2 ? -1 : 1;
+      const MP = MOTION[e.d?.wv]; if (MP) return base + motionAngle(MP, p, a.step);
       if (a.sh === 'arc' || a.sh === 'whip') return base + dirn * (-1.4 + sw * 2.8);
       if (a.sh === 'circle') return base + sw * TAU;
       if (a.sh === 'slam') return base - 1.8 + sw * 1.9;
@@ -194,7 +198,7 @@ export class Renderer {
     if (e.flags & 4) return base - 0.3;
     return base + (Math.cos(base) < 0 ? -0.9 : 0.9) * 0.6;
   }
-  weaponExt(e, now) { const a = e.atk; if (!a || now - a.t0 > a.dur) return 0; if (a.sh === 'thrust' || a.sh === 'chain') { const p = (now - a.t0) / a.dur; return Math.sin(Math.min(1, p * 2) * Math.PI) * 8; } return 0; }
+  weaponExt(e, now) { const a = e.atk; if (!a || now - a.t0 > a.dur) return 0; const MP = MOTION[e.d?.wv]; if (MP) return motionExt(MP, (now - a.t0) / a.dur); if (a.sh === 'thrust' || a.sh === 'chain') { const p = (now - a.t0) / a.dur; return Math.sin(Math.min(1, p * 2) * Math.PI) * 8; } return 0; }
   drawProj(p, ox, oy, now) {
     const g = this.g; const [x0, y0, a, sz, el, k, , v] = p; const x = x0 + ox, y = y0 + oy; const col = ec(el || 'phys');
     if (v) { const pv = vfxProfile(v, el || null); g.save(); g.translate(x, y); g.rotate(a);

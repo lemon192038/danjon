@@ -7,7 +7,8 @@ import { D, loadCore, loadType } from './data.js';
 import { charSprite, weaponSprite, SKIN, HAIR, OUTFIT, T } from './sprites.js';
 import { WEAPON_TYPES, WEAPON_CATEGORIES, WT_BY_ID, STARTER_WEAPON_TYPES } from '/shared/data/weaponTypes.js';
 import { STAT_NAMES } from '/shared/constants.js';
-import { sfx, setVolume } from './sfx.js';
+import { sfx, setVolume, playLayers } from './sfx.js';
+import { identSound, identSkillSound, MECH_SOUND } from './motion.js';
 
 const $ = s => document.querySelector(s);
 const net = new Net();
@@ -97,7 +98,12 @@ net.on('s', m => {
   for (const f of m.fx) { renderer.addFx(f, state.ents, state.me); if (f.t === 'tiles') renderer.updateTile(f.x, f.y, f.v); if (f.t === 'objUpdate' && state.zone) { const ob = state.zone.objects.find(o => o.x === f.x && (o.y === f.y + 1 || o.y === f.y)); if (f.looted && ob) ob.looted = 1; if (f.add) { state.zone.objects.push({ k: 'cont', ck: f.add, x: f.x, y: f.y + 1 }); state.zone.props.push({ k: 'cont', ck: f.add, x: f.x, y: f.y, w: 1, h: 1 }); renderer.rerender(); } } playSfx(f, m.me.id); if (f.t === 'bossdown') ui.toast(`${f.n} を撃破した！ 階段が開いた`, 'big'); }
   ui.onSnap(m);
 });
-function playSfx(f, myId) { if (f.t === 'atk' && f.id === myId) (f.sh === 'proj' || f.sh === 'beam' ? sfx.shoot : f.sh === 'slam' ? sfx.heavy : sfx.swing)(); else if (f.t === 'dmg' && !f.a && !f.h && !f.dot) (f.c ? sfx.crit : sfx.hit)(); else if (f.t === 'boom') sfx.boom(); else if (f.t === 'skill' && f.id === myId) sfx.skill(); else if (f.t === 'parry' || f.t === 'counter') sfx.parry(); else if (f.t === 'dodge' && f.id === myId) sfx.dodge(); }
+function playSfx(f, myId) { const me = state.ents.get(myId); const wvOf = id => state.ents.get(id)?.d?.wv;
+  if (f.t === 'atk' && f.id !== myId && wvOf(f.id) && me) { const o = state.ents.get(f.id); const dd = Math.hypot(o.x - me.x, o.y - me.y); const now = performance.now(); if (dd < 180 && now - (playSfx.last || 0) > 120) { playSfx.last = now; playLayers(identSound(o.d.wv), 0.35 * (1 - dd / 200)); } return; }
+  if (f.t === 'mech' && f.id === myId) return playLayers(MECH_SOUND[String(f.v).split(':')[0]]);
+  if (f.t === 'atk' && f.id === myId && wvOf(myId)) return playLayers(identSound(wvOf(myId)));
+  if (f.t === 'skill' && f.id === myId && wvOf(myId) && f.c2) return playLayers(identSkillSound(wvOf(myId)));
+  if (f.t === 'atk' && f.id === myId) (f.sh === 'proj' || f.sh === 'beam' ? sfx.shoot : f.sh === 'slam' ? sfx.heavy : sfx.swing)(); else if (f.t === 'dmg' && !f.a && !f.h && !f.dot) (f.c ? sfx.crit : sfx.hit)(); else if (f.t === 'boom') sfx.boom(); else if (f.t === 'skill' && f.id === myId) sfx.skill(); else if (f.t === 'parry' || f.t === 'counter') sfx.parry(); else if (f.t === 'dodge' && f.id === myId) sfx.dodge(); }
 net.on('note', m => ui?.note(m));
 net.on('toast', m => ui?.toast(m.v, m.cls));
 net.on('open', () => {});
