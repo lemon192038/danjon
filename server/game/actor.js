@@ -26,7 +26,7 @@ export class Actor {
   recalcBuffs() { const m = {}; for (const b of this.buffs) for (const [k, v] of Object.entries(b.mods)) if (typeof v === 'number') m[k] = (m[k] || 0) + v; if (this.auraMods) for (const [k, v] of Object.entries(this.auraMods)) m[k] = (m[k] || 0) + v; this.buffMods = m; }
   heal(n, zone) { if (this.dead || n <= 0) return; const h = Math.round(Math.min(n, this.maxHp - this.hp)); this.hp += h; if (h > 2) zone?.fx({ t: 'dmg', x: Math.round(this.x), y: Math.round(this.y - 10), v: h, h: 1 }); }
   get stopped() { const s = this.statuses; return !!(s.freeze || s.stun || s.stop || s.sleep); }
-  canAct(now) { if (this.kind !== 'player' && this.zone && isTimeFrozen(this.zone, this, now)) return false; return !this.dead && !this.stopped && now >= this.staggerUntil && !(this.airUntil > now && this.kind === 'monster'); }
+  canAct(now) { if ((this.kind !== 'player' || this.zone?.pvp) && this.zone && isTimeFrozen(this.zone, this, now)) return false; return !this.dead && !this.stopped && now >= this.staggerUntil && !(this.airUntil > now && this.kind === 'monster'); }
 }
 
 // Fighter = Actor driven by a character record (players & NPC adventurers).
@@ -40,6 +40,8 @@ export class Fighter extends Actor {
     this.weaponEl = this.weapon?.el || this.wt.elem[0] || null; this.magic = categoryOf(this.wt.id).id === 'magic';
     this.visKey = this.wt.key; this.level = this.ch.level; this.name = this.ch.name; this.r = 6; this.dodgeKind = null; this.superArmor = false; morphMods(this, s); chronoMods(this, s);
   }
+  // direction of the movement stick (touch) / movement keys, or null when neutral
+  stickDir() { const i = this.input || {}; const l = Math.hypot(i.mx || 0, i.my || 0); return l > 0.2 ? Math.atan2(i.my, i.mx) : null; }
   skillLv(id) { return this.ch.skills?.levels?.[id]?.lv || 1; }
   aspdNow() { let a = this.stats.aspd * (1 + (this.buffMods.aspd || 0)); if (this.gauge?.tempo && this.tempoUntil > this.zone.now) a *= 1 + this.gauge.tempo * this.wt.special.spd; else if (this.gauge?.tempo) this.gauge.tempo = 0; return a; }
 
@@ -96,11 +98,11 @@ export class Fighter extends Actor {
       const t = this.lockTarget(zone, false);
       if (t) {
         const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy); this.facing = Math.atan2(dy, dx);
-        if (step.s !== 'proj' && step.s !== 'beam') { const reach = (step.r || step.l || 30) + (step.d || 0) + t.r; const gap = d - reach * 0.75; if (gap > 0 && gap < 70) zone.push(this, dx / d * Math.min(gap, 40), dy / d * Math.min(gap, 40)); }
+        if (step.s !== 'proj' && step.s !== 'beam') { const reach = (step.r || step.l || 30) + (step.d || 0) + t.r; const gap = d - reach * 0.75; const sd = this.stickDir(); if (gap > 0 && gap < 70 && sd != null) zone.push(this, Math.cos(sd) * Math.min(gap, 40), Math.sin(sd) * Math.min(gap, 40)); }
         else step = { ...step, hom: Math.max(step.hom || 0, 0.07) };
       }
     }
-    if (first && step.lg) zone.lunge(this, step.lg);
+    if (first && step.lg) { const sd = this.stickDir(); if (sd != null) zone.push(this, Math.cos(sd) * step.lg, Math.sin(sd) * step.lg); else if (!this.autoAim) zone.lunge(this, step.lg); }
     step = preStep(this, step);
     let o = { m: step.m, st: step.st || 1, kb: step.kb, pen: step.pen, ls: step.ls, el: step.el, pull: step.pull, finisher: last };
     if (step.bleed) o.status = ['bleed', 0.35, 4000];

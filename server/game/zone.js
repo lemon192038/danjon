@@ -214,7 +214,7 @@ export class Zone {
   }
   tickActor(a, now, dt) {
     if (a.dead) return;
-    if (a.kind !== 'player' && freezeHold(this, a, now)) return; // stopped time: nothing happens to it at all
+    if ((a.kind !== 'player' || this.pvp) && freezeHold(this, a, now)) return; // stopped time: nothing happens to it at all
     if (((a.stuckChk = (a.stuckChk || 0) + 1) & 3) === 0) this.unstuck(a);
     const s = a.statuses;
     for (const k in s) {

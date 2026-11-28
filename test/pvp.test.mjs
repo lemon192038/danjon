@@ -35,6 +35,18 @@ test('player vs player duels', async () => {
     menu(B, { do: 'challenge', id: A.ch.id }); menu(A, { do: 'accept', from: B.ch.id }); assert.ok(A.actor.zone.pvp); menu(A, { do: 'forfeit' }); assert.equal(A.actor.zone, town); assert.equal(w.events.w.flags.pvp.ratings[B.ch.id].w, 1);
     // disconnect → the other wins and is returned
     menu(A, { do: 'challenge', id: B.ch.id }); menu(B, { do: 'accept', from: A.ch.id }); assert.ok(B.actor.zone.pvp); w.detach(A); assert.equal(B.actor.zone, town); assert.equal(w.events.w.flags.pvp.ratings[B.ch.id].w, 2);
+    // time stop in a duel: the opponent player's time stops (collapse and the time-stop square); the user's does not
+    const C = await import('../server/game/chrono.js');
+    const Cc = mk('pvpc', '剣士C'); w.enterZone(Cc, town); Cc.actor.x = B.actor.x + 30; Cc.actor.y = B.actor.y;
+    menu(Cc, { do: 'challenge', id: B.ch.id }); menu(B, { do: 'accept', from: Cc.ch.id }); const dz = B.actor.zone; assert.ok(dz.pvp); for (let i = 0; i < 65; i++) dz.tick(50);
+    const pa = B.actor, pb = Cc.actor; // B uses chrono
+    B.ch.job = 'ev_chrono'; B.ch.inventory.push({ uid: 'KX', kind: 'weapon', ref: 'job_silverknife', plus: 0 }); B.ch.equip.weapon = 'KX'; pa.refreshStats(); assert.ok(C.isChrono(pa));
+    pa.chrono.gauge = 100; pa.action = null; pa.cds = {}; assert.equal(pa.useSkill('chr_collapse', dz, {}), 'ok'); dz.tick(50);
+    assert.ok(C.isTimeFrozen(dz, pb, dz.now), 'the opponent is frozen ' + JSON.stringify({ cu: dz.collapseUntil - dz.now, ct: dz.collapseTeam, bt: pb.team, at: pa.team, pvp: !!dz.pvp, same: pb.zone === dz, g: pa.chrono.gauge, cc: pa.chrono.collapseUntil - dz.now })); assert.ok(!C.isTimeFrozen(dz, pa, dz.now), 'the user is not'); assert.ok(!pb.canAct(dz.now), 'the opponent cannot act');
+    const bx = pb.x, bhp = pb.hp; pb.input = { mx: 1, my: 0 }; for (let i = 0; i < 10; i++) dz.tick(50); assert.equal(pb.x, bx, 'cannot move'); assert.equal(dealDamage(dz, pa, pb, { m: 3 }, dz.now), 0, 'takes no damage while stopped');
+    assert.equal(pb.attack(dz.now, dz), false, 'cannot attack'); pb.input = {}; for (let i = 0; i < 120; i++) dz.tick(50); assert.ok(!C.isTimeFrozen(dz, pb, dz.now), 'time resumes'); assert.ok(pb.canAct(dz.now));
+    pa.action = null; pa.cds = {}; pa.x = pb.x - 40; pa.y = pb.y; assert.equal(pa.useSkill('chr_square', dz, {}), 'ok'); dz.tick(50); assert.ok(pb.timeStopUntil > dz.now, 'the square stops the opponent too');
+    menu(Cc, { do: 'forfeit' }); void bhp;
     // no duels from dungeons / expired invitations
     menu(B, { do: 'accept', from: 'nobody' }); assert.match(err(B), /期限切れ/);
   } finally { setTimeout(() => process.exit(process.exitCode || 0), 50); }
