@@ -150,7 +150,7 @@ export function monsterTick(zone, m, now, dt) {
       if (A.spawn) { zone.spawnMinions(m, A.spawn + Math.floor(m.aiLv / 2), A.fam); return; }
       if (!A.self) m.facing = Math.atan2(p.y - m.y, p.x - m.x);
       execEffects(zone, m, A.eff, { tx: p.x, ty: p.y, lvM: 1 }, zone.now);
-      if (m.abilities.includes('echo')) zone.schedule(zone.now + 600, () => !m.dead && execEffects(zone, m, A.eff, { tx: t.x, ty: t.y, lvM: 0.6 }, zone.now));
+      if (m.abilities.includes('echo')) zone.schedule(zone.now + 600, () => !m.dead && m.canAct(zone.now) && execEffects(zone, m, A.eff, { tx: t.x, ty: t.y, lvM: 0.6 }, zone.now));
     };
     if (A.tele) zone.fx({ t: 'tele', s: A.tele.s, x: Math.round(m.x), y: Math.round(m.y), a: +ang.toFixed(2), r: A.tele.r || 0, l: A.tele.l || 0, w: A.tele.w || 0, ar: A.tele.a || 0, d: cast, dd: A.tele.d || 0, e: A.eff[0].el || 'phys' });
     m.action = { type: 'cast', until: now + cast + 250, lockMove: true, ab };

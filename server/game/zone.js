@@ -10,7 +10,7 @@ import { makeMonster, makeBoss, monsterTick } from './monsters.js';
 import { onHitHook, onKillHook } from './specials.js';
 import { summonTick as bodyTick, onProjHit } from './mechanics.js';
 import { morphTick } from './morph.js';
-import { chronoTick, chronoKill, frozen, slowedSkip, projFrozen } from './chrono.js';
+import { chronoTick, chronoKill, frozen, slowedSkip, projFrozen, freezeHold, isTimeFrozen } from './chrono.js';
 import { SUMMON_BODIES } from '../../shared/data/identity.js';
 import { DATA } from '../data.js';
 import { DIFFICULTIES } from '../../shared/constants.js';
@@ -214,6 +214,7 @@ export class Zone {
   }
   tickActor(a, now, dt) {
     if (a.dead) return;
+    if (a.kind !== 'player' && freezeHold(this, a, now)) return; // stopped time: nothing happens to it at all
     if (((a.stuckChk = (a.stuckChk || 0) + 1) & 3) === 0) this.unstuck(a);
     const s = a.statuses;
     for (const k in s) {
@@ -376,7 +377,7 @@ export class Zone {
         else if (p.ret) p.returning = true; else end = true;
       }
       if (!end) for (const t of this.enemiesOf(p.owner)) {
-        if (p.hits.has(t.id)) continue;
+        if (p.hits.has(t.id) || isTimeFrozen(this, t, now)) continue;
         if (Math.hypot(t.x - p.x, t.y - p.y) > t.r + p.sz) continue;
         p.hits.add(t.id);
         const res = p.aoe ? 0 : dealDamage(this, p.owner, t, { ...p.opt, ang: Math.atan2(p.vy, p.vx) }, now);
@@ -403,7 +404,7 @@ export class Zone {
     for (const a of this.actors.values()) {
       if (Math.abs(a.x - vx) > R || Math.abs(a.y - vy) > R) continue;
       let flags = 0; const n = this.now;
-      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048; if (a.altMode) flags |= 4096; if (a.core) flags |= Math.min(7, a.core) << 13; if (a.morph && a.wt?.morph) flags |= ((a.morph.stage & 3) << 16) | ((a.morphSi || 0) & 7) << 18 | ((a.wt.id - 86) & 31) << 21;
+      if (a.dead) flags |= 1; if (a.invulnUntil > n) flags |= 2; if (a.action?.guard) flags |= 4; if (a.stopped || isTimeFrozen(this, a, n)) flags |= 8; if (a.staggerUntil > n) flags |= 16; if (a.airUntil > n) flags |= 32; if (a.shield?.amt > 0) flags |= 64; if (a.marked > n) flags |= 128; if (a.buffMods?.stealth) flags |= 256; if (a.demonUntil > n || a.enraged) flags |= 512; if (a.flyUntil > n) flags |= 1024; if (a.action?.counter) flags |= 2048; if (a.altMode) flags |= 4096; if (a.core) flags |= Math.min(7, a.core) << 13; if (a.morph && a.wt?.morph) flags |= ((a.morph.stage & 3) << 16) | ((a.morphSi || 0) & 7) << 18 | ((a.wt.id - 86) & 31) << 21;
       const sts = Object.keys(a.statuses).join(',');
       ents.push([a.id, Math.round(a.x), Math.round(a.y), +a.facing.toFixed(2), Math.round(a.hp / a.maxHp * 1000), flags, sts, a.action?.type || '', a.enchant?.until > n ? a.enchant.el : '']);
       if (!viewer.known.has(a.id)) { viewer.known.add(a.id); full.push(this.describe(a)); }

@@ -62,7 +62,7 @@ export function chronoEff(z, a, e, lvM, ctx, now) { if (!isChrono(a)) return a.s
   const emp = C.empower && z.actors.get(C.empower) && !z.actors.get(C.empower).dead ? z.actors.get(C.empower) : null; const useEmp = () => { if (emp) { emp.cmark[a.id] = 0; C.empower = null; z.fx({ t: 'cmark', id: emp.id, v: 0 }); } };
   const St = STYLES[C.style === 'timelag' ? C.prevStyle : C.style];
   switch (e.c) {
-    case 'collapse': if (C.gauge < 100) return a.session?.send({ t: 'err', v: `時刻崩壊ゲージが足りない（${Math.floor(C.gauge)}/100）` }); C.collapseUntil = now + 6000; C.prevStyle = C.style === 'timelag' ? C.prevStyle : C.style; a.refreshStats(); z.fx({ t: 'collapse', id: a.id, v: 1 }); return;
+    case 'collapse': if (C.gauge < 100) return a.session?.send({ t: 'err', v: `時刻崩壊ゲージが足りない（${Math.floor(C.gauge)}/100）` }); C.collapseUntil = now + 6000; z.collapseUntil = Math.max(z.collapseUntil || 0, C.collapseUntil); for (const t of z.actorsList()) if (isEnemyUnit(t)) { t.action = null; t.vx = t.vy = 0; } C.prevStyle = C.style === 'timelag' ? C.prevStyle : C.style; a.refreshStats(); z.fx({ t: 'collapse', id: a.id, v: 1 }); return;
     case 'misdirect': { const dir = Math.atan2((ctx.ty ?? a.y + Math.sin(a.facing)) - a.y, (ctx.tx ?? a.x + Math.cos(a.facing)) - a.x); const n = 5 + (emp ? 3 : 0); useEmp(); const x0 = a.x, y0 = a.y; const D = 7 * M;
       z.push(a, Math.cos(dir) * D, Math.sin(dir) * D); a.invulnUntil = Math.max(a.invulnUntil, now + 200); z.fx({ t: 'mirage', id: a.id, x: Math.round(x0), y: Math.round(y0) });
       const iv = C.style === 'rapid' ? 40 : 80; for (let i = 0; i < n; i++) { const px = x0 + Math.cos(dir) * D * (i + 1) / n, py = y0 + Math.sin(dir) * D * (i + 1) / n;
@@ -86,6 +86,16 @@ function clockShot(z, a, k, now) { const C = cstate(a); const St = STYLES[C.styl
   // time resonance: all three clocks aimed at the same enemy → next clock attack +20%
   const ids = (C.clocks || []).map(c => c.lastT); if (ids.length === 3 && ids[0] && ids.every(x => x === ids[0])) { C.resonance = now + 3000; for (const c of C.clocks) c.lastT = null; z.fx({ t: 'resonance', id: a.id }); } }
 // time stop on the zone: enemies frozen / bosses slowed; enemy projectiles frozen inside a stop area. Players are never affected.
-export function frozen(z, x, now) { return x.timeStopUntil > now; }
+// enemies (monsters and their summons; never players) whose time is stopped by a time stop zone or by a time collapse:
+// they cannot move, attack, use abilities, regenerate, tick status damage, or take damage until time resumes
+export const isEnemyUnit = x => !x.dead && x.team === 'enemy' && x.kind !== 'player';
+export function isTimeFrozen(z, x, now) { return !!x && (x.timeStopUntil > now || (z.collapseUntil > now && isEnemyUnit(x))); }
+export function frozen(z, x, now) { return isTimeFrozen(z, x, now); }
+// called every tick for each actor: hold everything while frozen, and push status/ability timers by the frozen time after
+export function freezeHold(z, x, now) { if (isTimeFrozen(z, x, now)) { x.frozenSince ??= now; x.vx = x.vy = 0; x.action = null; return true; }
+  if (x.frozenSince != null) { const d = now - x.frozenSince; x.frozenSince = null; for (const st of Object.values(x.statuses || {})) { st.until += d; if (st.nextDot) st.nextDot += d; } for (const b of x.buffs || []) b.until += d; if (x.atkCd) x.atkCd += d; if (x.nextRegen) x.nextRegen += d; if (x.nextAbility) x.nextAbility += d; }
+  return false; }
+// knives thrown during a collapse fly for 0.05s, then stop in the air until that collapse ends
+export function knifeHeld(z, p, now) { const C = p.owner?.chrono; if (!C || !(C.collapseUntil > now)) return false; p.born ??= now; return now - p.born >= 50; }
 export function slowedSkip(z, x, now) { return x.timeScaleUntil > now && (Math.floor(now / 50) % 5) >= Math.round((x.timeScale || 0.2) * 5); }
-export function projFrozen(z, p, now) { if (!z.chronoStops?.length || p.owner.team !== 'enemy') return false; return z.chronoStops.some(s => s.until > now && Math.hypot(p.x - s.x, p.y - s.y) <= s.r); }
+export function projFrozen(z, p, now) { if (p.owner.team === 'enemy' && z.collapseUntil > now) return true; if (knifeHeld(z, p, now)) return true; if (!z.chronoStops?.length || p.owner.team !== 'enemy') return false; return z.chronoStops.some(s => s.until > now && Math.hypot(p.x - s.x, p.y - s.y) <= s.r); }

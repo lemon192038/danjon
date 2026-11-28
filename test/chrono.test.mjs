@@ -9,6 +9,7 @@ const { store } = await import('../server/store.js');
 const { setClockAt } = await import('../server/game/life.js');
 const { makeMonster } = await import('../server/game/monsters.js');
 const C = await import('../server/game/chrono.js');
+const { dealDamage } = await import('../server/game/combat.js');
 const { COMBO_MUL, HIT_MUL, COMBO } = await import('../shared/data/chrono.js');
 await store.init(); setClockAt(300, 12);
 
@@ -56,8 +57,17 @@ test('chrono blade thrower', async () => {
     m1.cmark = {}; S.empower = null; for (let i = 0; i < 30; i++) C.chronoDeal(z, a, m1, 1, { knife: 1 }, z.now); assert.equal(m1.cmark[a.id], 100); assert.equal(S.empower, m1.id);
     // collapse: gauge rules, 6 seconds, timelag style available, returns to the previous style
     S.gauge = 0; C.chronoDeal(z, a, m1, 1, {}, z.now); assert.equal(S.gauge, 2); C.chronoDeal(z, a, m1, 1, { isSkill: 1, finisher: 1 }, z.now); assert.equal(S.gauge, 20); C.chronoParry(a); assert.equal(S.gauge, 32);
-    S.gauge = 100; S.style = 'pierce'; S.prevStyle = 'pierce'; a.cds = {}; a.action = null; assert.equal(a.useSkill('chr_collapse', z, {}), 'ok'); for (let i = 0; i < 3; i++) z.tick(50); assert.ok(S.collapseUntil > z.now); a.special('press', z); assert.equal(S.style, 'timelag');
+    S.gauge = 100; S.style = 'pierce'; S.prevStyle = 'pierce'; a.cds = {}; a.action = null; assert.equal(a.useSkill('chr_collapse', z, {}), 'ok'); for (let i = 0; i < 3; i++) z.tick(50); assert.ok(S.collapseUntil > z.now);
+    // collapse = enemies' time stops: no movement, no attacks, no status damage, no damage taken; timers resume afterwards
+    m1.statuses.bleed = { until: z.now + 3000, stacks: 1, src: a.id, pow: 1, nextDot: z.now }; const hpF = m1.hp, xF = m1.x; m1.vx = 50;
+    for (let i = 0; i < 20; i++) z.tick(50); assert.equal(m1.hp, hpF, 'no status damage while time is stopped'); assert.equal(m1.x, xF, 'no movement'); assert.ok(!m1.canAct(z.now), 'cannot act');
+    assert.equal(dealDamage(z, a, m1, { m: 5 }, z.now), 0, 'nothing reaches a stopped enemy'); const bleedLeft = m1.statuses.bleed.until - z.now;
+    // knives thrown now fly 0.05s, then hang in the air until the collapse ends
+    const ap0 = z.addProj.bind(z); const mine = []; z.addProj = p => { if (p.owner === a) mine.push(p); ap0(p); }; const st0 = S.style; S.style = 'rapid'; a.action = null; a.input = { atk: true }; for (let i = 0; i < 4 && !mine.length; i++) z.tick(50); a.input = {}; z.addProj = ap0;
+    for (let i = 0; i < 3; i++) z.tick(50); const held = mine.filter(p => !p.dead); assert.ok(held.length > 0, 'knives thrown'); const pos = held.map(p => [p.x, p.y]); for (let i = 0; i < 10; i++) z.tick(50);
+    assert.deepEqual(held.map(p => [p.x, p.y]), pos, 'knives stop in the air'); assert.equal(m1.hp, hpF); S.style = st0; a.special('press', z); assert.equal(S.style, 'timelag');
     for (let i = 0; i < 125; i++) z.tick(50); assert.equal(S.collapseUntil, 0); assert.equal(S.gauge, 0); assert.equal(S.style, 'pierce');
+    assert.ok(m1.hp < hpF, 'when time resumes the held knives (and the bleed) land'); assert.ok(!m1.statuses.bleed || m1.statuses.bleed.until - z.now > bleedLeft - 1500, 'status timers were paused, not consumed'); assert.ok(m1.canAct(z.now));
     // time stop: enemies frozen, bosses slowed, players untouched; unlimited planting fires exactly once each
     const boss = foe(430, 330, true); a.cds = {}; a.action = null; S.empower = null; const p2 = { kind: 'player', team: 'enemy' }; void p2;
     assert.equal(a.useSkill('chr_square', z, {}), 'ok'); for (let i = 0; i < 2; i++) z.tick(50); assert.ok(m1.timeStopUntil > z.now, 'enemy stopped'); assert.ok(boss.timeScaleUntil > z.now && !(boss.timeStopUntil > z.now), 'boss slowed, not stopped');
@@ -78,5 +88,8 @@ test('chrono blade thrower', async () => {
     const s4 = w.attach(ws, r.account); w.handle(s4, { t: 'play', id: cid }); assert.ok(!s4.ch.events.prog.ct_chrono, 'progress reset'); assert.ok(!s4.ch.progress.flags.clockshopVisit);
     s4.ch.jobs.ev_chrono = { rank: 5, xp: 0 }; s4.ch.job = 'ev_chrono'; s4.ch.events.prog.ct_chrono = { stage: 9, done: true, data: {} }; delete s4.ch.progress.chronoQuestReset2; w.detach(s4);
     const s5 = w.attach(ws, r.account); w.handle(s5, { t: 'play', id: cid }); assert.equal(s5.ch.job, 'ev_chrono', 'holders keep 時律投刃士'); assert.ok(s5.ch.jobs.ev_chrono);
+    // 投刃士 removal: job and its quest progress removed once; 時律投刃士 kept
+    s5.ch.jobs.ev_bladethrower = { rank: 4, xp: 0 }; delete s5.ch.progress.bladeReset1; w.detach(s5);
+    const s6 = w.attach(ws, r.account); w.handle(s6, { t: 'play', id: cid }); assert.ok(!s6.ch.jobs.ev_bladethrower, '投刃士 removed'); assert.ok(!s6.ch.events.prog.ct_bladethrower, 'its quest reset'); assert.equal(s6.ch.job, 'ev_chrono');
   } finally { setTimeout(() => process.exit(process.exitCode || 0), 50); }
 });

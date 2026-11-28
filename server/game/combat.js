@@ -1,6 +1,6 @@
 import { artTrigger } from './artifacts.js';
 import { morphDmgMul, morphDeal, morphHurt } from './morph.js';
-import { chronoMul, chronoDeal, chronoParry } from './chrono.js';
+import { chronoMul, chronoDeal, chronoParry, isTimeFrozen } from './chrono.js';
 // Hit-shape tests and the single damage pipeline used by every attacker (players, NPCs, monsters, summons).
 import { ELEMENT_CHART, STATUS } from '../../shared/constants.js';
 import { angDiff } from '../../shared/util.js';
@@ -47,6 +47,7 @@ export function applyStatus(zone, src, tgt, [st, chance, dur], now) {
 // Central damage function. o: { m, el, pen, critAdd, st, kb, status, ls, exec, vs, mark, consumeMark, ang, noCounter, tip, isSkill, fixed }
 export function dealDamage(zone, src, tgt, o, now) {
   if (!tgt || tgt.dead || tgt.team === src.team) return 0;
+  if (isTimeFrozen(zone, tgt, now)) return 0; // stopped time: nothing reaches it until time resumes
   if (zone.dungeon?.underwater && o.m && UW_EL[o.el || src.weaponEl]) o = { ...o, m: o.m * UW_EL[o.el || src.weaponEl] }; // underwater: fire fizzles, water/thunder conduct
   if (tgt.invulnUntil > now || tgt.timeStopImmune) { zone.fx({ t: 'miss', x: tgt.x, y: tgt.y }); return 0; }
   const ang = o.ang ?? Math.atan2(tgt.y - src.y, tgt.x - src.x);

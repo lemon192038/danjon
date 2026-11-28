@@ -8,7 +8,7 @@ import { meleeHit, spawnProj, execEffects } from './skillExec.js';
 import { SPECIALS, onAttackHook } from './specials.js';
 import { circleFor } from '../../shared/data/circles.js';
 import { morphMods, morphCombo, morphDodge, skillBlock } from './morph.js';
-import { isChrono, chronoMods, chronoCombo, chronoStep, switchStyle } from './chrono.js';
+import { isChrono, chronoMods, chronoCombo, chronoStep, switchStyle, isTimeFrozen } from './chrono.js';
 import { identityMods, altCombo, preStep, stepOpts, postStep } from './mechanics.js';
 
 let NEXT_ID = 1;
@@ -26,7 +26,7 @@ export class Actor {
   recalcBuffs() { const m = {}; for (const b of this.buffs) for (const [k, v] of Object.entries(b.mods)) if (typeof v === 'number') m[k] = (m[k] || 0) + v; if (this.auraMods) for (const [k, v] of Object.entries(this.auraMods)) m[k] = (m[k] || 0) + v; this.buffMods = m; }
   heal(n, zone) { if (this.dead || n <= 0) return; const h = Math.round(Math.min(n, this.maxHp - this.hp)); this.hp += h; if (h > 2) zone?.fx({ t: 'dmg', x: Math.round(this.x), y: Math.round(this.y - 10), v: h, h: 1 }); }
   get stopped() { const s = this.statuses; return !!(s.freeze || s.stun || s.stop || s.sleep); }
-  canAct(now) { return !this.dead && !this.stopped && now >= this.staggerUntil && !(this.airUntil > now && this.kind === 'monster'); }
+  canAct(now) { if (this.kind !== 'player' && this.zone && isTimeFrozen(this.zone, this, now)) return false; return !this.dead && !this.stopped && now >= this.staggerUntil && !(this.airUntil > now && this.kind === 'monster'); }
 }
 
 // Fighter = Actor driven by a character record (players & NPC adventurers).

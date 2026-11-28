@@ -601,6 +601,8 @@ export class World {
         if (m.zone && this.zones.get(m.zone)) { this.enterZone(s, this.zones.get(m.zone)); return; }
         if (m.wpn && DATA.weapons.get(m.wpn)) { const u = uid(); ch.inventory.push({ uid: u, kind: 'weapon', ref: m.wpn, plus: 0 }); ch.equip.weapon = u; ch.mastery[DATA.weapons.get(m.wpn).wt] ||= { lv: 100, xp: 0 }; ch.skills.slots[0] = DATA.weapons.get(m.wpn).skill.id; a.refreshStats(); a.comboStep = 0; a.altMode = false; this.sendSelf?.(s); }
         if (m.god) a.invulnUntil = z.now + 3600000;
+        if (m.cg && a.chrono) a.chrono.gauge = 100;
+        if (m.setjob && DATA.jobs.get(m.setjob)) { ch.jobs[m.setjob] ||= { rank: 0, xp: 0 }; ch.job = m.setjob; a.refreshStats(); }
         if (m.killall) for (const x of [...z.actors.values()]) if (x.kind === 'monster' && !x.dead) z.kill(x, a, z.now);
         if (m.stairs && z.map.stairs) { const p = z.tileCenter(z.map.stairs); a.x = p.x; a.y = p.y; }
         if (m.mres != null && a.wt?.morph) { a.morph ||= null; if (!a.morph) a.refreshStats(); if (a.morph) a.morph.res = m.mres; }
@@ -634,4 +636,12 @@ function resetChrono(ch) { if (ch.progress.chronoReset1) return; ch.progress.chr
 function resetChronoQuest(ch) { if (ch.progress.chronoQuestReset2) return; ch.progress.chronoQuestReset2 = 1; const E = ch.events; if (E?.prog?.ct_chrono) { delete E.prog.ct_chrono; for (const k of Object.keys(E.rewards || {})) if (k.startsWith('ct_chrono:')) delete E.rewards[k];
     if (!ch.jobs?.ev_chrono) (ch.progress.notices ||= []).push('時律投刃士の解放イベント「刻を止める銀刃」が新しくなったため、進み具合をリセットしました。王都セレスティア外壁下層区の時計屋の弟子から始まります'); }
   if (ch.progress.flags) delete ch.progress.flags.clockshopVisit; if (ch.progress.cevPeriod) delete ch.progress.cevPeriod.ct_chrono; }
-function migrate(ch) { resetChrono(ch); resetChronoQuest(ch); ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }
+// one-time removal (2026-11-28): 投刃士 is taken from everyone who has it; its quest 一投必中 is reset too, otherwise the
+// job would unlock again by itself. 時律投刃士 holders keep 時律投刃士.
+function resetBlade(ch) { if (ch.progress.bladeReset1) return; ch.progress.bladeReset1 = 1; if (!ch.jobs) return; const had = !!ch.jobs.ev_bladethrower || ch.job === 'ev_bladethrower'; delete ch.jobs.ev_bladethrower;
+  if (ch.job === 'ev_bladethrower') { const others = Object.entries(ch.jobs).sort((x, y) => (y[1].rank || 0) - (x[1].rank || 0)); ch.job = others[0]?.[0] || 'warrior_0'; ch.jobs[ch.job] ||= { rank: 0, xp: 0 }; }
+  ch.skills.slots = ch.skills.slots.map(x => x === 'job_ev_bladethrower' ? null : x);
+  const E = ch.events; if (E?.prog?.ct_bladethrower) { delete E.prog.ct_bladethrower; for (const k of Object.keys(E.rewards || {})) if (k.startsWith('ct_bladethrower:')) delete E.rewards[k]; }
+  if (ch.progress.cevPeriod) delete ch.progress.cevPeriod.ct_bladethrower;
+  if (had) (ch.progress.notices ||= []).push('投刃士は、基本職「狩人」の熟練2と前提クエスト「一投必中」（ヘイヴンの投げナイフ使いレト）を経て就く職業になりました。いったん職業から外れています'); }
+function migrate(ch) { resetChrono(ch); resetChronoQuest(ch); resetBlade(ch); ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }
