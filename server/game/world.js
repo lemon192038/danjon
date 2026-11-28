@@ -629,4 +629,9 @@ function resetChrono(ch) { if (ch.progress.chronoReset1) return; ch.progress.chr
       if (w) ch.equip.weapon = w.i.uid; else { const st = DATA.wtWeapons.get(ch.starterType || 1)?.[0]; const uid = 'st' + Date.now().toString(36); ch.inventory.push({ uid, kind: 'weapon', ref: st.id, plus: 0 }); ch.equip.weapon = uid; } } }
   for (const k of ['chr_square', 'chr_lunaclock', 'chr_doll', 'chr_collapse', 'job_ev_chrono']) ch.skills.slots = ch.skills.slots.map(x => x === k ? null : x);
   if (had) (ch.progress.notices ||= []).push('時律投刃士は、前提職「投刃士」と解放イベント「刻を止める銀刃」（ヴェルミオンの老時計師）を経て就く職業になりました。いったん職業から外れています'); }
-function migrate(ch) { resetChrono(ch); ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }
+// one-time reset (2026-11-28): the 時律投刃士 unlock quest was rebuilt (book + midnight workshop first), so everyone's
+// progress in it starts over. Characters that already hold the job keep it.
+function resetChronoQuest(ch) { if (ch.progress.chronoQuestReset2) return; ch.progress.chronoQuestReset2 = 1; const E = ch.events; if (E?.prog?.ct_chrono) { delete E.prog.ct_chrono; for (const k of Object.keys(E.rewards || {})) if (k.startsWith('ct_chrono:')) delete E.rewards[k];
+    if (!ch.jobs?.ev_chrono) (ch.progress.notices ||= []).push('時律投刃士の解放イベント「刻を止める銀刃」が新しくなったため、進み具合をリセットしました。王都セレスティア外壁下層区の時計屋の弟子から始まります'); }
+  if (ch.progress.flags) delete ch.progress.flags.clockshopVisit; if (ch.progress.cevPeriod) delete ch.progress.cevPeriod.ct_chrono; }
+function migrate(ch) { resetChrono(ch); resetChronoQuest(ch); ch.progress.codex ||= []; ch.progress.quests ||= {}; ch.progress.items ||= {}; ch.progress.npcBond ||= {}; ch.skills.levels ||= {}; }

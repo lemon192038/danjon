@@ -20,14 +20,20 @@ test('chrono blade thrower', async () => {
     const err = () => out.filter(m => m.t === 'err').at(-1)?.v; const menu = m => w.handle(s, { t: 'menu', ...m });
     ch.inventory.push({ uid: 'K0', kind: 'weapon', ref: 'job_silverknife', plus: 0 }); menu({ op: 'equip', uid: 'K0' }); assert.match(err() || '', /時律投刃士/, 'job-only weapon');
     w.enterZone(s, w.zones.get('haven')); menu({ op: 'job', id: 'ev_chrono' }); assert.notEqual(ch.job, 'ev_chrono', 'locked without the prerequisite job and event');
-    // prerequisite job 投刃士 (Lv15) → unlock event 刻を止める銀刃 → 時律投刃士 (Lv30)
-    ch.level = 30; menu({ op: 'job', id: 'ev_bladethrower' }); assert.equal(ch.job, 'ev_bladethrower');
-    const E = w.events; const cev = m => w.handle(s, { t: 'menu', op: 'cev', ...m }); const vz = w.zones.get('vermion'); w.enterZone(s, vz); const host = vz.map.npcs.find(n => n.ev === 'ct_chrono'); assert.ok(host, 'clockmaker placed');
-    const toHost = () => { if (s.actor.zone !== vz) w.enterZone(s, vz); const p = vz.tileCenter([host.x, host.y]); s.actor.x = p.x; s.actor.y = p.y + 10; };
-    toHost(); cev({ ev: 'ct_chrono', act: 'start' }); cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' }); assert.match(err(), /前提職/);
-    ch.jobs.ev_bladethrower.rank = 3; cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' }); for (let i = 0; i < 40; i++) w.cev.onKill(s, { fam: 'slime' }, s.actor);
-    toHost(); cev({ ev: 'ct_chrono', act: 'go', choice: 1 }); w.cev.onFloor(s, { dungeon: { id: 'd01' }, floor: 21 }, false); setClockAt(301, 0); toHost(); cev({ ev: 'ct_chrono', act: 'go' }); cev({ ev: 'ct_chrono', act: 'go' });
-    assert.ok(E.prog(ch, 'ct_chrono').done, 'unlock event done'); setClockAt(301, 12);
+    // 狩人 (base job) → quest 一投必中 → 投刃士 → quest 刻を止める銀刃 (book, midnight workshop, …) → 時律投刃士
+    const E = w.events; const cev = m => w.handle(s, { t: 'menu', op: 'cev', ...m });
+    const goHost = (ev, city) => { const zz = w.zones.get(city); if (s.actor.zone !== zz) w.enterZone(s, zz); const h = zz.map.npcs.find(n => n.ev === ev); assert.ok(h, 'host ' + ev); const p = zz.tileCenter([h.x, h.y]); s.actor.x = p.x; s.actor.y = p.y + 10; };
+    ch.level = 30; w.enterZone(s, w.zones.get('haven')); menu({ op: 'job', id: 'ev_bladethrower' }); assert.notEqual(ch.job, 'ev_bladethrower', '投刃士 needs 狩人 and its quest');
+    goHost('ct_bladethrower', 'haven'); cev({ ev: 'ct_bladethrower', act: 'start' }); cev({ ev: 'ct_bladethrower', act: 'go' }); cev({ ev: 'ct_bladethrower', act: 'go' }); assert.match(err(), /前提職/);
+    ch.jobs.hunter_0 = { rank: 2, xp: 0 }; cev({ ev: 'ct_bladethrower', act: 'go' }); for (let i = 0; i < 30; i++) w.cev.onKill(s, { fam: 'slime' }, s.actor); goHost('ct_bladethrower', 'haven'); cev({ ev: 'ct_bladethrower', act: 'go', choice: 1 }); cev({ ev: 'ct_bladethrower', act: 'go' });
+    assert.ok(E.prog(ch, 'ct_bladethrower').done); menu({ op: 'job', id: 'ev_bladethrower' }); assert.equal(ch.job, 'ev_bladethrower');
+    const go = () => { goHost('ct_chrono', 'celestia'); cev({ ev: 'ct_chrono', act: 'go' }); };
+    goHost('ct_chrono', 'celestia'); cev({ ev: 'ct_chrono', act: 'start' }); go(); go(); assert.match(err(), /時空間の研究/, 'the book comes first');
+    ch.progress.books = { chronospace: 2 }; go(); assert.match(err(), /時空間の研究/, 'must be read to the end'); ch.progress.books.chronospace = 3; go();
+    go(); assert.match(err(), /時計屋の工房/); const shop = w.zones.get('celestia').map.doors.find(d => d.id === 'c_clockshop'); assert.ok(shop && shop.hours[0] === 0 && shop.hours[1] === 3, 'the workshop opens only 0:00-3:00');
+    w.grand.onEnterZone(s, { id: 'in:c_clockshop' }); go(); go(); go(); assert.match(err(), /前提職/);
+    ch.jobs.ev_bladethrower.rank = 3; go(); for (let i = 0; i < 40; i++) w.cev.onKill(s, { fam: 'slime' }, s.actor); goHost('ct_chrono', 'celestia'); cev({ ev: 'ct_chrono', act: 'go', choice: 1 }); w.cev.onFloor(s, { dungeon: { id: 'd01' }, floor: 21 }, false); go();
+    assert.ok(E.prog(ch, 'ct_chrono').done, 'unlock event done');
     w.enterZone(s, w.zones.get('haven')); menu({ op: 'job', id: 'ev_chrono' }); assert.equal(ch.job, 'ev_chrono'); const kn = ch.inventory.find(i => i.ref === 'job_silverknife'); menu({ op: 'equip', uid: kn.uid }); a = s.actor; assert.equal(ch.equip.weapon, kn.uid); assert.ok(C.isChrono(a));
     // an arena
     const z = w.zones.get('field_greatwood'); w.enterZone(s, z); a = s.actor; for (const x of [...z.actors.values()]) if (x.kind === 'monster') z.remove(x);
@@ -67,5 +73,10 @@ test('chrono blade thrower', async () => {
     const s2 = w.attach(ws, r.account); w.handle(s2, { t: 'play', id: cid }); const c2 = s2.ch; assert.ok(!c2.jobs.ev_chrono && c2.job !== 'ev_chrono', 'job removed'); assert.ok(!c2.inventory.some(i => i.ref === 'job_silverknife'), 'job-only knives removed');
     assert.ok(c2.equip.weapon && c2.inventory.some(i => i.uid === c2.equip.weapon), 'another weapon equipped'); assert.equal(c2.skills.slots[0], null); assert.equal(c2.gold, gold); assert.ok(out.some(m => m.t === 'chat' && /投刃士/.test(m.v)), 'player told why');
     const again = c2.job; w.detach(s2); const s3 = w.attach(ws, r.account); w.handle(s3, { t: 'play', id: cid }); assert.equal(s3.ch.job, again, 'reset runs once');
+    // quest-progress reset: everyone's 刻を止める銀刃 progress starts over; current holders keep the job
+    const c3 = s3.ch; c3.events.prog.ct_chrono = { stage: 4, done: false, data: {} }; delete c3.progress.chronoQuestReset2; c3.progress.flags = { clockshopVisit: true }; w.detach(s3);
+    const s4 = w.attach(ws, r.account); w.handle(s4, { t: 'play', id: cid }); assert.ok(!s4.ch.events.prog.ct_chrono, 'progress reset'); assert.ok(!s4.ch.progress.flags.clockshopVisit);
+    s4.ch.jobs.ev_chrono = { rank: 5, xp: 0 }; s4.ch.job = 'ev_chrono'; s4.ch.events.prog.ct_chrono = { stage: 9, done: true, data: {} }; delete s4.ch.progress.chronoQuestReset2; w.detach(s4);
+    const s5 = w.attach(ws, r.account); w.handle(s5, { t: 'play', id: cid }); assert.equal(s5.ch.job, 'ev_chrono', 'holders keep 時律投刃士'); assert.ok(s5.ch.jobs.ev_chrono);
   } finally { setTimeout(() => process.exit(process.exitCode || 0), 50); }
 });

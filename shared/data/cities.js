@@ -85,7 +85,7 @@ export const CITIES = {
         B('c_inn', '宿屋「白鳩亭」', 'inn', 'M', { svc: 'inn' }), B('c_tavern', '大衆酒場「騎士の休息」', 'tavern', 'M', { hours: [11, 2] }), B('c_smith', '王都鍛冶組合', 'smithy', 'M', { svc: 'smith', guild: 'smiths', hours: [7, 19] }),
         B('c_armor', '防具職人組合', 'shop', 'M', { svc: 'armor', guild: 'armorers', hours: [8, 19] }), B('c_item', '市民市場の道具屋', 'shop', 'S', { svc: 'item' }), B('c_bath', '公衆浴場', 'bathhouse', 'M', { svc: 'inn', hours: [6, 24] }),
         B('c_realty', '王都不動産', 'office', 'S', { svc: 'realty', hours: [9, 18] }), B('c_arena', '王立闘技場', 'arena', 'L', { guild: 'gladiators', svc: 'arena', hours: [10, 22] })] },
-      { id: 'lower', name: '外壁下層区', type: 'slum', at: [0.8, 0.82], buildings: [B('celestia_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'celestia_lower' }), 
+      { id: 'lower', name: '外壁下層区', type: 'slum', at: [0.8, 0.82], buildings: [B('c_clockshop', '時計屋の工房', 'shack', 'S', { hours: [0, 3] }), B('celestia_under', 'スラム深部への入口', 'shack', 'M', { svc: 'slum', region: 'celestia_lower' }), 
         B('c_shack', '取り壊し予定の長屋', 'shack', 'S', { lore: 'celestia_lower' }), B('c_thieves', '盗賊ギルド「灰鼠」', 'blackmarket', 'M', { guild: 'thieves', hours: [19, 5], svc: 'blackmarket' }),
         B('c_bounty', '賞金稼ぎ組合', 'tavern', 'S', { guild: 'bounty' })] },
     ],

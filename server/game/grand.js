@@ -11,6 +11,7 @@ import { clock } from './life.js';
 import { addItem } from './progress.js';
 import { DATA } from '../data.js';
 import { PLACE } from '../../shared/data/world.js';
+import { BOOK_BY_ID } from '../../shared/data/library.js';
 
 const night = h => h >= 20 || h < 5; const cityName = c => CITIES[c]?.name || c;
 const SKY_EVERY = 12, SKY_LEN = 4, SKY_BARRIER = 300, SERPENT_EVERY = 15, SERPENT_LEN = 4, SERPENT_HP = 120, RIFT_EVERY = 20, RIFT_LEN = 5, RIFT_HP = 100;
@@ -48,6 +49,8 @@ export class Grand {
   cond(s, id) { const ch = s.ch, P = this.P(ch), G = this.G; const [k, v] = id.split(':'); const n = +v;
     switch (k) {
       case 'job': { const need = +id.split(':')[2] || 0; return (ch.jobs?.[v]?.rank ?? -1) >= need ? null : `前提職の熟練が足りない（${v === 'ev_bladethrower' ? '投刃士' : v} 熟練${need}以上）`; }
+      case 'book': { const B = BOOK_BY_ID[v]; return B && (ch.progress.books?.[v] || 0) >= B.pages.length ? null : `禁書庫で${B?.title || v}を最後まで読む必要がある`; }
+      case 'clockshop': return ch.progress.flags?.clockshopVisit ? null : '真夜中（0時〜3時）に、王都の外壁下層区にある時計屋の工房へ入ろう';
       case 'trials': return P.trials.length >= n ? null : `試練の達成が足りない（${P.trials.length}/${n}）。試練の記録から達成済みの試練を受け取ろう`;
       case 'bureau': return P.reported.length >= n ? null : `報告した記録が足りない（${P.reported.length}/${n}）`;
       case 'catalog': return this.catalog(ch).length >= n ? null : `UR以上を入手した武器種が足りない（${this.catalog(ch).length}/${n}）`;
@@ -90,7 +93,8 @@ export class Grand {
   wk() { return Math.floor(clock().day / 7); }
   course() { return RALLY_COURSES[((this.wk() % RALLY_COURSES.length) + RALLY_COURSES.length) % RALLY_COURSES.length]; }
   rallyStart(s) { const P = this.P(s.ch); const c = this.course(); if (s.actor.zone.cityId !== 'marinelia' && s.actor.zone.cityId !== c[0]) return this.toast(s, '受付（マリネリア）で出走しよう'); this.syncRally(); P.rally = { week: this.wk(), t0: Date.now(), cp: 0, done: false }; this.toast(s, `出走！ 最初のチェックポイントは${cityName(c[0])}`); }
-  onEnterZone(s, z) { const P = this.P(s.ch); const R = P.rally; if (!R || R.done || R.week !== this.wk() || !z.cityId) return; this.syncRally(); const c = this.course(); if (z.cityId !== c[R.cp]) return; R.cp++;
+  onEnterZone(s, z) { if (z.id === 'in:c_clockshop') { const p = this.world.events.prog(s.ch, 'ct_chrono'); if (p && !p.done) { (s.ch.progress.flags ||= {}).clockshopVisit = true; this.toast(s, '工房の奥で、止まった時計に囲まれて老いた時計師が待っていた'); } else this.toast(s, '無数の時計が、同じ時刻で止まっている'); }
+    const P = this.P(s.ch); const R = P.rally; if (!R || R.done || R.week !== this.wk() || !z.cityId) return; this.syncRally(); const c = this.course(); if (z.cityId !== c[R.cp]) return; R.cp++;
     if (R.cp < c.length) return this.toast(s, `チェックポイント通過（${R.cp}/${c.length}）次は${cityName(c[R.cp])}`);
     R.done = true; R.time = Date.now() - R.t0; const G = this.G; const best = G.rally.times[s.ch.id]; if (!best || R.time < best) { G.rally.times[s.ch.id] = R.time; (G.rally.names ||= {})[s.ch.id] = s.ch.name; }
     this.toast(s, `ゴール！ 記録 ${fmt(R.time)}（受付で報告しよう）`); }
