@@ -364,7 +364,7 @@ export class Zone {
     for (const p of this.projs) {
       if (p.dead) continue;
       if (projFrozen(this, p, now)) { keep.push(p); continue; }
-      const step = dt / 1000;
+      const step = dt / 1000; const x0 = p.x, y0 = p.y; // start of this tick's path (swept collision below)
       if (p.hom && !p.returning) { const t = this.nearestEnemy({ ...p, team: p.owner.team, x: p.x, y: p.y, facing: Math.atan2(p.vy, p.vx) }, 160); if (t) { const want = Math.atan2(t.y - p.y, t.x - p.x), cur = Math.atan2(p.vy, p.vx), sp = Math.hypot(p.vx, p.vy); let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const na = cur + Math.sign(d) * Math.min(Math.abs(d), p.hom * 2); p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp; } }
       if (p.curve && !p.returning) { const cur = Math.atan2(p.vy, p.vx) + p.curve * 0.04, sp = Math.hypot(p.vx, p.vy); p.vx = Math.cos(cur) * sp; p.vy = Math.sin(cur) * sp; }
       if (p.returning) { const o = p.owner; const ang = Math.atan2(o.y - p.y, o.x - p.x), sp = Math.hypot(p.vx, p.vy) || 300; p.vx = Math.cos(ang) * sp; p.vy = Math.sin(ang) * sp; if (Math.hypot(o.x - p.x, o.y - p.y) < 12 || o.dead) continue; }
@@ -372,13 +372,21 @@ export class Zone {
       else { p.x += p.vx * step; p.y += p.vy * step; p.travelled += Math.hypot(p.vx, p.vy) * step; }
       if (p.pullF) for (const t of this.enemiesOf(p.owner)) { const d = Math.hypot(t.x - p.x, t.y - p.y); if (d < 60 && d > 4 && !t.boss) this.moveActor(t, (p.x - t.x) / d * p.pullF, (p.y - t.y) / d * p.pullF); }
       let end = false;
+      // walls along the path (not only at the end point), so fast projectiles cannot slip through thin walls either
+      const SX = p.x - x0, SY = p.y - y0, SL = Math.hypot(SX, SY); let wallS = 1;
+      if (!p.returning && SL > 6) for (let k = 1, n = Math.ceil(SL / 6); k < n; k++) { const q = k / n, qx = x0 + SX * q, qy = y0 + SY * q; if (this.blocked(qx, qy) && tileAt(this.map, qx, qy) !== T.WATER && tileAt(this.map, qx, qy) !== T.VOID) { wallS = q; p.x = qx; p.y = qy; break; } }
       if (!p.returning && this.blocked(p.x, p.y) && tileAt(this.map, p.x, p.y) !== T.WATER && tileAt(this.map, p.x, p.y) !== T.VOID) {
         if (p.bnc > 0) { p.bnc--; const bx = this.blocked(p.x - p.vx * step, p.y); if (bx) p.vy = -p.vy; else p.vx = -p.vx; p.x -= p.vx * step * 2; p.y -= p.vy * step * 2; }
         else if (p.ret) p.returning = true; else end = true;
       }
-      if (!end) for (const t of this.enemiesOf(p.owner)) {
-        if (p.hits.has(t.id) || isTimeFrozen(this, t, now)) continue;
-        if (Math.hypot(t.x - p.x, t.y - p.y) > t.r + p.sz) continue;
+      // swept hit test: every enemy whose body touches the segment travelled this tick, in the order the projectile meets them
+      const wallEnd = end, ex = p.x, ey = p.y; const hitsNow = []; for (const t of this.enemiesOf(p.owner)) { if (p.hits.has(t.id) || isTimeFrozen(this, t, now)) continue;
+        const L2 = SX * SX + SY * SY; let q = L2 > 0 ? ((t.x - x0) * SX + (t.y - y0) * SY) / L2 : 0; q = Math.max(0, Math.min(wallS, q));
+        if (Math.hypot(t.x - (x0 + SX * q), t.y - (y0 + SY * q)) <= t.r + p.sz) hitsNow.push([q, t]); }
+      hitsNow.sort((A, B) => A[0] - B[0]);
+      if (!end || hitsNow.length) for (const [q, t] of hitsNow) {
+        if (p.hits.has(t.id)) continue;
+        p.x = x0 + SX * q; p.y = y0 + SY * q; end = false; // the impact point (kept if the projectile stops here)
         p.hits.add(t.id);
         const res = p.aoe ? 0 : dealDamage(this, p.owner, t, { ...p.opt, ang: Math.atan2(p.vy, p.vx) }, now);
         if (res === -1) { p.owner = t; p.vx = -p.vx; p.vy = -p.vy; p.hits.clear(); p.travelled = 0; break; }
@@ -389,6 +397,7 @@ export class Zone {
         if (p.ret) { p.returning = true; break; }
         end = true; break;
       }
+      if (!end && hitsNow.length) { p.x = ex; p.y = ey; } if (wallEnd && !p.dead) end = true; // pierced on through: continue to the path's end; a wall still stops it
       if (!p.returning && p.travelled >= p.rng) { if (p.ret) p.returning = true; else end = true; }
       if (p.returning && p.travelled > p.rng * 3) end = true;
       if (end) { if (p.aoe) { const ah = meleeHit(this, p.owner, { s: 'circle', r: p.aoe }, { ...p.opt }, now, { x: p.x, y: p.y, a: 0 }); if (p.owner.wt && ah[0]) onProjHit(this, p.owner, ah[0], now, p); this.fx({ t: 'boom', x: Math.round(p.x), y: Math.round(p.y), r: p.aoe, e: p.opt.el || 'fire' }); } continue; }
